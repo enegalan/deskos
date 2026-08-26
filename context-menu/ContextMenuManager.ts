@@ -767,7 +767,7 @@ export class ContextMenuManager {
       document.removeEventListener('keydown', this.boundHandlers.keydown);
     }
     if (this.boundHandlers.click) {
-      document.removeEventListener('click', this.boundHandlers.click, true);
+      document.removeEventListener('click', this.boundHandlers.click, false);
     }
     if (this.boundHandlers.blur) {
       window.removeEventListener('blur', this.boundHandlers.blur);

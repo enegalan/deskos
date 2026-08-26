@@ -92,7 +92,8 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
   }
 
   // Find next available position if not provided
-  if (x === undefined || y === undefined) {
+  const positionNotSpecified = x === undefined || y === undefined;
+  if (positionNotSpecified) {
     const position = findNextAvailablePosition(shortcuts.map(s => ({ x: s.x, y: s.y })));
     x = position.x;
     y = position.y;
@@ -110,7 +111,7 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
   systemStorage.setItem(STORAGE_KEY, shortcuts);
   
   // If auto arrange is enabled and position was not manually specified, arrange all icons
-  if ((x === undefined || y === undefined) && useKernel.getState().settings.autoArrange) {
+  if (positionNotSpecified && useKernel.getState().settings.autoArrange) {
     autoArrangeIcons();
   } else {
     // Dispatch event to notify DesktopIcons to refresh
