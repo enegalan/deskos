@@ -3,6 +3,10 @@ import { useKernel } from './kernel';
 import { createSecureScopedStorage, type StorageAPI } from './storage';
 import { createScopedEventBus, type EventBusAPI } from './event-bus';
 import { ContextMenuManager, type ContextMenuProvider, type MenuContext, type MenuItem } from '../context-menu/ContextMenuManager';
+import {
+  registerSelectionSource,
+  SELECTION_PRIORITY,
+} from './selection';
 import packageJson from '../package.json';
 
 export interface WindowAPI {
@@ -48,6 +52,33 @@ export interface ContextMenuAPI {
   }): () => void;
 }
 
+/**
+ * Publish program selection for context menus and other system features.
+ * Return null/undefined from the getter when nothing is selected.
+ *
+ * @example
+ * useEffect(() => {
+ *   return ctx.selection.register(() => {
+ *     const ids = Array.from(selectedIdsRef.current);
+ *     return ids.length ? { type: 'my-items', ids } : null;
+ *   });
+ * }, [ctx]);
+ */
+export interface SelectionAPI {
+  /**
+   * Register a selection getter for this program.
+   *
+   * @param getSelection - Return null/undefined when nothing is selected
+   * @param options.id - Source id suffix (`{programId}:{id}`, default `default`)
+   * @param options.priority - Override {@link SELECTION_PRIORITY.PROGRAM}
+   * @returns Unregister function
+   */
+  register(
+    getSelection: () => unknown | null | undefined,
+    options?: { id?: string; priority?: number }
+  ): () => void;
+}
+
 const SEMANTIC_MENU_TARGETS = new Set(['desktop', 'window', 'file', 'folder-window']);
 
 /** Scope a CSS selector to this program's windows; leave semantic targets unchanged. */
@@ -68,6 +99,7 @@ export interface ProgramContext {
   events: EventBusAPI;
   system: SystemAPI;
   contextMenu: ContextMenuAPI;
+  selection: SelectionAPI;
 }
 
 /**
@@ -241,6 +273,24 @@ function createContextMenuAPI(programId: string): ContextMenuAPI {
 }
 
 /**
+ * Creates a SelectionAPI for a specific program.
+ */
+function createSelectionAPI(programId: string): SelectionAPI {
+  return {
+    register(
+      getSelection: () => unknown | null | undefined,
+      options?: { id?: string; priority?: number }
+    ): () => void {
+      return registerSelectionSource({
+        id: `${programId}:${options?.id ?? 'default'}`,
+        priority: options?.priority ?? SELECTION_PRIORITY.PROGRAM,
+        getSelection,
+      });
+    },
+  };
+}
+
+/**
  * Creates a complete ProgramContext for a specific program.
  * This is the only interface through which programs interact with the system.
  */
@@ -252,6 +302,7 @@ function createProgramContext(programId: string, icon: string = 'package'): Prog
     events: createScopedEventBus(programId),
     system: createSystemAPI(programId),
     contextMenu: createContextMenuAPI(programId),
+    selection: createSelectionAPI(programId),
   };
 
   return new Proxy(context, {

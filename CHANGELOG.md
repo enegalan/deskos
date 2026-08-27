@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.0] - 2026-08-27
+
+### Added
+
+- Trash app (`programs/trash`): soft-delete storage, Restore / Delete Forever / Empty Trash
+- `core/trash.ts` — `moveToTrash`, `restoreFromTrash`, `deleteForever`, `emptyTrash`
+- Desktop icon context menu: Empty Trash via `iconContextMenu`
+- Trash dock pin; `trash` / `trash-full` icons
+- `ctx.selection.register()` — programs publish selection for context menus without core changes
+- `registerSelectionSource` / `getActiveSelection` in `core/selection.ts` (shell + apps)
+
+### Changed
+
+- Delete on desktop and in folders is Move to Trash (no confirm on soft-delete)
+- Context menu selection no longer uses `window.__*Selection` globals; registry by priority instead
+
 ## [1.3.0] - 2026-08-27
 
 ### Added
@@ -97,6 +113,7 @@
 - Core services (storage, event bus, ProgramContext)
 - First desktop shell and context menu foundation
 
+[1.4.0]: https://github.com/enegalan/deskos/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/enegalan/deskos/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/enegalan/deskos/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/enegalan/deskos/compare/v1.0.0...v1.1.0

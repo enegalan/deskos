@@ -85,11 +85,26 @@ Programs interact with the system through the `ProgramContext` object:
 
 ```tsx
 interface ProgramContext {
-  window: WindowAPI;      // Create/manage windows
-  storage: StorageAPI;    // Scoped key-value storage
-  events: EventBusAPI;    // Emit/listen to events
-  system: SystemAPI;      // Read-only system info
+  window: WindowAPI;           // Create/manage windows
+  storage: StorageAPI;         // Scoped key-value storage
+  events: EventBusAPI;         // Emit/listen to events
+  system: SystemAPI;           // Read-only system info
+  contextMenu: ContextMenuAPI; // Register context menus
+  selection: SelectionAPI;     // Publish selection for menus / system
 }
+```
+
+#### Selection API
+
+Publish the program's current selection so context menus (and other shell features) can read it — no core changes needed:
+
+```tsx
+useEffect(() => {
+  return ctx.selection.register(() => {
+    const ids = Array.from(selectedIdsRef.current);
+    return ids.length ? { type: 'my-items', ids, count: ids.length } : null;
+  });
+}, [ctx]);
 ```
 
 #### Window API

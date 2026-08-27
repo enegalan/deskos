@@ -1,4 +1,5 @@
 import type { MenuPosition, MenuDimensions } from './positioning';
+import { getActiveSelection } from '../core/selection';
 
 export type MenuItemType = 'action' | 'checkbox' | 'radio' | 'separator' | 'submenu';
 
@@ -354,17 +355,20 @@ export class ContextMenuManager {
       actualTarget = folderWindowItem;
     }
     
-    // Find program ID from target element
+    // Nearest ancestor wins (desktop also has data-program-id="system")
     let programId: string | undefined;
     let windowId: string | undefined;
 
     let element: HTMLElement | null = actualTarget;
     while (element && element !== document.body) {
-      if (element.dataset.programId) {
+      if (!programId && element.dataset.programId) {
         programId = element.dataset.programId;
       }
-      if (element.dataset.windowId) {
+      if (!windowId && element.dataset.windowId) {
         windowId = element.dataset.windowId;
+      }
+      if (programId && windowId) {
+        break;
       }
       element = element.parentElement;
     }
@@ -380,33 +384,14 @@ export class ContextMenuManager {
   }
 
   /**
-   * Extract selection state (for future file operations, etc.)
+   * Active selection from registered sources, then browser text selection.
    */
   private getSelectionState(): unknown {
-    // Folder window selection takes priority when present
-    const folderSelection = (window as any).__folderSelection as
-      | { ids: string[]; path: string }
-      | undefined;
-    if (folderSelection && folderSelection.ids.length > 0) {
-      return {
-        type: 'folder-items',
-        ids: folderSelection.ids,
-        path: folderSelection.path,
-        count: folderSelection.ids.length,
-      };
+    const registered = getActiveSelection();
+    if (registered !== undefined) {
+      return registered;
     }
 
-    // Check for desktop icon selection
-    const desktopSelection = (window as any).__desktopSelection as Set<string> | undefined;
-    if (desktopSelection && desktopSelection.size > 0) {
-      return {
-        type: 'desktop-icons',
-        ids: Array.from(desktopSelection),
-        count: desktopSelection.size,
-      };
-    }
-    
-    // Check for text selection
     const selection = window.getSelection();
     if (selection && selection.toString().trim()) {
       return {
@@ -602,7 +587,9 @@ export class ContextMenuManager {
       return true;
     }
     if (selector === 'folder-window') {
-      const inFolderWindow = element.closest('.folder-window-main') !== null;
+      // Require data-folder-path so apps that reuse folder layout do not match
+      const inFolderWindow =
+        element.closest('.folder-window-main[data-folder-path]') !== null;
       if (!inFolderWindow) {
         return false;
       }
@@ -637,11 +624,46 @@ export class ContextMenuManager {
     }
 
     // CSS selector
+    return this.matchesCssSelector(element, selector);
+  }
+
+  /**
+   * Match an element against a CSS selector, including scoped forms like
+   * `[data-program-id="x"] .item` where `closest()` is unreliable.
+   */
+  private matchesCssSelector(element: HTMLElement, selector: string): boolean {
     try {
-      return element.matches(selector) || element.closest(selector) !== null;
+      if (element.matches(selector)) {
+        return true;
+      }
+    } catch {
+      // Unsupported selector for matches()
+    }
+
+    try {
+      if (element.closest(selector)) {
+        return true;
+      }
+    } catch {
+      // Unsupported selector for closest()
+    }
+
+    // Descendant-scoped providers (from ctx.contextMenu.register): find matching
+    // nodes and accept if the click target is one of them or inside one.
+    try {
+      const root = element.getRootNode();
+      const scope =
+        root instanceof Document || root instanceof ShadowRoot ? root : document;
+      for (const node of scope.querySelectorAll(selector)) {
+        if (node === element || node.contains(element)) {
+          return true;
+        }
+      }
     } catch {
       return false;
     }
+
+    return false;
   }
 
   /**

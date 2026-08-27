@@ -1,20 +1,117 @@
 /**
  * Selection management system for DeskOS
- * Provides handler registration for keyboard shortcuts and marquee helpers
+ * Provides handler registration for keyboard shortcuts, marquee helpers,
+ * and a pluggable selection-source registry for context menus / clipboard.
  */
 
 import { DRAG_START_THRESHOLD } from './constants';
 
-// Global handler registration (priority: folder window > desktop)
+/** Registered Select All handlers (higher priority first after sort) */
 let selectAllHandlers: Array<{ handler: () => void; priority: number }> = [];
 
+/** Priority for desktop icon selection / Select All */
 const PRIORITY_DESKTOP = 0;
+/** Priority for folder-window selection / Select All */
 const PRIORITY_FOLDER_WINDOW = 1;
+/** Default priority for program-published selection sources */
+const PRIORITY_PROGRAM = 10;
 
+/**
+ * Priority levels for Select All handlers and selection sources.
+ * Higher values win when resolving the active selection.
+ */
 export const SELECTION_PRIORITY = {
   DESKTOP: PRIORITY_DESKTOP,
   FOLDER_WINDOW: PRIORITY_FOLDER_WINDOW,
+  PROGRAM: PRIORITY_PROGRAM,
 };
+
+/** Stable ids for shell selection sources (cross-feature reads) */
+export const SELECTION_SOURCE_IDS = {
+  DESKTOP: 'system:desktop-icons',
+  FOLDER_WINDOW: 'system:folder-window',
+} as const;
+
+/**
+ * Pluggable selection publisher for context menus and clipboard coordination.
+ */
+export interface SelectionSource {
+  /** Stable id (e.g. `system:desktop-icons` or `trash:default`) */
+  id: string;
+  /** Higher wins when resolving the active selection */
+  priority?: number;
+  /** Return null/undefined when nothing is selected */
+  getSelection: () => unknown | null | undefined;
+}
+
+/** Registered selection sources keyed by id */
+const selectionSources = new Map<string, SelectionSource>();
+
+/**
+ * True if the selection is meaningful (not null/undefined and has ids)
+ * @param selection - The selection to check
+ * @returns True if the selection is meaningful (not null/undefined and has ids)
+ */
+function isMeaningfulSelection(selection: unknown): boolean {
+  if (selection == null) return false;
+  if (typeof selection !== 'object') return true;
+  if (!('ids' in selection)) return true;
+  const ids = (selection as { ids: unknown }).ids;
+  if (Array.isArray(ids)) return ids.length > 0;
+  if (ids instanceof Set) return ids.size > 0;
+  return true;
+}
+
+/**
+ * Publish a selection source (desktop, folder window, or any program).
+ *
+ * @param source - Selection publisher to register
+ * @returns Unregister function
+ */
+export function registerSelectionSource(source: SelectionSource): () => void {
+  selectionSources.set(source.id, source);
+  return () => {
+    if (selectionSources.get(source.id) === source) {
+      selectionSources.delete(source.id);
+    }
+  };
+}
+
+/**
+ * Highest-priority non-empty selection, or undefined.
+ */
+export function getActiveSelection(): unknown | undefined {
+  const sorted = [...selectionSources.values()].sort(
+    (a, b) => (b.priority ?? 0) - (a.priority ?? 0)
+  );
+  for (const source of sorted) {
+    try {
+      const selection = source.getSelection();
+      if (isMeaningfulSelection(selection)) {
+        return selection;
+      }
+    } catch (error) {
+      console.error(`[selection] getSelection failed for ${source.id}:`, error);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Read a specific source by id (may be empty / null).
+ *
+ * @param id - Source id (e.g. {@link SELECTION_SOURCE_IDS.DESKTOP})
+ */
+export function getSelectionById(id: string): unknown | undefined {
+  const source = selectionSources.get(id);
+  if (!source) return undefined;
+  try {
+    return source.getSelection() ?? undefined;
+  } catch (error) {
+    console.error(`[selection] getSelection failed for ${id}:`, error);
+    return undefined;
+  }
+}
 
 /**
  * Register a handler for "Select All" keyboard shortcut

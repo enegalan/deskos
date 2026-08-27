@@ -827,6 +827,51 @@ textarea,
   color: var(--color-text-muted);
 }
 
+/* Trash app */
+.trash-window.folder-window-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.trash-header.folder-window-header {
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.trash-toolbar {
+  display: flex;
+  flex: 1;
+  gap: var(--space-sm);
+  align-items: center;
+  min-width: 0;
+}
+
+.trash-toolbar-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.trash-toolbar-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-bg-tertiary);
+}
+
+.trash-toolbar-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.trash-toolbar-btn-danger:hover:not(:disabled) {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

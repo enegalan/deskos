@@ -4,7 +4,7 @@ import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMen
 export function registerFolderWindowItemMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-folder-window-item-menu',
-    target: '.folder-window-item',
+    target: '[data-folder-path] .folder-window-item',
     programId: 'system',
     priority: 0,
     generator: async (context: MenuContext) => {
@@ -139,33 +139,15 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
 
       items.push({
         id: 'folder-window-item-delete',
-        label: isMultiple ? `Delete (${selectedIds.length} items)` : 'Delete',
+        label: isMultiple ? `Move to Trash (${selectedIds.length} items)` : 'Move to Trash',
         icon: 'delete',
         shortcut: 'Delete',
         action: async () => {
           try {
-            const { removeDesktopShortcut, deleteDesktopFolder, getDesktopFolders } = await import('@core/desktop-shortcuts');
-            const folders = getDesktopFolders();
-            const hasFolders = selectedIds.some((id) => folders.some((f) => f.id === id));
-            if (hasFolders) {
-              const ok = confirm(
-                selectedIds.length === 1
-                  ? 'Are you sure you want to delete this folder and all its contents?'
-                  : `Are you sure you want to delete ${selectedIds.length} items?`
-              );
-              if (!ok) return;
-            }
-
-            for (const id of selectedIds) {
-              if (folders.some((f) => f.id === id)) {
-                deleteDesktopFolder(id);
-              } else {
-                removeDesktopShortcut(id);
-              }
-            }
-            window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+            const { moveToTrash } = await import('@core/trash');
+            moveToTrash(selectedIds);
           } catch (error) {
-            console.error('[FolderWindowItem] Error deleting:', error);
+            console.error('[FolderWindowItem] Error moving items to trash:', error);
           }
         },
       });

@@ -6,6 +6,7 @@
 import { item as launcher } from './items/launcher';
 import { item as notes } from './items/notes';
 import { item as settings } from './items/settings';
+import { item as trash } from './items/trash';
 import { item as separator } from './items/separator';
 import { item as clock } from './items/clock';
 import { item as running } from './items/running';
@@ -30,6 +31,7 @@ export const DOCK_ITEMS: DockItem[] = [
   separator,
   notes,
   settings,
+  trash,
   running,
   separator,
   clock,

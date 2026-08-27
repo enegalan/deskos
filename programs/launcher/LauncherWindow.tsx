@@ -1,7 +1,8 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useEffect } from 'react';
 import type { ProgramContext } from '@core/context';
 import { programList } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
+import { isTrashEmpty } from '@core/trash';
 import { Icon } from '../../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
@@ -13,6 +14,13 @@ interface LauncherWindowProps {
 /** App launcher UI: searchable program grid; closes itself after launching. */
 export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWindowProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [trashEmpty, setTrashEmpty] = useState(() => isTrashEmpty());
+
+  useEffect(() => {
+    const refresh = () => setTrashEmpty(isTrashEmpty());
+    window.addEventListener('trash-updated', refresh);
+    return () => window.removeEventListener('trash-updated', refresh);
+  }, []);
 
   const filteredPrograms = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -51,7 +59,11 @@ export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWind
       </div>
 
       <div className="launcher-grid">
-        {filteredPrograms.map((program) => (
+        {filteredPrograms.map((program) => {
+          const iconName = program.id === 'trash'
+            ? (trashEmpty ? 'trash' : 'trash-full')
+            : program.icon;
+          return (
           <button
             key={program.id}
             className="launcher-item"
@@ -64,19 +76,20 @@ export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWind
             data-program-id={program.id}
           >
             <div className="launcher-item-icon">
-              {hasIcon(program.icon as IconName) ? (
+              {hasIcon(iconName as IconName) ? (
                 <Icon 
-                  name={program.icon as IconName} 
+                  name={iconName as IconName} 
                   size={56}
-                  fallback={typeof program.icon === 'string' && !hasIcon(program.icon as IconName) ? program.icon : undefined}
+                  fallback={typeof iconName === 'string' && !hasIcon(iconName as IconName) ? iconName : undefined}
                 />
               ) : (
-                <span>{program.icon}</span>
+                <span>{iconName}</span>
               )}
             </div>
             <div className="launcher-item-name">{program.name}</div>
           </button>
-        ))}
+          );
+        })}
 
         {filteredPrograms.length === 0 && (
           <div className="launcher-empty">

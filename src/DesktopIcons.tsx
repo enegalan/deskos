@@ -11,7 +11,10 @@ import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 import {
   registerSelectAllHandler,
+  registerSelectionSource,
   startMarqueeSelection,
+  SELECTION_PRIORITY,
+  SELECTION_SOURCE_IDS,
   type MarqueeRect,
 } from '@core/selection';
 import {
@@ -40,11 +43,10 @@ import {
   isDesktopFolder,
   updateFolderPosition,
   computeGroupDropPositions,
-  removeDesktopShortcut,
-  deleteDesktopFolder,
   type DesktopShortcut,
   type DesktopFolder,
 } from '@core/desktop-shortcuts';
+import { resolveProgramIcon } from '@core/trash';
 
 /**
  * Highlight the desktop icon under a drag, or clear all highlights.
@@ -369,17 +371,16 @@ const DesktopIcon = memo(function DesktopIcon({
             const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
             const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
             if (folderWindowMain) {
-              // Get the folder window's current path
-              const folderSelection = (window as any).__folderSelection as { ids: string[]; path: string } | undefined;
-              if (folderSelection?.path) {
+              const path = (folderWindowMain as HTMLElement).dataset.folderPath;
+              if (path) {
                 handledByFolderWindow = true;
                 Promise.all([
                   import('@file-system/file-system'),
                   import('@core/desktop-shortcuts')
                 ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
-                  const resolved = resolvePath(folderSelection.path);
+                  const resolved = resolvePath(path);
                   if (resolved.type === 'folder') {
-                    const targetFolder = getFolderByPath(folderSelection.path);
+                    const targetFolder = getFolderByPath(path);
                     if (targetFolder) {
                       // Add items to the folder
                       for (const id of dragIds) {
@@ -851,17 +852,16 @@ const FolderIcon = memo(function FolderIcon({
             const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
             const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
             if (folderWindowMain) {
-              // Get the folder window's current path
-              const folderSelection = (window as any).__folderSelection as { ids: string[]; path: string } | undefined;
-              if (folderSelection?.path) {
+              const path = (folderWindowMain as HTMLElement).dataset.folderPath;
+              if (path) {
                 handledByFolderWindow = true;
                 Promise.all([
                   import('@file-system/file-system'),
                   import('@core/desktop-shortcuts')
                 ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
-                  const resolved = resolvePath(folderSelection.path);
+                  const resolved = resolvePath(path);
                   if (resolved.type === 'folder') {
-                    const targetFolder = getFolderByPath(folderSelection.path);
+                    const targetFolder = getFolderByPath(path);
                     if (targetFolder) {
                       for (const id of dragIds) {
                         if (id !== targetFolder.id) {
@@ -1088,7 +1088,7 @@ export function DesktopIcons() {
         data[shortcut.id] = {
           id: shortcut.programId,
           name: program.metadata.name,
-          icon: program.metadata.icon,
+          icon: resolveProgramIcon(shortcut.programId, program.metadata.icon),
         };
       }
     });
@@ -1182,13 +1182,22 @@ export function DesktopIcons() {
     }
   }, []);
 
-  // Store selection state globally for context menu access
+  // Publish selection for context menus / clipboard coordination
   useEffect(() => {
-    (window as any).__desktopSelection = selectedIds;
-    return () => {
-      delete (window as any).__desktopSelection;
-    };
-  }, [selectedIds]);
+    return registerSelectionSource({
+      id: SELECTION_SOURCE_IDS.DESKTOP,
+      priority: SELECTION_PRIORITY.DESKTOP,
+      getSelection: () => {
+        const ids = selectedIdsRef.current;
+        if (ids.size === 0) return null;
+        return {
+          type: 'desktop-icons',
+          ids: Array.from(ids),
+          count: ids.size,
+        };
+      },
+    });
+  }, []);
 
   // Drag-to-select on empty desktop + click to clear
   useEffect(() => {
@@ -1375,36 +1384,18 @@ export function DesktopIcons() {
     }
   }, [selectedIds, shortcuts, folders]);
 
-  // Delete handler
-  const handleDelete = useCallback(() => {
+  // Delete handler — soft-delete into Trash
+  const handleDelete = useCallback(async () => {
     if (selectedIds.size === 0) {
       throw new HandlerSkippedError();
     }
 
-    const hasFolders = Array.from(selectedIds).some((id) =>
-      folders.some((f) => f.id === id)
-    );
-    if (hasFolders) {
-      const ok = confirm(
-        selectedIds.size === 1
-          ? 'Are you sure you want to delete this folder and all its contents?'
-          : `Are you sure you want to delete ${selectedIds.size} items?`
-      );
-      if (!ok) return;
-    }
-
-    selectedIds.forEach((id) => {
-      if (folders.some((f) => f.id === id)) {
-        deleteDesktopFolder(id);
-      } else {
-        removeDesktopShortcut(id);
-      }
-    });
+    const { moveToTrash } = await import('@core/trash');
+    moveToTrash(Array.from(selectedIds));
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = -1;
     loadItems();
-    window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-  }, [selectedIds, folders, loadItems]);
+  }, [selectedIds, loadItems]);
 
   // Paste handler
   const handlePaste = useCallback(async () => {

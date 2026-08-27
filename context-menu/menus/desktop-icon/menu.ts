@@ -291,14 +291,12 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
         });
       }
       
-      // Delete action - adapt label based on selection
+      // Move to Trash — soft-delete
       const totalSelectedForDelete = selectedShortcuts.length + selectedFolders.length;
-      const deleteLabel = totalSelectedForDelete > 1 
-        ? `Delete (${totalSelectedForDelete} items)`
-        : selectedFolders.length > 0 
-          ? 'Delete'
-          : 'Delete';
-      
+      const deleteLabel = totalSelectedForDelete > 1
+        ? `Move to Trash (${totalSelectedForDelete} items)`
+        : 'Move to Trash';
+
       items.push({
         id: 'desktop-icon-delete',
         label: deleteLabel,
@@ -306,33 +304,10 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
         shortcut: 'Delete',
         action: async () => {
           try {
-            const { removeDesktopShortcut, deleteDesktopFolder } = await import('@core/desktop-shortcuts');
-            
-            // Show confirmation dialog if there are folders to delete
-            if (selectedFolders.length > 0) {
-              const folderMessage = selectedFolders.length === 1
-                ? 'Are you sure you want to delete this folder and all its contents?'
-                : `Are you sure you want to delete ${selectedFolders.length} folders and all their contents?`;
-              
-              if (!confirm(folderMessage)) {
-                return; // User cancelled
-              }
-            }
-            
-            // Delete all selected shortcuts (no confirmation needed for shortcuts)
-            for (const shortcutId of selectedShortcuts) {
-              removeDesktopShortcut(shortcutId);
-            }
-            
-            // Delete all selected folders
-            for (const folderId of selectedFolders) {
-              deleteDesktopFolder(folderId);
-            }
-            
-            // Dispatch custom event to notify DesktopIcons to refresh
-            window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+            const { moveToTrash } = await import('@core/trash');
+            moveToTrash([...selectedShortcuts, ...selectedFolders]);
           } catch (error) {
-            console.error('[DesktopIcon] Error deleting items:', error);
+            console.error('[DesktopIcon] Error moving items to trash:', error);
           }
         },
       });

@@ -19,18 +19,20 @@ import {
   getFolderByPath,
   DESKOS_ITEM_IDS_MIME,
   readDraggedItemIds,
-  removeDesktopShortcut,
-  deleteDesktopFolder,
 } from '@core/desktop-shortcuts';
 import { programs } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
 import { FolderSidebar } from './FolderSidebar';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
+import { resolveProgramIcon } from '@core/trash';
 import {
   registerSelectAllHandler,
+  registerSelectionSource,
+  getSelectionById,
   startMarqueeSelection,
   SELECTION_PRIORITY,
+  SELECTION_SOURCE_IDS,
   type MarqueeRect,
 } from '@core/selection';
 import { registerCopyHandler, registerCutHandler, registerPasteHandler, registerDeleteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, getCutItemIds, CLIPBOARD_PRIORITY, HandlerSkippedError, type ClipboardItem } from '@core/clipboard';
@@ -62,9 +64,11 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
   const isInitialMount = useRef(true);
   const selectedIdsRef = useRef(selectedIds);
   const itemsRef = useRef(items);
+  const currentPathRef = useRef(currentPath);
   const suppressClickClearRef = useRef(false);
   selectedIdsRef.current = selectedIds;
   itemsRef.current = items;
+  currentPathRef.current = currentPath;
 
   useEffect(() => {
     const sync = () => setCutIds(getCutItemIds());
@@ -274,8 +278,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     assertThisFolderWindowActive();
     // If no selection in this folder window, check if there's desktop selection
     if (selectedIds.size === 0) {
-      const desktopSelection = (window as any).__desktopSelection as Set<string> | undefined;
-      if (desktopSelection && desktopSelection.size > 0) {
+      const desktopSelection = getSelectionById(SELECTION_SOURCE_IDS.DESKTOP) as
+        | { ids?: string[] }
+        | undefined;
+      if (desktopSelection?.ids && desktopSelection.ids.length > 0) {
         // There's desktop selection, let DesktopIcons handle it
         throw new HandlerSkippedError();
       }
@@ -310,8 +316,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     assertThisFolderWindowActive();
     // If no selection in this folder window, check if there's desktop selection
     if (selectedIds.size === 0) {
-      const desktopSelection = (window as any).__desktopSelection as Set<string> | undefined;
-      if (desktopSelection && desktopSelection.size > 0) {
+      const desktopSelection = getSelectionById(SELECTION_SOURCE_IDS.DESKTOP) as
+        | { ids?: string[] }
+        | undefined;
+      if (desktopSelection?.ids && desktopSelection.ids.length > 0) {
         // There's desktop selection, let DesktopIcons handle it
         throw new HandlerSkippedError();
       }
@@ -341,26 +349,15 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     }
   }, [selectedIds, items, currentPath, assertThisFolderWindowActive]);
 
-  // Delete handler
-  const handleDelete = useCallback(() => {
+  // Delete handler — soft-delete into Trash
+  const handleDelete = useCallback(async () => {
     assertThisFolderWindowActive();
     if (selectedIds.size === 0) throw new HandlerSkippedError();
-    const folders = getDesktopFolders();
-    const hasFolders = Array.from(selectedIds).some(id => folders.some(f => f.id === id));
-    if (hasFolders) {
-      const ok = confirm(selectedIds.size === 1
-        ? 'Are you sure you want to delete this folder and all its contents?'
-        : `Are you sure you want to delete ${selectedIds.size} items?`);
-      if (!ok) return;
-    }
-    for (const id of selectedIds) {
-      if (folders.some(f => f.id === id)) deleteDesktopFolder(id);
-      else removeDesktopShortcut(id);
-    }
+    const { moveToTrash } = await import('@core/trash');
+    moveToTrash(Array.from(selectedIds));
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = -1;
     loadItems(currentPath);
-    window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
   }, [selectedIds, currentPath, loadItems, assertThisFolderWindowActive]);
 
   // Paste handler
@@ -531,13 +528,23 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     };
   }, [handleSelectAll, handleCopy, handleCut, handlePaste, handleDelete]);
 
-  // Store selection state globally for context menu access
+  // Publish selection for context menus / clipboard coordination
   useEffect(() => {
-    (window as any).__folderSelection = { ids: Array.from(selectedIds), path: currentPath };
-    return () => {
-      delete (window as any).__folderSelection;
-    };
-  }, [selectedIds, currentPath]);
+    return registerSelectionSource({
+      id: SELECTION_SOURCE_IDS.FOLDER_WINDOW,
+      priority: SELECTION_PRIORITY.FOLDER_WINDOW,
+      getSelection: () => {
+        const ids = Array.from(selectedIdsRef.current);
+        if (ids.length === 0) return null;
+        return {
+          type: 'folder-items',
+          ids,
+          path: currentPathRef.current,
+          count: ids.length,
+        };
+      },
+    });
+  }, []);
 
   // Drag-to-select on empty grid + click to clear
   useEffect(() => {
@@ -889,7 +896,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
-                      {renderItemIcon(program.metadata.icon, iconSize)}
+                      {renderItemIcon(
+                        resolveProgramIcon(item.programId, program.metadata.icon),
+                        iconSize
+                      )}
                       {(isList || settings.showIconLabels) && (
                         <div className="folder-window-item-label">
                           {item.customName || program.metadata.name}
