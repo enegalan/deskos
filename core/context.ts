@@ -214,7 +214,7 @@ function createContextMenuAPI(programId: string): ContextMenuAPI {
  * Creates a complete ProgramContext for a specific program.
  * This is the only interface through which programs interact with the system.
  */
-export function createProgramContext(programId: string, icon: string = '📦'): ProgramContext {
+export function createProgramContext(programId: string, icon: string = 'package'): ProgramContext {
   const windowApi = createWindowAPI(programId, icon);
   const storageApi = createSecureScopedStorage(programId);
   const eventsApi = createScopedEventBus(programId);

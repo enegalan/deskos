@@ -17,7 +17,7 @@ export interface ProgramDefinition<T extends string = string> {
  * export default defineProgram({
  *   id: 'my-program',
  *   name: 'My Program',
- *   icon: '🚀',
+ *   icon: 'package',
  *   launch: (ctx) => {
  *     ctx.window.create({
  *       title: 'My Program',

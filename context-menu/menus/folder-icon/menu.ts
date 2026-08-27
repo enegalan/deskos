@@ -46,7 +46,7 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
         items.push({
           id: 'folder-icon-open',
           label: 'Open',
-          icon: '▶️',
+          icon: 'open',
           action: async (context: MenuContext) => {
             const folderId = context.target.getAttribute('data-folder-id');
             if (folderId) {

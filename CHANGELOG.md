@@ -10,11 +10,17 @@
 
 ### Changed
 
+- System UI uses SVG icons by default (special locations, folder sidebar, context menus, program templates); emoji only when a program sets a custom emoji icon
 - Desktop icons fill one grid cell (`width`/`height` = `gridSize`); removed independent `iconSpacing` setting
 - Icon size capped so glyph + label fit inside the cell when labels are enabled
 - Drag snap uses icon center (neighbor cell highlights past midpoint)
 - App version comes from `package.json` instead of a hardcoded string in `context.ts`
 - Dragging a desktop icon no longer scales/rotates it
+- Window drag is unrestricted (can move partially or fully off-screen); removed viewport clamp and shake feedback
+
+### Fixed
+
+- Accent color now applies to desktop/folder SVG icons and selection/hover chrome (was hardcoded blue)
 
 ### Removed
 

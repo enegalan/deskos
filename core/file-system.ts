@@ -24,12 +24,12 @@ export interface SpecialLocationInfo {
 }
 
 export const SPECIAL_LOCATIONS: Record<SpecialLocation, SpecialLocationInfo> = {
-  Desktop: { path: '/Desktop', name: 'Desktop', icon: '🖥️' },
-  Documents: { path: '/Documents', name: 'Documents', icon: '📄' },
-  Downloads: { path: '/Downloads', name: 'Downloads', icon: '📥' },
-  Music: { path: '/Music', name: 'Music', icon: '🎵' },
-  Videos: { path: '/Videos', name: 'Videos', icon: '🎬' },
-  Images: { path: '/Images', name: 'Images', icon: '🖼️' },
+  Desktop: { path: '/Desktop', name: 'Desktop', icon: 'desktop' },
+  Documents: { path: '/Documents', name: 'Documents', icon: 'file' },
+  Downloads: { path: '/Downloads', name: 'Downloads', icon: 'download' },
+  Music: { path: '/Music', name: 'Music', icon: 'music' },
+  Videos: { path: '/Videos', name: 'Videos', icon: 'video' },
+  Images: { path: '/Images', name: 'Images', icon: 'image' },
   Applications: { path: '/Applications', name: 'Applications', icon: 'folder' },
 };
 
@@ -86,6 +86,20 @@ export function resolvePath(path: string): { type: 'special' | 'folder' | 'not-f
   }
   
   return { type: 'not-found' };
+}
+
+/**
+ * Icon name for a filesystem path (special location, folder, or generic folder)
+ */
+export function getPathIcon(path: string): string {
+  const resolved = resolvePath(path);
+  if (resolved.type === 'special' && resolved.location) {
+    return SPECIAL_LOCATIONS[resolved.location].icon;
+  }
+  if (resolved.type === 'folder' && resolved.folder) {
+    return resolved.folder.icon || 'folder';
+  }
+  return 'folder';
 }
 
 /**

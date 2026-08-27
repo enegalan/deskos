@@ -161,6 +161,23 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     }
   }, [currentPath, handleNavigate]);
 
+  // Context menu "Open" on a nested folder navigates this window
+  useEffect(() => {
+    const handleFolderNavigate = (e: Event) => {
+      const detail = (e as CustomEvent<{ windowId?: string; path: string }>).detail;
+      if (!detail?.path || !detail.windowId || !contentRef.current) return;
+      const hostWindow = contentRef.current.closest('[data-window-id]');
+      const thisWindowId = hostWindow?.getAttribute('data-window-id');
+      if (!thisWindowId || thisWindowId !== detail.windowId) return;
+      handleNavigate(detail.path);
+    };
+
+    window.addEventListener('folder-navigate', handleFolderNavigate as EventListener);
+    return () => {
+      window.removeEventListener('folder-navigate', handleFolderNavigate as EventListener);
+    };
+  }, [handleNavigate]);
+
   const breadcrumbs = parsePath(currentPath);
 
   const handleBreadcrumbClick = useCallback((index: number) => {
@@ -637,6 +654,7 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
         <div 
           ref={contentRef} 
           className="folder-window-main"
+          data-folder-path={currentPath}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -659,6 +677,8 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                     <div
                       key={item.id}
                       className={`folder-window-item folder-item ${selectedIds.has(item.id) ? 'selected' : ''}`}
+                      data-item-id={item.id}
+                      data-item-type="folder"
                       style={{
                         left: `${x}px`,
                         top: `${y}px`,
@@ -686,6 +706,7 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                           <Icon 
                             name={item.icon as IconName} 
                             size={settings.iconSize * ICON_GLYPH_SCALE}
+                            color="var(--color-accent)"
                             fallback={typeof item.icon === 'string' && !hasIcon(item.icon as IconName) ? item.icon : undefined}
                           />
                         ) : (
@@ -705,6 +726,9 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                     <div
                       key={item.id}
                       className={`folder-window-item shortcut-item ${selectedIds.has(item.id) ? 'selected' : ''}`}
+                      data-item-id={item.id}
+                      data-item-type="shortcut"
+                      data-program-id={item.programId}
                       style={{
                         left: `${x}px`,
                         top: `${y}px`,

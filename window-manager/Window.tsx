@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef, memo, type MouseEvent as ReactMouseEvent } from 'react';
 import { useKernel } from '@core/kernel';
 import type { WindowState } from '@core/kernel';
-import { TASKBAR_HEIGHT } from '@core/constants';
 import { Icon } from '../components/Icon';
 
 type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
@@ -128,27 +127,11 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
   useEffect(() => {
     const handleMouseMove = (e: globalThis.MouseEvent) => {
       if (dragState.isDragging) {
-        const newX = e.clientX - dragState.offsetX;
-        const newY = Math.max(0, e.clientY - dragState.offsetY);
-        
-        // Check boundaries
-        const maxX = window.innerWidth - win.width;
-        const maxY = window.innerHeight - TASKBAR_HEIGHT - win.height;
-        
-        const constrainedX = Math.max(0, Math.min(newX, maxX));
-        const constrainedY = Math.max(0, Math.min(newY, maxY));
-        
-        // If constrained, add shake effect
-        if ((constrainedX !== newX || constrainedY !== newY) && windowRef.current) {
-          windowRef.current.style.animation = 'window-shake 0.3s ease';
-          setTimeout(() => {
-            if (windowRef.current) {
-              windowRef.current.style.animation = '';
-            }
-          }, 300);
-        }
-        
-        moveWindow(win.id, constrainedX, constrainedY);
+        moveWindow(
+          win.id,
+          e.clientX - dragState.offsetX,
+          e.clientY - dragState.offsetY
+        );
       }
 
       if (resizeState.isResizing && resizeState.direction) {

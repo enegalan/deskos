@@ -16,6 +16,7 @@ import {
   findItemAtPosition,
   swapItemPositions,
   pixelToGrid,
+  clampGridPosition,
   getGridSize,
   addItemToFolder,
   isDesktopFolder,
@@ -170,11 +171,11 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
         rawY = Math.max(minY, Math.min(maxY, rawY));
         
         // Snap by icon center so adjacent cell highlights past midpoint
-        const gridPos = pixelToGrid(rawX + gridSize / 2, rawY + gridSize / 2);
-        
-        // Ensure grid position is also within bounds
-        gridPos.x = Math.max(0, Math.min(Math.floor((currentDesktopRect.width - iconWidth) / gridSize) * gridSize, gridPos.x));
-        gridPos.y = Math.max(0, Math.min(Math.floor((currentDesktopRect.height - iconHeight) / gridSize) * gridSize, gridPos.y));
+        const snapped = pixelToGrid(rawX + gridSize / 2, rawY + gridSize / 2);
+        const gridPos = clampGridPosition(snapped.x, snapped.y, {
+          width: currentDesktopRect.width,
+          height: currentDesktopRect.height,
+        });
         
         setVisualPosition({ x: rawX, y: rawY });
         setGridPosition(gridPos);
@@ -587,11 +588,11 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
         rawY = Math.max(minY, Math.min(maxY, rawY));
         
         // Snap by icon center so adjacent cell highlights past midpoint
-        const gridPos = pixelToGrid(rawX + gridSize / 2, rawY + gridSize / 2);
-        
-        // Ensure grid position is also within bounds
-        gridPos.x = Math.max(0, Math.min(Math.floor((currentDesktopRect.width - iconWidth) / gridSize) * gridSize, gridPos.x));
-        gridPos.y = Math.max(0, Math.min(Math.floor((currentDesktopRect.height - iconHeight) / gridSize) * gridSize, gridPos.y));
+        const snapped = pixelToGrid(rawX + gridSize / 2, rawY + gridSize / 2);
+        const gridPos = clampGridPosition(snapped.x, snapped.y, {
+          width: currentDesktopRect.width,
+          height: currentDesktopRect.height,
+        });
         
         setVisualPosition({ x: rawX, y: rawY });
         setGridPosition(gridPos);
@@ -855,6 +856,7 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
             <Icon 
               name={folder.icon as IconName} 
               size={iconSize * ICON_GLYPH_SCALE}
+              color="var(--color-accent)"
               fallback={typeof folder.icon === 'string' && !hasIcon(folder.icon as IconName) ? folder.icon : undefined}
             />
           ) : (
@@ -915,6 +917,9 @@ export function DesktopIcons() {
 
   useEffect(() => {
     loadItems();
+    import('@core/desktop-shortcuts').then(({ clampAllIconsToDesktop }) => {
+      clampAllIconsToDesktop();
+    });
 
     const handleStorageChange = () => {
       loadItems();
@@ -928,9 +933,17 @@ export function DesktopIcons() {
     
     window.addEventListener('desktop-shortcuts-updated', handleShortcutUpdate);
 
+    const handleResize = () => {
+      import('@core/desktop-shortcuts').then(({ clampAllIconsToDesktop }) => {
+        clampAllIconsToDesktop();
+      });
+    };
+    window.addEventListener('resize', handleResize);
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('desktop-shortcuts-updated', handleShortcutUpdate);
+      window.removeEventListener('resize', handleResize);
     };
   }, [loadItems]);
 

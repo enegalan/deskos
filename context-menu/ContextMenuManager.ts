@@ -345,11 +345,14 @@ export class ContextMenuManager {
     event: MouseEvent | KeyboardEvent | TouchEvent,
     target: HTMLElement
   ): MenuContext {
-    // For desktop icons, find the actual .desktop-icon element (may be parent if clicked on child)
+    // For desktop icons / folder-window items, use the item root as target
     let actualTarget: HTMLElement = target;
-    const desktopIcon = target.closest('.desktop-icon') as HTMLElement;
+    const desktopIcon = target.closest('.desktop-icon') as HTMLElement | null;
+    const folderWindowItem = target.closest('.folder-window-item') as HTMLElement | null;
     if (desktopIcon) {
       actualTarget = desktopIcon;
+    } else if (folderWindowItem) {
+      actualTarget = folderWindowItem;
     }
     
     // Find program ID from target element
@@ -381,6 +384,19 @@ export class ContextMenuManager {
    * Extract selection state (for future file operations, etc.)
    */
   private getSelectionState(): unknown {
+    // Folder window selection takes priority when present
+    const folderSelection = (window as any).__folderSelection as
+      | { ids: string[]; path: string }
+      | undefined;
+    if (folderSelection && folderSelection.ids.length > 0) {
+      return {
+        type: 'folder-items',
+        ids: folderSelection.ids,
+        path: folderSelection.path,
+        count: folderSelection.ids.length,
+      };
+    }
+
     // Check for desktop icon selection
     const desktopSelection = (window as any).__desktopSelection as Set<string> | undefined;
     if (desktopSelection && desktopSelection.size > 0) {
@@ -515,6 +531,10 @@ export class ContextMenuManager {
       if (!isInsideDesktop) {
         return false;
       }
+      // Folder windows / app windows are not the desktop surface
+      if (element.closest('.window, .folder-window-main, .folder-window-content') !== null) {
+        return false;
+      }
       // Exclude desktop menu when clicking on icons or folders (including their children)
       const isIcon = element.classList.contains('desktop-icon') || 
                      element.classList.contains('folder-icon') ||
@@ -541,9 +561,24 @@ export class ContextMenuManager {
       
       return true;
     }
+    if (selector === 'folder-window') {
+      const inFolderWindow = element.closest('.folder-window-main') !== null;
+      if (!inFolderWindow) {
+        return false;
+      }
+      // Item click uses folder-window-item menu, not background menu
+      if (element.closest('.folder-window-item') !== null) {
+        return false;
+      }
+      return true;
+    }
     if (selector === 'window') {
       const isInsideWindow = element.classList.contains('window') || element.closest('.window') !== null;
       if (!isInsideWindow) {
+        return false;
+      }
+      // Folder content has its own menus
+      if (element.closest('.folder-window-grid, .folder-window-item') !== null) {
         return false;
       }
       // Exclude native interactive elements from window menu

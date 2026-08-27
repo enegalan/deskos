@@ -2,6 +2,8 @@ import { ContextMenuManager } from '../ContextMenuManager';
 import { registerDesktopMenu } from './desktop/menu';
 import { registerDesktopIconMenu } from './desktop-icon/menu';
 import { registerFolderIconMenu } from './folder-icon/menu';
+import { registerFolderWindowMenu } from './folder-window/menu';
+import { registerFolderWindowItemMenu } from './folder-window-item/menu';
 import { registerLauncherItemMenu } from './launcher-item/menu';
 import { registerWindowMenu } from './window/menu';
 import { registerTextMenu } from './text/menu';
@@ -24,6 +26,8 @@ export function registerDefaultMenus(): void {
   registerLauncherItemMenu(manager);
   registerDesktopIconMenu(manager);
   registerFolderIconMenu(manager);
+  registerFolderWindowMenu(manager);
+  registerFolderWindowItemMenu(manager);
   registerWindowMenu(manager);
   registerTextMenu(manager);
 

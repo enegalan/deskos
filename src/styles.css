@@ -18,8 +18,9 @@
   --color-text-muted: #606078;
   
   --color-accent: #5c9fff;
+  --color-accent-rgb: 92, 159, 255;
   --color-accent-hover: #7bb3ff;
-  --color-accent-glow: rgba(92, 159, 255, 0.3);
+  --color-accent-glow: rgba(var(--color-accent-rgb), 0.3);
   
   --color-success: #4ade80;
   --color-warning: #fbbf24;
@@ -77,7 +78,7 @@
   --color-surface-active: rgba(235, 235, 245, 1);
   
   --color-border: rgba(0, 0, 0, 0.1);
-  --color-border-focus: rgba(92, 159, 255, 0.6);
+  --color-border-focus: rgba(var(--color-accent-rgb), 0.6);
   
   --color-text-primary: #1a1a25;
   --color-text-secondary: #505068;
@@ -378,13 +379,6 @@ body {
 
 .window.maximized .window-content {
   border-radius: 0;
-}
-
-/* Window shake animation for boundary feedback */
-@keyframes window-shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-  20%, 40%, 60%, 80% { transform: translateX(4px); }
 }
 
 /* Resize handles */
@@ -805,7 +799,7 @@ body {
   --menu-bg: rgba(30, 30, 30, 0.95);
   --menu-text: rgba(255, 255, 255, 0.9);
   --menu-item-hover: rgba(60, 60, 60, 0.8);
-  --menu-item-active: rgba(92, 159, 255, 0.3);
+  --menu-item-active: rgba(var(--color-accent-rgb), 0.3);
   --menu-item-disabled: rgba(255, 255, 255, 0.3);
   --menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.1) inset;
   --menu-radius: 8px;
@@ -820,7 +814,7 @@ body {
   --menu-bg: rgba(255, 255, 255, 0.95);
   --menu-text: rgba(0, 0, 0, 0.85);
   --menu-item-hover: rgba(0, 0, 0, 0.08);
-  --menu-item-active: rgba(92, 159, 255, 0.2);
+  --menu-item-active: rgba(var(--color-accent-rgb), 0.2);
   --menu-item-disabled: rgba(0, 0, 0, 0.3);
   --menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.05) inset;
   --menu-separator: rgba(0, 0, 0, 0.1);
@@ -1023,8 +1017,8 @@ body {
 }
 
 .desktop-icon.selected {
-  background: rgba(92, 159, 255, 0.2);
-  outline: 2px solid rgba(92, 159, 255, 0.6);
+  background: rgba(var(--color-accent-rgb), 0.2);
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.6);
   outline-offset: -2px;
   border-radius: 8px;
   transform: scale(1.02);
@@ -1040,21 +1034,21 @@ body {
 }
 
 .desktop-icon.drag-over-target {
-  background: rgba(92, 159, 255, 0.15);
-  border: 2px dashed rgba(92, 159, 255, 0.6);
+  background: rgba(var(--color-accent-rgb), 0.15);
+  border: 2px dashed rgba(var(--color-accent-rgb), 0.6);
   border-radius: 8px;
   transform: scale(1.05);
 }
 
 .desktop-icon-grid-indicator {
   position: absolute;
-  background: rgba(92, 159, 255, 0.15);
-  border: 2px solid rgba(92, 159, 255, 0.4);
+  background: rgba(var(--color-accent-rgb), 0.15);
+  border: 2px solid rgba(var(--color-accent-rgb), 0.4);
   border-radius: 8px;
   pointer-events: none;
   z-index: 9999;
   box-sizing: border-box;
-  box-shadow: 0 0 0 1px rgba(92, 159, 255, 0.2) inset;
+  box-shadow: 0 0 0 1px rgba(var(--color-accent-rgb), 0.2) inset;
 }
 
 .desktop-icon-image {
@@ -1100,7 +1094,7 @@ body {
 }
 
 .desktop-icon.selected .desktop-icon-label {
-  background: rgba(92, 159, 255, 0.3);
+  background: rgba(var(--color-accent-rgb), 0.3);
   color: rgba(255, 255, 255, 1);
 }
 
@@ -1249,15 +1243,15 @@ body {
 }
 
 .folder-window-item.selected {
-  background: rgba(92, 159, 255, 0.2);
-  outline: 2px solid rgba(92, 159, 255, 0.6);
+  background: rgba(var(--color-accent-rgb), 0.2);
+  outline: 2px solid rgba(var(--color-accent-rgb), 0.6);
   outline-offset: -2px;
   border-radius: 8px;
   transform: scale(1.02);
 }
 
 .folder-window-item.selected .folder-window-item-label {
-  background: rgba(92, 159, 255, 0.3);
+  background: rgba(var(--color-accent-rgb), 0.3);
   color: rgba(255, 255, 255, 1);
 }
 
@@ -1271,20 +1265,20 @@ body {
 .folder-window-main.drag-over {
   outline: 2px dashed var(--color-accent);
   outline-offset: -2px;
-  background: rgba(92, 159, 255, 0.1);
+  background: rgba(var(--color-accent-rgb), 0.1);
   border-radius: 4px;
 }
 
 .desktop.drag-over {
   outline: 2px dashed var(--color-accent);
   outline-offset: -2px;
-  background: rgba(92, 159, 255, 0.05);
+  background: rgba(var(--color-accent-rgb), 0.05);
 }
 
 .desktop-icon.dragging-over-folder,
 .desktop-icon.dragging-over-desktop {
   opacity: 0.8;
-  filter: drop-shadow(0 4px 8px rgba(92, 159, 255, 0.4));
+  filter: drop-shadow(0 4px 8px rgba(var(--color-accent-rgb), 0.4));
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
@@ -1292,7 +1286,7 @@ body {
 .folder-window-item.dragging-over-desktop {
   opacity: 0.8;
   transform: scale(1.1);
-  filter: drop-shadow(0 4px 8px rgba(92, 159, 255, 0.4));
+  filter: drop-shadow(0 4px 8px rgba(var(--color-accent-rgb), 0.4));
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
@@ -1634,8 +1628,8 @@ body {
 }
 
 .toast-info .toast-icon {
-  background: rgba(92, 159, 255, 0.2);
-  color: #5c9fff;
+  background: rgba(var(--color-accent-rgb), 0.2);
+  color: var(--color-accent);
 }
 
 .toast-content {

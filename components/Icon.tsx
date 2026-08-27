@@ -21,7 +21,7 @@ export function Icon({
   fallback,
   style,
 }: IconProps) {
-  const svgContent = getIconSvg(name as IconName, fallback);
+  const svgContent = getIconSvg(name as IconName);
   const viewBox = getIconViewBox(name as IconName);
 
   // If no SVG and no fallback, return null

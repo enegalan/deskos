@@ -35,8 +35,17 @@ export type IconName =
   | 'paste'
   | 'search'
   | 'arrow-right'
+  | 'chevron-down'
+  | 'chevron-right'
   | 'checkmark'
-  | string; // Allow custom icon names
+  | 'desktop'
+  | 'download'
+  | 'music'
+  | 'video'
+  | 'image'
+  | 'globe'
+  | 'package'
+  | string; // Allow custom icon names / emoji for user programs
 
 export interface IconDefinition {
   name: IconName;
@@ -204,8 +213,53 @@ const systemIcons: IconDefinition[] = [
     viewBox: '0 0 24 24',
   },
   {
+    name: 'chevron-down',
+    svg: '<path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'chevron-right',
+    svg: '<path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
     name: 'checkmark',
     svg: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'desktop',
+    svg: '<path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7v2H8v2h8v-2h-2v-2h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H3V4h18v12z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'download',
+    svg: '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'music',
+    svg: '<path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'video',
+    svg: '<path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'image',
+    svg: '<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'globe',
+    svg: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'package',
+    svg: '<path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z" fill="currentColor"/>',
     viewBox: '0 0 24 24',
   },
 ];
@@ -232,17 +286,8 @@ export function hasIcon(name: IconName): boolean {
 /**
  * Get icon SVG content
  */
-export function getIconSvg(name: IconName, fallback?: string): string {
-  const icon = getIcon(name);
-  if (icon) {
-    return icon.svg;
-  }
-  // Fallback to emoji if provided
-  if (fallback) {
-    return fallback;
-  }
-  // Default fallback
-  return '';
+export function getIconSvg(name: IconName): string {
+  return getIcon(name)?.svg || '';
 }
 
 /**

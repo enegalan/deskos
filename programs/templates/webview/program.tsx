@@ -4,7 +4,7 @@ import { WebViewWindow } from './WebViewWindow';
 export default defineProgram({
   id: '__PROGRAM_ID__',
   name: '__PROGRAM_NAME__',
-  icon: '🌐',
+  icon: 'globe',
   launch: (ctx) => {
     ctx.window.create({
       title: '__PROGRAM_NAME__',

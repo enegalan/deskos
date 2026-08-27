@@ -103,14 +103,14 @@ export function registerDesktopMenu(manager: ContextMenuManager): void {
         icon: 'new-folder',
         action: async (context: MenuContext) => {
           try {
-            const { createDesktopFolder, findItemAtPosition, pixelToGrid } = await import('@core/desktop-shortcuts');
+            const { createDesktopFolder, findItemAtPosition, pixelToClampedGrid } = await import('@core/desktop-shortcuts');
             const desktopElement = document.querySelector('.desktop');
             if (desktopElement && context.event && 'clientX' in context.event && 'clientY' in context.event) {
               const rect = desktopElement.getBoundingClientRect();
               // Convert click coordinates to desktop-relative coordinates
               const x = context.event.clientX - rect.left;
               const y = context.event.clientY - rect.top;
-              const gridPos = pixelToGrid(x, y);
+              const gridPos = pixelToClampedGrid(x, y, { width: rect.width, height: rect.height });
               
               // Check if there's already an item at this position (should not happen because desktop apps fill a grid cell)
               const existingItem = findItemAtPosition(gridPos.x, gridPos.y);

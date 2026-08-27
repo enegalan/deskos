@@ -1,14 +1,14 @@
 import { useState, useRef, useCallback, type ChangeEvent } from 'react';
 import type { ProgramContext } from '@core/context';
+import { Icon } from '../../../components/Icon';
 
 interface MediaWindowProps {
   ctx: ProgramContext;
 }
 
-export function MediaWindow({ ctx }: MediaWindowProps) {
+export function MediaWindow({ ctx: _ctx }: MediaWindowProps) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'audio' | 'video' | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
   const handleFileSelect = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -22,19 +22,6 @@ export function MediaWindow({ ctx }: MediaWindowProps) {
       setMediaType('audio');
     } else if (file.type.startsWith('video/')) {
       setMediaType('video');
-    }
-  }, []);
-
-  const togglePlayPause = useCallback(() => {
-    const media = mediaRef.current;
-    if (!media) return;
-
-    if (media.paused) {
-      media.play();
-      setIsPlaying(true);
-    } else {
-      media.pause();
-      setIsPlaying(false);
     }
   }, []);
 
@@ -52,7 +39,7 @@ export function MediaWindow({ ctx }: MediaWindowProps) {
     >
       {!mediaUrl && (
         <>
-          <span style={{ fontSize: '48px' }}>🎵</span>
+          <Icon name="music" size={48} color="var(--color-text-secondary)" />
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-md)' }}>
             Select an audio or video file to play
           </p>
@@ -83,23 +70,19 @@ export function MediaWindow({ ctx }: MediaWindowProps) {
           src={mediaUrl}
           controls
           style={{ maxWidth: '100%', maxHeight: 'calc(100% - 60px)', borderRadius: 'var(--radius-md)' }}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
         />
       )}
 
       {mediaUrl && mediaType === 'audio' && (
         <div style={{ textAlign: 'center', width: '100%' }}>
-          <span style={{ fontSize: '64px', display: 'block', marginBottom: 'var(--space-lg)' }}>
-            {isPlaying ? '🎶' : '🎵'}
-          </span>
+          <div style={{ marginBottom: 'var(--space-lg)' }}>
+            <Icon name="music" size={64} color="var(--color-text-secondary)" />
+          </div>
           <audio
             ref={mediaRef as React.RefObject<HTMLAudioElement>}
             src={mediaUrl}
             controls
             style={{ width: '100%' }}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
           />
         </div>
       )}
@@ -109,7 +92,6 @@ export function MediaWindow({ ctx }: MediaWindowProps) {
           onClick={() => {
             setMediaUrl(null);
             setMediaType(null);
-            setIsPlaying(false);
           }}
           style={{
             padding: 'var(--space-xs) var(--space-md)',

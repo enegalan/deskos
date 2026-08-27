@@ -6,7 +6,7 @@ import { eventBus, SystemEvents } from '@core/event-bus';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { registerDefaultMenus } from '../context-menu/menus';
 import { DesktopIcons } from './DesktopIcons';
-import { addDesktopShortcut, pixelToGrid, getFolderById, getGridSize } from '@core/desktop-shortcuts';
+import { addDesktopShortcut, pixelToClampedGrid, getFolderById, getGridSize } from '@core/desktop-shortcuts';
 import { FolderWindow } from './FolderWindow';
 import { getWallpaper, isWallpaperReference } from '@core/wallpaper-storage';
 import { ToastContainer } from '@components/Toast';
@@ -124,8 +124,10 @@ export function Desktop() {
           const hoverR = Math.min(255, r + 30);
           const hoverG = Math.min(255, g + 30);
           const hoverB = Math.min(255, b + 30);
+          root.style.setProperty('--color-accent-rgb', `${r}, ${g}, ${b}`);
           root.style.setProperty('--color-accent-hover', `rgb(${hoverR}, ${hoverG}, ${hoverB})`);
           root.style.setProperty('--color-accent-glow', `rgba(${r}, ${g}, ${b}, 0.3)`);
+          root.style.setProperty('--color-border-focus', `rgba(${r}, ${g}, ${b}, 0.6)`);
         }
       }
     }
@@ -206,7 +208,7 @@ export function Desktop() {
       
       if (!isOverWindow) {
         desktopRef.current.classList.add('drag-over');
-        const gridPos = pixelToGrid(x, y);
+        const gridPos = pixelToClampedGrid(x, y, { width: rect.width, height: rect.height });
         setDragGridPosition(gridPos);
       } else {
         desktopRef.current.classList.remove('drag-over');
@@ -249,7 +251,7 @@ export function Desktop() {
           // Calculate grid position for visual indicator
           const x = e.clientX - rect.left;
           const y = e.clientY - rect.top;
-          const gridPos = pixelToGrid(x, y);
+          const gridPos = pixelToClampedGrid(x, y, { width: rect.width, height: rect.height });
           setDragGridPosition(gridPos);
         } else {
           desktopRef.current.classList.remove('drag-over');
@@ -317,7 +319,10 @@ export function Desktop() {
 
     const x = e.clientX - desktopRect.left;
     const y = e.clientY - desktopRect.top;
-    const gridPos = pixelToGrid(x, y);
+    const gridPos = pixelToClampedGrid(x, y, {
+      width: desktopRect.width,
+      height: desktopRect.height,
+    });
 
     // Check for items from folder windows
     const shortcutId = e.dataTransfer.getData('application/x-deskos-shortcut-id');

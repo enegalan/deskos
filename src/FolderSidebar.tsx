@@ -6,9 +6,15 @@ import {
   removeFavorite,
   isFavorite,
   getRecentItems,
+  getPathIcon,
   type SpecialLocation,
 } from '@core/file-system';
 import { Icon } from '../components/Icon';
+import { hasIcon, type IconName } from '@core/icons';
+
+function sidebarIcon(name: string): IconName {
+  return (hasIcon(name as IconName) ? name : 'folder') as IconName;
+}
 
 interface FolderSidebarProps {
   currentPath: string;
@@ -76,7 +82,7 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
             onClick={() => toggleSection('locations')}
           >
             <span className="folder-sidebar-section-icon">
-              {expandedSections.locations ? '▼' : '▶'}
+              <Icon name={expandedSections.locations ? 'chevron-down' : 'chevron-right'} size={16} />
             </span>
             <span className="folder-sidebar-section-title">Locations</span>
           </button>
@@ -90,7 +96,7 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
                   title={location.path}
                 >
                   <span className="folder-sidebar-item-icon">
-                    {typeof location.icon === 'string' && location.icon.length === 1 ? location.icon : '📁'}
+                    <Icon name={sidebarIcon(location.icon)} size={18} />
                   </span>
                   <span className="folder-sidebar-item-label">{location.name}</span>
                 </button>
@@ -105,7 +111,7 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
             onClick={() => toggleSection('favorites')}
           >
             <span className="folder-sidebar-section-icon">
-              {expandedSections.favorites ? '▼' : '▶'}
+              <Icon name={expandedSections.favorites ? 'chevron-down' : 'chevron-right'} size={16} />
             </span>
             <span className="folder-sidebar-section-title">Favorites</span>
           </button>
@@ -122,7 +128,7 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
                       title={path}
                     >
                       <span className="folder-sidebar-item-icon">
-                        <Icon name="folder" size={18} />
+                        <Icon name={sidebarIcon(getPathIcon(path))} size={18} />
                       </span>
                       <span className="folder-sidebar-item-label">
                         {path.split('/').pop() || path}
@@ -151,7 +157,7 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
             onClick={() => toggleSection('recent')}
           >
             <span className="folder-sidebar-section-icon">
-              {expandedSections.recent ? '▼' : '▶'}
+              <Icon name={expandedSections.recent ? 'chevron-down' : 'chevron-right'} size={16} />
             </span>
             <span className="folder-sidebar-section-title">Recent</span>
           </button>
@@ -167,7 +173,9 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
                     onClick={() => onNavigate(item.path)}
                     title={item.path}
                   >
-                    <span className="folder-sidebar-item-icon">📄</span>
+                    <span className="folder-sidebar-item-icon">
+                      <Icon name={sidebarIcon(getPathIcon(item.path))} size={18} />
+                    </span>
                     <span className="folder-sidebar-item-label">
                       {item.path.split('/').pop() || item.path}
                     </span>

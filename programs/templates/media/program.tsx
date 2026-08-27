@@ -4,7 +4,7 @@ import { MediaWindow } from './MediaWindow';
 export default defineProgram({
   id: '__PROGRAM_ID__',
   name: '__PROGRAM_NAME__',
-  icon: '🎵',
+  icon: 'music',
   launch: (ctx) => {
     ctx.window.create({
       title: '__PROGRAM_NAME__',

@@ -78,8 +78,9 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
     
     // Update existing shortcut position if provided
     if (x !== undefined && y !== undefined) {
-      existing.x = x;
-      existing.y = y;
+      const clamped = clampGridPosition(x, y);
+      existing.x = clamped.x;
+      existing.y = clamped.y;
     }
     if (customName !== undefined) {
       existing.customName = customName;
@@ -93,10 +94,14 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
 
   // Find next available position if not provided
   const positionNotSpecified = x === undefined || y === undefined;
-  if (positionNotSpecified) {
+  if (x === undefined || y === undefined) {
     const position = findNextAvailablePosition(shortcuts.map(s => ({ x: s.x, y: s.y })));
     x = position.x;
     y = position.y;
+  } else {
+    const clamped = clampGridPosition(x, y);
+    x = clamped.x;
+    y = clamped.y;
   }
 
   const newShortcut: DesktopShortcut = {
@@ -137,8 +142,9 @@ export function updateDesktopShortcutPosition(shortcutId: string, x: number, y: 
   const shortcuts = getDesktopShortcuts();
   const shortcut = shortcuts.find((s) => s.id === shortcutId);
   if (shortcut) {
-    shortcut.x = x;
-    shortcut.y = y;
+    const clamped = clampGridPosition(x, y);
+    shortcut.x = clamped.x;
+    shortcut.y = clamped.y;
     systemStorage.setItem(STORAGE_KEY, shortcuts);
   }
 }
@@ -204,15 +210,69 @@ export function swapItemPositions(itemId1: string, itemId2: string): void {
 }
 
 /**
+ * Desktop element size, or viewport fallback
+ */
+export function getDesktopBounds(): { width: number; height: number } {
+  const el = document.querySelector('.desktop');
+  if (el) {
+    const rect = el.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  }
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight - TASKBAR_HEIGHT,
+  };
+}
+
+/**
+ * Clamp grid coords so the icon cell fits fully inside the desktop
+ */
+export function clampGridPosition(
+  x: number,
+  y: number,
+  bounds: { width: number; height: number } = getDesktopBounds()
+): { x: number; y: number } {
+  const gridSize = getGridSize();
+  const maxX = Math.max(0, Math.floor((bounds.width - gridSize) / gridSize) * gridSize);
+  const maxY = Math.max(0, Math.floor((bounds.height - gridSize) / gridSize) * gridSize);
+  return {
+    x: Math.max(0, Math.min(maxX, x)),
+    y: Math.max(0, Math.min(maxY, y)),
+  };
+}
+
+/**
+ * Convert pixel coordinates to grid coordinates
+ */
+export function pixelToGrid(x: number, y: number): { x: number; y: number } {
+  const gridSize = getGridSize();
+  return {
+    x: Math.floor(x / gridSize) * gridSize,
+    y: Math.floor(y / gridSize) * gridSize,
+  };
+}
+
+/**
+ * Pixel → grid cell that fits fully on the desktop
+ */
+export function pixelToClampedGrid(
+  x: number,
+  y: number,
+  bounds: { width: number; height: number } = getDesktopBounds()
+): { x: number; y: number } {
+  const snapped = pixelToGrid(x, y);
+  return clampGridPosition(snapped.x, snapped.y, bounds);
+}
+
+/**
  * Find next available grid position
  */
 export function findNextAvailablePosition(items: Array<{ x: number; y: number }>): { x: number; y: number } {
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight - TASKBAR_HEIGHT;
+  const { width: viewportWidth, height: viewportHeight } = getDesktopBounds();
   const gridSize = getGridSize();
   
-  const maxCols = Math.floor(viewportWidth / gridSize);
-  const maxRows = Math.floor(viewportHeight / gridSize);
+  const maxCols = Math.max(0, Math.floor(viewportWidth / gridSize));
+  const maxRows = Math.max(0, Math.floor(viewportHeight / gridSize));
 
   // Start from top-left and find first empty position
   for (let row = 0; row < maxRows; row++) {
@@ -231,19 +291,42 @@ export function findNextAvailablePosition(items: Array<{ x: number; y: number }>
     }
   }
 
-  // If all positions are occupied, place at end
-  return { x: 0, y: items.length * gridSize };
+  // If all positions are occupied, place at origin
+  return { x: 0, y: 0 };
 }
 
 /**
- * Convert pixel coordinates to grid coordinates
+ * Pull any icons that sit outside the desktop back into valid cells
  */
-export function pixelToGrid(x: number, y: number): { x: number; y: number } {
-  const gridSize = getGridSize();
-  return {
-    x: Math.floor(x / gridSize) * gridSize,
-    y: Math.floor(y / gridSize) * gridSize,
-  };
+export function clampAllIconsToDesktop(): void {
+  const bounds = getDesktopBounds();
+  const shortcuts = getDesktopShortcuts();
+  const folders = getDesktopFolders();
+  let changed = false;
+
+  shortcuts.forEach((shortcut) => {
+    const clamped = clampGridPosition(shortcut.x, shortcut.y, bounds);
+    if (clamped.x !== shortcut.x || clamped.y !== shortcut.y) {
+      shortcut.x = clamped.x;
+      shortcut.y = clamped.y;
+      changed = true;
+    }
+  });
+
+  folders.forEach((folder) => {
+    const clamped = clampGridPosition(folder.x, folder.y, bounds);
+    if (clamped.x !== folder.x || clamped.y !== folder.y) {
+      folder.x = clamped.x;
+      folder.y = clamped.y;
+      changed = true;
+    }
+  });
+
+  if (!changed) return;
+
+  systemStorage.setItem(STORAGE_KEY, shortcuts);
+  systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+  window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
 
 /**
@@ -645,6 +728,10 @@ export function createDesktopFolder(name: string, x?: number, y?: number, parent
     const position = findNextAvailablePosition(allItems.map(item => ({ x: item.x, y: item.y })));
     x = position.x;
     y = position.y;
+  } else {
+    const clamped = clampGridPosition(x, y);
+    x = clamped.x;
+    y = clamped.y;
   }
 
   // Generate unique folder name
@@ -667,6 +754,21 @@ export function createDesktopFolder(name: string, x?: number, y?: number, parent
 
   folders.push(newFolder);
   paths[folderId] = path;
+
+  // Nest under parent folder contents (path alone is not enough for getItemsByPath)
+  if (targetParentPath !== '/Desktop') {
+    const parentFolder = folders.find((f) => {
+      const parentStoredPath =
+        paths[f.id] ||
+        (f.parentPath && f.parentPath !== '/Desktop'
+          ? `${f.parentPath}/${f.name}`
+          : `/Desktop/${f.name}`);
+      return parentStoredPath === targetParentPath;
+    });
+    if (parentFolder && !parentFolder.contents.includes(folderId)) {
+      parentFolder.contents.push(folderId);
+    }
+  }
   
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);
@@ -920,8 +1022,9 @@ export function updateFolderPosition(folderId: string, x: number, y: number): vo
   const folders = getDesktopFolders();
   const folder = folders.find(f => f.id === folderId);
   if (folder) {
-    folder.x = x;
-    folder.y = y;
+    const clamped = clampGridPosition(x, y);
+    folder.x = clamped.x;
+    folder.y = clamped.y;
     systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   }
 }
