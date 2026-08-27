@@ -116,6 +116,11 @@ export function MenuItem({
         {item.shortcut && (
           <span className="context-menu-item-shortcut">{item.shortcut}</span>
         )}
+        {isChecked && !hasSubmenu && (
+          <span className="context-menu-item-check" aria-hidden="true">
+            <Icon name="checkmark" size={14} />
+          </span>
+        )}
         {hasSubmenu && (
           <span className="context-menu-item-arrow" aria-hidden="true">
             <Icon name="arrow-right" size={10} />

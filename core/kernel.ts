@@ -60,6 +60,8 @@ export function isDateFormat(value: unknown): value is DateFormat {
   return typeof value === 'string' && DATE_FORMATS.includes(value as DateFormat);
 }
 
+export type FolderViewMode = 'grid' | 'list';
+
 export interface SystemSettings {
   theme: 'light' | 'dark';
   wallpaper: string;
@@ -75,6 +77,8 @@ export interface SystemSettings {
   gridSize: number;
   autoArrange: boolean;
   showIconLabels: boolean;
+  /** Directory window layout: icon grid or details list */
+  folderViewMode: FolderViewMode;
 }
 
 /** Max glyph size that still fits glyph + label in one grid cell */
@@ -127,6 +131,7 @@ const defaultSettings: SystemSettings = {
   gridSize: DEFAULT_GRID_SIZE,
   autoArrange: false,
   showIconLabels: true,
+  folderViewMode: 'grid',
 };
 
 /**
@@ -168,6 +173,9 @@ function loadSettings(): SystemSettings {
   }
   if (typeof settings.showSeconds !== 'boolean') {
     settings.showSeconds = defaultSettings.showSeconds;
+  }
+  if (settings.folderViewMode !== 'grid' && settings.folderViewMode !== 'list') {
+    settings.folderViewMode = defaultSettings.folderViewMode;
   }
   const maxIconSize = getMaxIconSize(settings.gridSize, settings.showIconLabels);
   if (settings.iconSize > maxIconSize) {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useKernel } from '@core/kernel';
+import { useKernel, type FolderViewMode } from '@core/kernel';
 import { ICON_EMOJI_SCALE, ICON_GLYPH_SCALE } from '@core/constants';
 import {
   getItemsByPath,
@@ -42,8 +42,11 @@ interface FolderWindowProps {
   folderId?: string;
 }
 
-/** File-browser window: sidebar, breadcrumbs, grid, and clipboard/DnD. */
+/** File-browser window: sidebar, breadcrumbs, grid/list, and clipboard/DnD. */
 export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
+  const settings = useKernel((state) => state.settings);
+  const updateSettings = useKernel((state) => state.updateSettings);
+  const viewMode: FolderViewMode = settings.folderViewMode === 'list' ? 'list' : 'grid';
   const [currentPath, setCurrentPath] = useState<string>(initialPath || '/Desktop');
   const [items, setItems] = useState<DesktopItem[]>([]);
   const [folderName, setFolderName] = useState<string>('Folder');
@@ -98,7 +101,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
       const folders = getDesktopFolders();
       const folder = folders.find(f => f.id === folderId);
       if (folder) {
-        const path = `/Desktop/${folder.name}`;
+        const path =
+          folder.parentPath && folder.parentPath !== '/Desktop'
+            ? `${folder.parentPath}/${folder.name}`
+            : `/Desktop/${folder.name}`;
         setCurrentPath(path);
         setPathInput(path);
         loadItems(path);
@@ -709,8 +715,41 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     }
   }, [currentPath, loadItems]);
 
-  const settings = useKernel((state) => state.settings);
   const gridSize = getGridSize();
+  const listIconSize = 20;
+  const isList = viewMode === 'list';
+
+  const setViewMode = useCallback((mode: FolderViewMode) => {
+    updateSettings({ folderViewMode: mode });
+  }, [updateSettings]);
+
+  const renderItemIcon = (
+    icon: string,
+    size: number,
+    color?: string,
+  ) => (
+    <div
+      className="folder-window-item-icon"
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {hasIcon(icon as IconName) ? (
+        <Icon
+          name={icon as IconName}
+          size={size * ICON_GLYPH_SCALE}
+          color={color}
+          fallback={typeof icon === 'string' && !hasIcon(icon as IconName) ? icon : undefined}
+        />
+      ) : (
+        <span style={{ fontSize: `${size * ICON_EMOJI_SCALE}px` }}>{icon}</span>
+      )}
+    </div>
+  );
 
   return (
     <div className="folder-window-content">
@@ -748,6 +787,26 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
             )}
           </div>
         )}
+        <div className="folder-window-view-toggle" role="group" aria-label="View mode">
+          <button
+            type="button"
+            className={`folder-view-button ${viewMode === 'grid' ? 'active' : ''}`}
+            aria-pressed={viewMode === 'grid'}
+            title="Grid view"
+            onClick={() => setViewMode('grid')}
+          >
+            <Icon name="view-grid" size={14} />
+          </button>
+          <button
+            type="button"
+            className={`folder-view-button ${viewMode === 'list' ? 'active' : ''}`}
+            aria-pressed={viewMode === 'list'}
+            title="List view"
+            onClick={() => setViewMode('list')}
+          >
+            <Icon name="view-list" size={14} />
+          </button>
+        </div>
       </div>
       <div className="folder-window-body">
         <FolderSidebar currentPath={currentPath} onNavigate={handleNavigate} />
@@ -760,7 +819,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
           onDrop={handleDrop}
         >
           <div className="folder-window-title">{folderName}</div>
-          <div className="folder-window-grid" ref={gridRef}>
+          <div
+            className={`folder-window-grid view-${viewMode}`}
+            ref={gridRef}
+          >
             {marquee && (
               <div
                 className="selection-marquee"
@@ -780,48 +842,32 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                 const itemsPerRow = Math.max(1, Math.floor((containerWidth - 32) / (gridSize + 16)));
                 const row = Math.floor(index / itemsPerRow);
                 const col = index % itemsPerRow;
-                const x = col * (gridSize + 16) + 16;
-                const y = row * (gridSize + 64) + 16;
+                const gridStyle = isList
+                  ? undefined
+                  : {
+                      left: `${col * (gridSize + 16) + 16}px`,
+                      top: `${row * (gridSize + 64) + 16}px`,
+                      width: `${gridSize}px`,
+                    };
+                const iconSize = isList ? listIconSize : settings.iconSize;
+                const selectedClass = selectedIds.has(item.id) ? 'selected' : '';
+                const cutClass = cutIds.has(item.id) ? 'cut' : '';
 
                 if (isDesktopFolder(item)) {
                   return (
                     <div
                       key={item.id}
-                      className={`folder-window-item folder-item ${selectedIds.has(item.id) ? 'selected' : ''} ${cutIds.has(item.id) ? 'cut' : ''}`}
+                      className={`folder-window-item folder-item ${selectedClass} ${cutClass}`}
                       data-item-id={item.id}
                       data-item-type="folder"
-                      style={{
-                        left: `${x}px`,
-                        top: `${y}px`,
-                        width: `${gridSize}px`,
-                      }}
+                      style={gridStyle}
                       draggable={true}
                       onDragStart={(e) => handleItemDragStart(item, e)}
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
-                      <div
-                        className="folder-window-item-icon"
-                        style={{
-                          width: `${settings.iconSize}px`,
-                          height: `${settings.iconSize}px`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {hasIcon(item.icon as IconName) ? (
-                          <Icon 
-                            name={item.icon as IconName} 
-                            size={settings.iconSize * ICON_GLYPH_SCALE}
-                            color="var(--color-accent)"
-                            fallback={typeof item.icon === 'string' && !hasIcon(item.icon as IconName) ? item.icon : undefined}
-                          />
-                        ) : (
-                          <span style={{ fontSize: `${settings.iconSize * ICON_EMOJI_SCALE}px` }}>{item.icon}</span>
-                        )}
-                      </div>
-                      {settings.showIconLabels && (
+                      {renderItemIcon(item.icon, iconSize, 'var(--color-accent)')}
+                      {(isList || settings.showIconLabels) && (
                         <div className="folder-window-item-label">{item.name}</div>
                       )}
                     </div>
@@ -833,41 +879,18 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                   return (
                     <div
                       key={item.id}
-                      className={`folder-window-item shortcut-item ${selectedIds.has(item.id) ? 'selected' : ''} ${cutIds.has(item.id) ? 'cut' : ''}`}
+                      className={`folder-window-item shortcut-item ${selectedClass} ${cutClass}`}
                       data-item-id={item.id}
                       data-item-type="shortcut"
                       data-program-id={item.programId}
-                      style={{
-                        left: `${x}px`,
-                        top: `${y}px`,
-                        width: `${gridSize}px`,
-                      }}
+                      style={gridStyle}
                       draggable={true}
                       onDragStart={(e) => handleItemDragStart(item, e)}
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
-                      <div
-                        className="folder-window-item-icon"
-                        style={{
-                          width: `${settings.iconSize}px`,
-                          height: `${settings.iconSize}px`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {hasIcon(program.metadata.icon as IconName) ? (
-                          <Icon 
-                            name={program.metadata.icon as IconName} 
-                            size={settings.iconSize * ICON_GLYPH_SCALE}
-                            fallback={typeof program.metadata.icon === 'string' && !hasIcon(program.metadata.icon as IconName) ? program.metadata.icon : undefined}
-                          />
-                        ) : (
-                          <span style={{ fontSize: `${settings.iconSize * ICON_EMOJI_SCALE}px` }}>{program.metadata.icon}</span>
-                        )}
-                      </div>
-                      {settings.showIconLabels && (
+                      {renderItemIcon(program.metadata.icon, iconSize)}
+                      {(isList || settings.showIconLabels) && (
                         <div className="folder-window-item-label">
                           {item.customName || program.metadata.name}
                         </div>
