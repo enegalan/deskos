@@ -216,13 +216,6 @@ systemIcons.forEach((icon) => {
 });
 
 /**
- * Register a custom icon
- */
-export function registerIcon(icon: IconDefinition): void {
-  iconRegistry.set(icon.name, icon);
-}
-
-/**
  * Get an icon definition
  */
 export function getIcon(name: IconName): IconDefinition | undefined {

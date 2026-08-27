@@ -210,14 +210,6 @@ function Submenu({ items, parentItem, parentItemId, onSelect, onMouseEnter, onMo
         y = 0;
       }
 
-      // Debug log (can be removed later)
-      // console.log('[Submenu] Positioning:', {
-      //   parentRect: { right: parentRect.right, top: parentRect.top },
-      //   submenuSize: { width: submenuWidth, height: submenuHeight },
-      //   finalPosition: { x, y },
-      //   viewport: { width: viewport.width, height: viewport.height },
-      // });
-
       setPosition({
         x,
         y,

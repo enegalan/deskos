@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { programs } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
 import { getMaxIconSize, useKernel } from '@core/kernel';
+import {
+  DRAG_START_THRESHOLD,
+  ICON_EMOJI_SCALE,
+  ICON_GLYPH_SCALE,
+} from '@core/constants';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 import {
@@ -183,8 +188,8 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
         const deltaX = Math.abs(moveEvent.clientX - startX);
         const deltaY = Math.abs(moveEvent.clientY - startY);
         
-        // Only start dragging if mouse moved more than 5px
-        if ((deltaX > 5 || deltaY > 5) && !hasMoved) {
+        // Only start dragging if mouse moved more than the threshold
+        if ((deltaX > DRAG_START_THRESHOLD || deltaY > DRAG_START_THRESHOLD) && !hasMoved) {
           hasMoved = true;
           // Select the icon when dragging starts (force single selection)
           onSelect(undefined as any, true);
@@ -445,11 +450,11 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
           {hasIcon(program.icon as IconName) ? (
             <Icon 
               name={program.icon as IconName} 
-              size={iconSize * 0.8}
+              size={iconSize * ICON_GLYPH_SCALE}
               fallback={typeof program.icon === 'string' && !hasIcon(program.icon as IconName) ? program.icon : undefined}
             />
           ) : (
-            <span style={{ fontSize: `${iconSize * 0.7}px` }}>{program.icon}</span>
+            <span style={{ fontSize: `${iconSize * ICON_EMOJI_SCALE}px` }}>{program.icon}</span>
           )}
         </div>
         {settings.showIconLabels && (
@@ -600,7 +605,7 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
         const deltaX = Math.abs(moveEvent.clientX - startX);
         const deltaY = Math.abs(moveEvent.clientY - startY);
         
-        if ((deltaX > 5 || deltaY > 5) && !hasMoved) {
+        if ((deltaX > DRAG_START_THRESHOLD || deltaY > DRAG_START_THRESHOLD) && !hasMoved) {
           hasMoved = true;
           // Select the folder when dragging starts (force single selection)
           onSelect(undefined as any, true);
@@ -849,11 +854,11 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
           {hasIcon(folder.icon as IconName) ? (
             <Icon 
               name={folder.icon as IconName} 
-              size={iconSize * 0.8}
+              size={iconSize * ICON_GLYPH_SCALE}
               fallback={typeof folder.icon === 'string' && !hasIcon(folder.icon as IconName) ? folder.icon : undefined}
             />
           ) : (
-            <span style={{ fontSize: `${iconSize * 0.7}px` }}>{folder.icon}</span>
+            <span style={{ fontSize: `${iconSize * ICON_EMOJI_SCALE}px` }}>{folder.icon}</span>
           )}
         </div>
         {settings.showIconLabels && (

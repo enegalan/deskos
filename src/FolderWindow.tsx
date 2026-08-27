@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useKernel } from '@core/kernel';
+import { ICON_EMOJI_SCALE, ICON_GLYPH_SCALE } from '@core/constants';
 import {
   getItemsByPath,
   getSpecialLocationItems,
@@ -684,11 +685,11 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                         {hasIcon(item.icon as IconName) ? (
                           <Icon 
                             name={item.icon as IconName} 
-                            size={settings.iconSize * 0.8}
+                            size={settings.iconSize * ICON_GLYPH_SCALE}
                             fallback={typeof item.icon === 'string' && !hasIcon(item.icon as IconName) ? item.icon : undefined}
                           />
                         ) : (
-                          <span style={{ fontSize: `${settings.iconSize * 0.7}px` }}>{item.icon}</span>
+                          <span style={{ fontSize: `${settings.iconSize * ICON_EMOJI_SCALE}px` }}>{item.icon}</span>
                         )}
                       </div>
                       {settings.showIconLabels && (
@@ -730,11 +731,11 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                         {hasIcon(program.metadata.icon as IconName) ? (
                           <Icon 
                             name={program.metadata.icon as IconName} 
-                            size={settings.iconSize * 0.8}
+                            size={settings.iconSize * ICON_GLYPH_SCALE}
                             fallback={typeof program.metadata.icon === 'string' && !hasIcon(program.metadata.icon as IconName) ? program.metadata.icon : undefined}
                           />
                         ) : (
-                          <span style={{ fontSize: `${settings.iconSize * 0.7}px` }}>{program.metadata.icon}</span>
+                          <span style={{ fontSize: `${settings.iconSize * ICON_EMOJI_SCALE}px` }}>{program.metadata.icon}</span>
                         )}
                       </div>
                       {settings.showIconLabels && (

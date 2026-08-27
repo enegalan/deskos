@@ -6,7 +6,7 @@ export interface IconProps {
   size?: number | string;
   color?: string;
   className?: string;
-  fallback?: string; // Emoji fallback for backward compatibility
+  fallback?: string; // Emoji when no SVG icon exists
   style?: React.CSSProperties;
 }
 

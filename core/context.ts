@@ -29,7 +29,6 @@ export interface ContextMenuAPI {
     generator?: (context: unknown) => MenuItem[] | Promise<MenuItem[]>;
     priority?: number;
   }): () => void;
-  unregister(target: string, providerId: string): void;
 }
 
 export interface ProgramContext {
@@ -207,12 +206,6 @@ function createContextMenuAPI(programId: string): ContextMenuAPI {
         programId,
       };
       return manager.registerProvider(fullProvider);
-    },
-
-    unregister(_target: string, _providerId: string): void {
-      // Unregister is handled by the return function from register
-      // This is kept for API completeness
-      console.warn('[ContextMenuAPI] Use the return function from register() to unregister');
     },
   };
 }

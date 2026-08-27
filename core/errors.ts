@@ -4,11 +4,8 @@
 
 export enum ErrorCode {
   WINDOW_NOT_FOUND = 'WINDOW_NOT_FOUND',
-  PROGRAM_NOT_FOUND = 'PROGRAM_NOT_FOUND',
   STORAGE_ERROR = 'STORAGE_ERROR',
-  INVALID_INPUT = 'INVALID_INPUT',
   OPERATION_FAILED = 'OPERATION_FAILED',
-  PERMISSION_DENIED = 'PERMISSION_DENIED',
 }
 
 export interface DeskOSError extends Error {
@@ -29,18 +26,6 @@ export class WindowNotFoundError extends Error implements DeskOSError {
   }
 }
 
-export class ProgramNotFoundError extends Error implements DeskOSError {
-  code = ErrorCode.PROGRAM_NOT_FOUND;
-  context?: Record<string, unknown>;
-  recoverable = false;
-
-  constructor(programId: string) {
-    super(`Program not found: ${programId}`);
-    this.name = 'ProgramNotFoundError';
-    this.context = { programId };
-  }
-}
-
 export class StorageError extends Error implements DeskOSError {
   code = ErrorCode.STORAGE_ERROR;
   context?: Record<string, unknown>;
@@ -49,18 +34,6 @@ export class StorageError extends Error implements DeskOSError {
   constructor(message: string, context?: Record<string, unknown>) {
     super(`Storage error: ${message}`);
     this.name = 'StorageError';
-    this.context = context;
-  }
-}
-
-export class InvalidInputError extends Error implements DeskOSError {
-  code = ErrorCode.INVALID_INPUT;
-  context?: Record<string, unknown>;
-  recoverable = false;
-
-  constructor(message: string, context?: Record<string, unknown>) {
-    super(`Invalid input: ${message}`);
-    this.name = 'InvalidInputError';
     this.context = context;
   }
 }
@@ -124,22 +97,6 @@ export function handleError(error: unknown, context?: Record<string, unknown>): 
 
   errorLogger.log(deskOSError);
   return deskOSError;
-}
-
-/**
- * Safe async wrapper
- */
-export async function safeAsync<T>(
-  fn: () => Promise<T>,
-  context?: Record<string, unknown>
-): Promise<[T | null, DeskOSError | null]> {
-  try {
-    const result = await fn();
-    return [result, null];
-  } catch (error) {
-    const deskOSError = handleError(error, context);
-    return [null, deskOSError];
-  }
 }
 
 /**

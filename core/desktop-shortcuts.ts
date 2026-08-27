@@ -1,5 +1,6 @@
 import { createScopedStorage } from './storage';
 import { useKernel } from './kernel';
+import { GRID_OCCUPANCY_RATIO, TASKBAR_HEIGHT } from './constants';
 
 export interface DesktopShortcut {
   id: string;
@@ -33,7 +34,6 @@ export function isDesktopShortcut(item: DesktopItem): item is DesktopShortcut {
 const STORAGE_KEY = 'desktop-shortcuts';
 const FOLDERS_STORAGE_KEY = 'desktop-folders';
 const FOLDER_PATHS_STORAGE_KEY = 'folder-paths';
-export const GRID_SIZE = 80; // Legacy constant, use getGridSize() instead
 
 /**
  * Get current grid size from settings
@@ -144,39 +144,6 @@ export function updateDesktopShortcutPosition(shortcutId: string, x: number, y: 
 }
 
 /**
- * Swap positions of two desktop shortcuts
- */
-export function swapDesktopShortcutPositions(shortcutId1: string, shortcutId2: string): void {
-  const shortcuts = getDesktopShortcuts();
-  const shortcut1 = shortcuts.find((s) => s.id === shortcutId1);
-  const shortcut2 = shortcuts.find((s) => s.id === shortcutId2);
-  
-  if (shortcut1 && shortcut2) {
-    const tempX = shortcut1.x;
-    const tempY = shortcut1.y;
-    shortcut1.x = shortcut2.x;
-    shortcut1.y = shortcut2.y;
-    shortcut2.x = tempX;
-    shortcut2.y = tempY;
-    systemStorage.setItem(STORAGE_KEY, shortcuts);
-  }
-}
-
-/**
- * Find shortcut at a given grid position
- */
-export function findShortcutAtPosition(x: number, y: number, excludeId?: string): DesktopShortcut | null {
-  const shortcuts = getDesktopShortcuts();
-  const gridSize = getGridSize();
-  const threshold = gridSize * 0.5;
-  
-  return shortcuts.find((s) => {
-    if (excludeId && s.id === excludeId) return false;
-    return Math.abs(s.x - x) < threshold && Math.abs(s.y - y) < threshold;
-  }) || null;
-}
-
-/**
  * Find any desktop item (shortcut or folder) at a given grid position
  * Only returns items that are exactly at the same grid position (same cell)
  */
@@ -241,7 +208,7 @@ export function swapItemPositions(itemId1: string, itemId2: string): void {
  */
 export function findNextAvailablePosition(items: Array<{ x: number; y: number }>): { x: number; y: number } {
   const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight - 48; // Account for taskbar
+  const viewportHeight = window.innerHeight - TASKBAR_HEIGHT;
   const gridSize = getGridSize();
   
   const maxCols = Math.floor(viewportWidth / gridSize);
@@ -254,7 +221,7 @@ export function findNextAvailablePosition(items: Array<{ x: number; y: number }>
       const y = row * gridSize;
       
       const occupied = items.some((item) => {
-        const threshold = gridSize * 0.5; // Consider occupied if within half grid size
+        const threshold = gridSize * GRID_OCCUPANCY_RATIO;
         return Math.abs(item.x - x) < threshold && Math.abs(item.y - y) < threshold;
       });
       
@@ -340,7 +307,7 @@ export function realignIconsToGrid(): void {
   // Second pass: resolve collisions by finding available positions
   if (collisions.length > 0) {
     const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight - 48; // Account for taskbar
+    const viewportHeight = window.innerHeight - TASKBAR_HEIGHT;
     const maxCols = Math.floor(viewportWidth / gridSize);
     const maxRows = Math.floor(viewportHeight / gridSize);
     
@@ -448,7 +415,7 @@ export function autoArrangeIcons(): void {
   // Sort items by their current position (top to bottom, left to right)
   // This preserves some order preference
   const sortedItems = [...allItems].sort((a, b) => {
-    if (Math.abs(a.y - b.y) < gridSize * 0.5) {
+    if (Math.abs(a.y - b.y) < gridSize * GRID_OCCUPANCY_RATIO) {
       // Same row, sort by x
       return a.x - b.x;
     }

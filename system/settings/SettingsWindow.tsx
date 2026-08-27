@@ -1,5 +1,12 @@
 import type { ProgramContext } from '@core/context';
 import { getMaxIconSize, useKernel } from '@core/kernel';
+import {
+  DEFAULT_GRID_SIZE,
+  DEFAULT_ICON_SIZE,
+  MAX_GRID_SIZE,
+  MIN_GRID_SIZE,
+  MIN_ICON_SIZE,
+} from '@core/constants';
 import { saveCustomWallpaper, getCustomWallpapers, removeCustomWallpaper, type WallpaperMetadata } from '@core/wallpaper-storage';
 import { useState, useEffect } from 'react';
 
@@ -157,7 +164,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
   };
 
   const handleGridSizeChange = (size: number) => {
-    const validSize = Math.max(100, size);
+    const validSize = Math.max(MIN_GRID_SIZE, size);
     updateSettings({ gridSize: validSize });
     // Realign all icons to the new grid size
     import('@core/desktop-shortcuts').then(({ realignIconsToGrid }) => {
@@ -182,11 +189,11 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
   };
 
   const handleResetIconSize = () => {
-    updateSettings({ iconSize: 64 });
+    updateSettings({ iconSize: DEFAULT_ICON_SIZE });
   };
 
   const handleResetGridSize = () => {
-    updateSettings({ gridSize: 100 });
+    updateSettings({ gridSize: DEFAULT_GRID_SIZE });
     // Realign all icons to the new grid size
     import('@core/desktop-shortcuts').then(({ realignIconsToGrid }) => {
       realignIconsToGrid();
@@ -372,7 +379,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
               type="range"
-              min="32"
+              min={MIN_ICON_SIZE}
               max={getMaxIconSize(settings.gridSize, settings.showIconLabels)}
               value={settings.iconSize}
               onChange={(e) => handleIconSizeChange(parseInt(e.target.value, 10))}
@@ -391,7 +398,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
                 fontSize: '11px',
                 cursor: 'pointer',
               }}
-              title="Reset to default (64px)"
+              title={`Reset to default (${DEFAULT_ICON_SIZE}px)`}
             >
               Reset
             </button>
@@ -403,8 +410,8 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
               type="range"
-              min="100"
-              max="120"
+              min={MIN_GRID_SIZE}
+              max={MAX_GRID_SIZE}
               value={settings.gridSize}
               onChange={(e) => handleGridSizeChange(parseInt(e.target.value, 10))}
               style={{
@@ -422,7 +429,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
                 fontSize: '11px',
                 cursor: 'pointer',
               }}
-              title="Reset to default (100px)"
+              title={`Reset to default (${DEFAULT_GRID_SIZE}px)`}
             >
               Reset
             </button>

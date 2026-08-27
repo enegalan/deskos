@@ -72,27 +72,6 @@ export function registerPasteHandler(handler: () => void, priority: number = PRI
 }
 
 /**
- * Unregister copy handler
- */
-export function unregisterCopyHandler(): void {
-  copyHandlers = [];
-}
-
-/**
- * Unregister cut handler
- */
-export function unregisterCutHandler(): void {
-  cutHandlers = [];
-}
-
-/**
- * Unregister paste handler
- */
-export function unregisterPasteHandler(): void {
-  pasteHandlers = [];
-}
-
-/**
  * Get current copy handler (highest priority)
  * @internal Used by keyboard shortcuts manager
  */
@@ -168,14 +147,6 @@ export function cut(data: ClipboardData): void {
 export function getClipboard(): ClipboardData | null {
   console.log('[Clipboard] Get: Returning clipboard', clipboardData);
   return clipboardData;
-}
-
-/**
- * Paste items from clipboard (placeholder - actual paste logic is in handlers)
- */
-export function paste(): void {
-  // This is a placeholder - actual paste logic is handled by registered handlers
-  // This function exists for API completeness
 }
 
 // Export priority constants

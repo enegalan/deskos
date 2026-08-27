@@ -1,5 +1,5 @@
 import { createScopedStorage } from './storage';
-import { getDesktopFolders, getFolderByPath as getFolderByPathImpl, getItemsByPath as getItemsByPathImpl, type DesktopItem, type DesktopFolder } from './desktop-shortcuts';
+import { getFolderByPath as getFolderByPathImpl, getItemsByPath as getItemsByPathImpl, type DesktopItem, type DesktopFolder } from './desktop-shortcuts';
 import { programs } from 'virtual:programs';
 
 // Re-export functions from desktop-shortcuts for convenience
@@ -67,25 +67,6 @@ export function normalizePath(path: string): string {
 }
 
 /**
- * Get path for a folder by its ID
- */
-export function getPathForFolder(folderId: string): string | null {
-  const folders = getDesktopFolders();
-  const folder = folders.find(f => f.id === folderId);
-  if (!folder) return null;
-  
-  // Build path by traversing parent chain
-  const buildPath = (f: DesktopFolder): string => {
-    if (!f.parentPath || f.parentPath === '/Desktop') {
-      return `/Desktop/${f.name}`;
-    }
-    return `${f.parentPath}/${f.name}`;
-  };
-  
-  return buildPath(folder);
-}
-
-/**
  * Resolve a path to a folder or special location
  */
 export function resolvePath(path: string): { type: 'special' | 'folder' | 'not-found'; location?: SpecialLocation; folder?: DesktopFolder } {
@@ -105,21 +86,6 @@ export function resolvePath(path: string): { type: 'special' | 'folder' | 'not-f
   }
   
   return { type: 'not-found' };
-}
-
-/**
- * Check if a path is a special location
- */
-export function isSpecialLocation(path: string): boolean {
-  const normalized = normalizePath(path);
-  return Object.values(SPECIAL_LOCATIONS).some(loc => loc.path === normalized);
-}
-
-/**
- * Get icon for a special location
- */
-export function getSpecialLocationIcon(location: SpecialLocation): string {
-  return SPECIAL_LOCATIONS[location].icon;
 }
 
 /**
@@ -215,11 +181,4 @@ export function addRecentItem(path: string): void {
   // Keep only last 20
   const limited = filtered.slice(0, 20);
   systemStorage.setItem(RECENT_ITEMS_STORAGE_KEY, limited);
-}
-
-/**
- * Clear recent items
- */
-export function clearRecentItems(): void {
-  systemStorage.setItem(RECENT_ITEMS_STORAGE_KEY, []);
 }

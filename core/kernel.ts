@@ -2,6 +2,15 @@ import { create } from 'zustand';
 import type { ReactNode } from 'react';
 import type { IconName } from './icons';
 import { WindowNotFoundError, StorageError, handleError, safeSync } from './errors';
+import {
+  DEFAULT_GRID_SIZE,
+  DEFAULT_ICON_SIZE,
+  ICON_CELL_PADDING,
+  ICON_LABEL_SPACE,
+  MIN_GRID_SIZE,
+  MIN_ICON_SIZE,
+  TASKBAR_HEIGHT,
+} from './constants';
 
 export interface WindowState {
   id: string;
@@ -50,13 +59,10 @@ export interface SystemSettings {
   showIconLabels: boolean;
 }
 
-/** Cell padding (4+4) + label block so glyph + label fit in one grid cell */
-const ICON_CELL_PADDING = 8;
-const ICON_LABEL_SPACE = 22;
-
+/** Max glyph size that still fits glyph + label in one grid cell */
 export function getMaxIconSize(gridSize: number, showIconLabels: boolean): number {
   const reserved = ICON_CELL_PADDING + (showIconLabels ? ICON_LABEL_SPACE : 0);
-  return Math.max(32, gridSize - reserved);
+  return Math.max(MIN_ICON_SIZE, gridSize - reserved);
 }
 
 export interface KernelState {
@@ -92,8 +98,8 @@ const defaultSettings: SystemSettings = {
   timeFormat: '24h',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   showDate: false,
-  iconSize: 64,
-  gridSize: 100,
+  iconSize: DEFAULT_ICON_SIZE,
+  gridSize: DEFAULT_GRID_SIZE,
   autoArrange: false,
   showIconLabels: true,
 };
@@ -112,8 +118,8 @@ function loadSettings(): SystemSettings {
 
   const [parsed, parseError] = safeSync(() => JSON.parse(stored) as Partial<SystemSettings>);
   
-  if (parseError) {
-    handleError(parseError, { operation: 'parseSettings' });
+  if (parseError || !parsed) {
+    handleError(parseError ?? new StorageError('Failed to parse settings'), { operation: 'parseSettings' });
     return defaultSettings;
   }
 
@@ -124,8 +130,8 @@ function loadSettings(): SystemSettings {
       (settings[key] as SystemSettings[typeof key]) = value as SystemSettings[typeof key];
     }
   });
-  if (settings.gridSize < 100) {
-    settings.gridSize = 100;
+  if (settings.gridSize < MIN_GRID_SIZE) {
+    settings.gridSize = MIN_GRID_SIZE;
   }
   const maxIconSize = getMaxIconSize(settings.gridSize, settings.showIconLabels);
   if (settings.iconSize > maxIconSize) {
@@ -155,7 +161,7 @@ export const useKernel = create<KernelState>((set, get) => ({
   createWindow: (programId: string, icon: string, options: WindowCreateOptions): string => {
     const windowId = generateWindowId();
     const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight - 48; // Account for taskbar
+    const viewportHeight = window.innerHeight - TASKBAR_HEIGHT;
 
     const width = options.width ?? 600;
     const height = options.height ?? 400;
@@ -266,7 +272,7 @@ export const useKernel = create<KernelState>((set, get) => ({
             x: 0,
             y: 0,
             width: window.innerWidth,
-            height: window.innerHeight - 48,
+            height: window.innerHeight - TASKBAR_HEIGHT,
           };
         }
         return w;
@@ -320,7 +326,7 @@ export const useKernel = create<KernelState>((set, get) => ({
 
       // Validate dimensions
       const validWidth = Math.max(win.minWidth, Math.min(width, window.innerWidth));
-      const validHeight = Math.max(win.minHeight, Math.min(height, window.innerHeight - 48));
+      const validHeight = Math.max(win.minHeight, Math.min(height, window.innerHeight - TASKBAR_HEIGHT));
 
       return {
         windows: state.windows.map((w) =>
@@ -347,8 +353,8 @@ export const useKernel = create<KernelState>((set, get) => ({
   updateSettings: (newSettings: Partial<SystemSettings>): void => {
     set((state) => {
       const updatedSettings = { ...state.settings, ...newSettings };
-      if (updatedSettings.gridSize < 100) {
-        updatedSettings.gridSize = 100;
+      if (updatedSettings.gridSize < MIN_GRID_SIZE) {
+        updatedSettings.gridSize = MIN_GRID_SIZE;
       }
       const maxIconSize = getMaxIconSize(updatedSettings.gridSize, updatedSettings.showIconLabels);
       if (updatedSettings.iconSize > maxIconSize) {

@@ -4,7 +4,7 @@ import { Taskbar } from './Taskbar';
 import { ContextMenuRenderer } from '../context-menu/Renderer';
 import { eventBus, SystemEvents } from '@core/event-bus';
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { registerDefaultMenus } from '../context-menu/default-menus';
+import { registerDefaultMenus } from '../context-menu/menus';
 import { DesktopIcons } from './DesktopIcons';
 import { addDesktopShortcut, pixelToGrid, getFolderById, getGridSize } from '@core/desktop-shortcuts';
 import { FolderWindow } from './FolderWindow';
@@ -139,11 +139,11 @@ export function Desktop() {
     // Wire up context menu events to event bus
     const handleMenuOpen = (e: Event) => {
       const customEvent = e as CustomEvent;
-      eventBus.emit(SystemEvents.CONTEXT_MENU_OPENED || 'system:contextmenu:opened', customEvent.detail);
+      eventBus.emit(SystemEvents.CONTEXT_MENU_OPENED, customEvent.detail);
     };
 
     const handleMenuClose = () => {
-      eventBus.emit(SystemEvents.CONTEXT_MENU_CLOSED || 'system:contextmenu:closed', {});
+      eventBus.emit(SystemEvents.CONTEXT_MENU_CLOSED, {});
     };
 
     document.addEventListener('contextmenu:menu:open', handleMenuOpen);

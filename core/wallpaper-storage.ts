@@ -261,28 +261,3 @@ export async function removeCustomWallpaper(id: string): Promise<void> {
   const filtered = wallpapers.filter((wp) => wp.id !== id);
   localStorage.setItem(WALLPAPERS_LIST_KEY, JSON.stringify(filtered));
 }
-
-/**
- * Get all wallpaper IDs (for cleanup purposes)
- */
-export async function getAllWallpaperIds(): Promise<string[]> {
-  try {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.getAllKeys();
-
-      request.onsuccess = () => {
-        resolve(request.result as string[]);
-      };
-
-      request.onerror = () => {
-        reject(request.error);
-      };
-    });
-  } catch (error) {
-    console.error('[WallpaperStorage] Failed to get wallpaper IDs:', error);
-    return [];
-  }
-}

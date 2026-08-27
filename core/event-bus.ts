@@ -95,12 +95,6 @@ export function createScopedEventBus(programId: string): EventBusAPI {
 
 // System-level event types
 export const SystemEvents = {
-  WINDOW_OPENED: 'system:window:opened',
-  WINDOW_CLOSED: 'system:window:closed',
-  WINDOW_FOCUSED: 'system:window:focused',
-  PROGRAM_LAUNCHED: 'system:program:launched',
-  THEME_CHANGED: 'system:theme:changed',
-  SETTINGS_UPDATED: 'system:settings:updated',
   CONTEXT_MENU_OPENED: 'system:contextmenu:opened',
   CONTEXT_MENU_CLOSED: 'system:contextmenu:closed',
 } as const;

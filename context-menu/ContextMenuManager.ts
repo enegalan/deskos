@@ -37,14 +37,6 @@ export interface ContextMenuProvider {
   programId?: string;
 }
 
-export interface ContextMenuHooks {
-  onBeforeOpen?: (context: MenuContext, items: MenuItem[]) => MenuItem[] | void;
-  onAfterOpen?: (context: MenuContext) => void;
-  onMenuItemSelect?: (item: MenuItem, context: MenuContext) => boolean | void;
-  onBeforeClose?: (context: MenuContext) => void;
-  onAfterClose?: (context: MenuContext) => void;
-}
-
 export type HapticPattern = 'trigger' | 'success' | 'error';
 
 export interface MenuRenderState {
@@ -64,7 +56,6 @@ export class ContextMenuManager {
   private static instance: ContextMenuManager | null = null;
 
   private providers: Map<string, ContextMenuProvider[]> = new Map();
-  private hooks: ContextMenuHooks[] = [];
   private renderState: MenuRenderState = {
     isOpen: false,
     isPositioning: false,
@@ -75,7 +66,6 @@ export class ContextMenuManager {
   };
 
   private currentContext: MenuContext | null = null;
-  private currentItems: MenuItem[] = [];
   private menuContainer: HTMLElement | null = null;
   private longPressTimer: number | null = null;
   private longPressThreshold = 500; // ms
@@ -454,30 +444,15 @@ export class ContextMenuManager {
         return; // No items to show
       }
 
-      // Execute onBeforeOpen hooks
-      let finalItems = items;
-      for (const hook of this.hooks) {
-        if (hook.onBeforeOpen) {
-          const result = hook.onBeforeOpen(context, finalItems);
-          if (result) {
-            finalItems = result;
-          }
-        }
-      }
-
-      this.currentItems = finalItems;
+      this.currentContext = context;
       this.renderState.isOpen = true;
       this.renderState.isPositioning = true;
 
       // Trigger render (will be handled by Renderer)
-      this.emit('menu:open', { context, items: finalItems });
+      this.emit('menu:open', { context, items });
 
-      // Execute onAfterOpen hooks after render
       requestAnimationFrame(() => {
         this.renderState.isPositioning = false;
-        for (const hook of this.hooks) {
-          hook.onAfterOpen?.(context);
-        }
       });
     } catch (error) {
       console.error('[ContextMenuManager] Error generating menu:', error);
@@ -492,30 +467,12 @@ export class ContextMenuManager {
       return;
     }
 
-    const context = this.currentContext;
-    if (context) {
-      // Execute onBeforeClose hooks
-      for (const hook of this.hooks) {
-        hook.onBeforeClose?.(context);
-      }
-    }
-
     this.renderState.isOpen = false;
     this.renderState.activeItemId = null;
     this.renderState.openSubmenuId = null;
     this.currentContext = null;
-    this.currentItems = [];
 
     this.emit('menu:close', {});
-
-    // Execute onAfterClose hooks
-    if (context) {
-      requestAnimationFrame(() => {
-        for (const hook of this.hooks) {
-          hook.onAfterClose?.(context);
-        }
-      });
-    }
   }
 
   /**
@@ -695,40 +652,6 @@ export class ContextMenuManager {
   }
 
   /**
-   * Register lifecycle hooks
-   */
-  registerHooks(hooks: ContextMenuHooks): () => void {
-    this.hooks.push(hooks);
-    return () => {
-      const index = this.hooks.indexOf(hooks);
-      if (index >= 0) {
-        this.hooks.splice(index, 1);
-      }
-    };
-  }
-
-  /**
-   * Get current render state
-   */
-  getRenderState(): MenuRenderState {
-    return { ...this.renderState };
-  }
-
-  /**
-   * Get current menu items
-   */
-  getCurrentItems(): MenuItem[] {
-    return [...this.currentItems];
-  }
-
-  /**
-   * Get current context
-   */
-  getCurrentContext(): MenuContext | null {
-    return this.currentContext;
-  }
-
-  /**
    * Update render state (called by Renderer)
    */
   updateRenderState(updates: Partial<MenuRenderState>): void {
@@ -741,21 +664,6 @@ export class ContextMenuManager {
   async handleMenuItemSelect(item: MenuItem): Promise<void> {
     const context = this.currentContext;
     if (!context) return;
-
-    // Execute hooks
-    let shouldExecute = true;
-    for (const hook of this.hooks) {
-      if (hook.onMenuItemSelect) {
-        const result = hook.onMenuItemSelect(item, context);
-        if (result === false) {
-          shouldExecute = false;
-        }
-      }
-    }
-
-    if (!shouldExecute) {
-      return;
-    }
 
     // Execute action
     if (item.action) {
@@ -835,7 +743,6 @@ export class ContextMenuManager {
     this.closeMenu();
 
     this.providers.clear();
-    this.hooks = [];
     this.menuContainer = null;
   }
 }
