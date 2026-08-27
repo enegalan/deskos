@@ -4,7 +4,7 @@
 
 ### Added
 
-- Programs can declare `iconContextMenu` on `defineProgram` — custom items on the desktop icon menu (before launch)
+- Programs can declare `iconContextMenu` on `defineProgram` — custom desktop icon menu items appear after Open and New Window (before launch)
 - `ctx.contextMenu.register(selector, …)` scopes CSS targets to the program’s windows so in-app menus (e.g. Preview on `img`) do not leak to other apps
 - Element-specific app providers suppress the generic window chrome menu on the same click
 
@@ -97,6 +97,7 @@
 - Core services (storage, event bus, ProgramContext)
 - First desktop shell and context menu foundation
 
+[1.3.0]: https://github.com/enegalan/deskos/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/enegalan/deskos/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/enegalan/deskos/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/enegalan/deskos/compare/v0.1.0...v1.0.0

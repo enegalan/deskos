@@ -58,7 +58,23 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
               programName = module.default.name;
               allowMultiple = module.default.allowMultipleWindows ?? false;
               if (module.default.iconContextMenu) {
-                iconContextMenuItems = await module.default.iconContextMenu(context);
+                try {
+                  const customPromise = Promise.resolve(
+                    module.default.iconContextMenu(context)
+                  );
+                  const timeoutPromise = new Promise<MenuItem[]>((resolve) => {
+                    setTimeout(() => resolve([]), 200);
+                  });
+                  iconContextMenuItems = await Promise.race([
+                    customPromise,
+                    timeoutPromise,
+                  ]);
+                } catch (error) {
+                  console.error(
+                    '[DesktopIcon] Error generating iconContextMenu:',
+                    error
+                  );
+                }
               }
             }
           } catch (error) {
