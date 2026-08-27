@@ -17,6 +17,7 @@
 - Folder sidebar highlights only the exact current path (not parent Recent/Favorites entries)
 - Window restore from maximized uses the same geometry transition as maximize
 - Keyboard editing shortcuts: Cmd/Ctrl+A/C/X/V, Delete/Backspace; cut ghost UI; paste folder→desktop; focus-aware handlers
+- Directory windows: grid or list view (header toggle + context menu); preference saved in settings
 
 ### Changed
 
@@ -27,6 +28,7 @@
 
 ### Fixed
 
+- Opening a folder by id uses `parentPath` so nested folders resolve to the full path (not only `/Desktop/Name`)
 - Nested folders no longer block “New Folder” on empty desktop cells (`findItemAtPosition` / placement only consider root desktop items)
 - Desktop resize keeps each icon’s cell (col/row); grid only stretches — occupied cells are not dropped
 

@@ -1,4 +1,5 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
+import { useKernel, type FolderViewMode } from '@core/kernel';
 
 /**
  * Read the folder path from a folder-window host element.
@@ -25,26 +26,58 @@ export function registerFolderWindowMenu(manager: ContextMenuManager): void {
         return items;
       }
 
-      const { getFolderByPath } = await import('@core/desktop-shortcuts');
-      const canCreateFolder = path === '/Desktop' || !!getFolderByPath(path);
-      if (!canCreateFolder) {
-        return items;
-      }
+      const viewMode: FolderViewMode =
+        useKernel.getState().settings.folderViewMode === 'list' ? 'list' : 'grid';
 
       items.push({
-        id: 'folder-window-new-folder',
-        label: 'New Folder',
-        icon: 'new-folder',
-        action: async () => {
-          try {
-            const { createDesktopFolder } = await import('@core/desktop-shortcuts');
-            const parentPath = path === '/Desktop' ? undefined : path;
-            createDesktopFolder('New Folder', undefined, undefined, parentPath);
-          } catch (error) {
-            console.error('[FolderWindow] Error creating folder:', error);
-          }
-        },
+        id: 'folder-window-view',
+        label: 'View',
+        icon: 'view',
+        type: 'submenu',
+        submenu: [
+          {
+            id: 'folder-window-view-grid',
+            label: 'as Grid',
+            icon: 'view-grid',
+            type: 'radio',
+            checked: viewMode === 'grid',
+            group: 'folder-view-mode',
+            action: () => {
+              useKernel.getState().updateSettings({ folderViewMode: 'grid' });
+            },
+          },
+          {
+            id: 'folder-window-view-list',
+            label: 'as List',
+            icon: 'view-list',
+            type: 'radio',
+            checked: viewMode === 'list',
+            group: 'folder-view-mode',
+            action: () => {
+              useKernel.getState().updateSettings({ folderViewMode: 'list' });
+            },
+          },
+        ],
       });
+
+      const { getFolderByPath } = await import('@core/desktop-shortcuts');
+      const canCreateFolder = path === '/Desktop' || !!getFolderByPath(path);
+      if (canCreateFolder) {
+        items.push({
+          id: 'folder-window-new-folder',
+          label: 'New Folder',
+          icon: 'new-folder',
+          action: async () => {
+            try {
+              const { createDesktopFolder } = await import('@core/desktop-shortcuts');
+              const parentPath = path === '/Desktop' ? undefined : path;
+              createDesktopFolder('New Folder', undefined, undefined, parentPath);
+            } catch (error) {
+              console.error('[FolderWindow] Error creating folder:', error);
+            }
+          },
+        });
+      }
 
       try {
         const { getClipboard, hasClipboardData } = await import('@core/clipboard');

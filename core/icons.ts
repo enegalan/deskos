@@ -21,6 +21,8 @@ export type IconName =
   | 'open'
   | 'new-window'
   | 'view'
+  | 'view-grid'
+  | 'view-list'
   | 'organize'
   | 'info'
   | 'duplicate'
@@ -140,6 +142,16 @@ const systemIcons: IconDefinition[] = [
   {
     name: 'view',
     svg: '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'view-grid',
+    svg: '<path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'view-list',
+    svg: '<path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" fill="currentColor"/>',
     viewBox: '0 0 24 24',
   },
   {
