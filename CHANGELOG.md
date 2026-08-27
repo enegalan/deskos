@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0] - 2026-08-27
+
+### Added
+
+- Programs can declare `iconContextMenu` on `defineProgram` — custom items on the desktop icon menu (before launch)
+- `ctx.contextMenu.register(selector, …)` scopes CSS targets to the program’s windows so in-app menus (e.g. Preview on `img`) do not leak to other apps
+- Element-specific app providers suppress the generic window chrome menu on the same click
+
 ## [1.2.0] - 2026-08-27
 
 ### Added

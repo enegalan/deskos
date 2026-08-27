@@ -1,5 +1,6 @@
 import type { IconName } from './icons';
 import type { ProgramContext } from './context';
+import type { MenuContext, MenuItem } from '../context-menu/ContextMenuManager';
 
 export interface ProgramDefinition<T extends string = string> {
   id: T;
@@ -7,6 +8,7 @@ export interface ProgramDefinition<T extends string = string> {
   icon: string | IconName;
   launch: (ctx: ProgramContext) => void;
   allowMultipleWindows?: boolean;
+  iconContextMenu?: (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
 }
 
 /**
@@ -18,6 +20,12 @@ export interface ProgramDefinition<T extends string = string> {
  *   id: 'my-program',
  *   name: 'My Program',
  *   icon: 'package',
+ *   iconContextMenu: () => [{
+ *     id: 'my-action',
+ *     label: 'My Action',
+ *     icon: 'package',
+ *     action: () => myAction(),
+ *   }],
  *   launch: (ctx) => {
  *     ctx.window.create({
  *       title: 'My Program',
@@ -32,6 +40,7 @@ export function defineProgram<T extends string>(config: {
   icon: string;
   launch: (ctx: ProgramContext) => void;
   allowMultipleWindows?: boolean;
+  iconContextMenu?: (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
 }): ProgramDefinition<T> {
   return config;
 }
