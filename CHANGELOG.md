@@ -44,6 +44,6 @@
 - Core services (storage, event bus, ProgramContext)
 - First desktop shell and context menu foundation
 
-[1.1.0]: https://github.com/YOUR_USERNAME/deskos/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/YOUR_USERNAME/deskos/compare/v0.1.0...v1.0.0
-[0.1.0]: https://github.com/YOUR_USERNAME/deskos/releases/tag/v0.1.0
+[1.1.0]: https://github.com/enegalan/deskos/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/enegalan/deskos/compare/v0.1.0...v1.0.0
+[0.1.0]: https://github.com/enegalan/deskos/releases/tag/v0.1.0
