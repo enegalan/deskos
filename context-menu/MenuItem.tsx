@@ -16,6 +16,7 @@ interface MenuItemProps {
   onSubmenuClose?: () => void;
 }
 
+/** Single context menu row (action, checkbox, separator, or submenu trigger) */
 export function MenuItem({
   item,
   isActive,
@@ -146,6 +147,7 @@ interface SubmenuProps {
   onClose: () => void;
 }
 
+/** Nested submenu portal positioned relative to its parent item */
 function Submenu({ items, parentItem, parentItemId, onSelect, onMouseEnter, onMouseLeave, onClose }: SubmenuProps) {
   const submenuRef = useRef<HTMLUListElement>(null);
   const [position, setPosition] = useState<MenuPosition | null>(null);

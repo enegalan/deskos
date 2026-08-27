@@ -1,5 +1,6 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
 
+/** Register the text selection / editable field context menu provider */
 export function registerTextMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-text-menu',

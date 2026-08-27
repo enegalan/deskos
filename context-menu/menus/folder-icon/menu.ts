@@ -1,5 +1,6 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
 
+/** Register the folder icon context menu provider */
 export function registerFolderIconMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-folder-icon-menu',

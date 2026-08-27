@@ -1,5 +1,6 @@
 import type { ContextMenuManager, MenuContext } from '../../ContextMenuManager';
 
+/** Register the window title bar / chrome context menu provider */
 export function registerWindowMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-window-menu',

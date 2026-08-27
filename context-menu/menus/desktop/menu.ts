@@ -3,6 +3,7 @@ import { useKernel } from '@core/kernel';
 import { ICON_SIZE_LARGE, ICON_SIZE_MEDIUM, ICON_SIZE_SMALL } from '@core/constants';
 import { organizeIconsByName, organizeIconsByDate } from '@core/desktop-shortcuts';
 
+/** Register the desktop context menu provider */
 export function registerDesktopMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-desktop-menu',

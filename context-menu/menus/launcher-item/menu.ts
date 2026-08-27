@@ -1,5 +1,6 @@
 import type { ContextMenuManager, MenuContext } from '../../ContextMenuManager';
 
+/** Register the launcher item context menu provider */
 export function registerLauncherItemMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-launcher-item-menu',

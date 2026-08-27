@@ -17,7 +17,7 @@ import {
   swapItemPositions,
   pixelToGrid,
   clampGridPosition,
-  getGridSize,
+  getGridMetrics,
   addItemToFolder,
   isDesktopFolder,
   type DesktopShortcut,
@@ -26,6 +26,11 @@ import {
 import { registerSelectAllHandler } from '@core/selection';
 import { registerCopyHandler, registerCutHandler, registerPasteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, type ClipboardItem } from '@core/clipboard';
 
+/**
+ * Highlight the desktop icon under a drag, or clear all highlights.
+ *
+ * @param itemId - Shortcut/folder id to mark, or `null` to clear
+ */
 function setDragOverTarget(itemId: string | null) {
   document.querySelectorAll('.desktop-icon').forEach((el) => {
     el.classList.remove('drag-over-target');
@@ -48,9 +53,11 @@ interface DesktopIconProps {
   onUpdate: () => void;
   isSelected: boolean;
   onSelect: (e?: React.MouseEvent, forceSingle?: boolean) => void;
+  layoutTick: number;
 }
 
-const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isSelected, onSelect }: DesktopIconProps) {
+const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isSelected, onSelect, layoutTick }: DesktopIconProps) {
+  void layoutTick;
   const settings = useKernel((state) => state.settings);
   const [isDragging, setIsDragging] = useState(false);
   const [visualPosition, setVisualPosition] = useState({ x: shortcut.x, y: shortcut.y });
@@ -150,16 +157,20 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
           return;
         }
         
-        const gridSize = getGridSize();
         const currentDesktopRect = desktopElement.getBoundingClientRect();
+        const bounds = {
+          width: currentDesktopRect.width,
+          height: currentDesktopRect.height,
+        };
+        const { cellWidth, cellHeight } = getGridMetrics(bounds);
         
         // Calculate position relative to desktop
         let rawX = moveEvent.clientX - currentDesktopRect.left - initialOffsetX;
         let rawY = moveEvent.clientY - currentDesktopRect.top - initialOffsetY;
         
         // Icon fills one grid cell
-        const iconWidth = gridSize;
-        const iconHeight = gridSize;
+        const iconWidth = cellWidth;
+        const iconHeight = cellHeight;
         
         // Constrain position to desktop bounds
         const minX = 0;
@@ -171,11 +182,8 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
         rawY = Math.max(minY, Math.min(maxY, rawY));
         
         // Snap by icon center so adjacent cell highlights past midpoint
-        const snapped = pixelToGrid(rawX + gridSize / 2, rawY + gridSize / 2);
-        const gridPos = clampGridPosition(snapped.x, snapped.y, {
-          width: currentDesktopRect.width,
-          height: currentDesktopRect.height,
-        });
+        const snapped = pixelToGrid(rawX + cellWidth / 2, rawY + cellHeight / 2, bounds);
+        const gridPos = clampGridPosition(snapped.x, snapped.y, bounds);
         
         setVisualPosition({ x: rawX, y: rawY });
         setGridPosition(gridPos);
@@ -300,7 +308,7 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
               if (folderSelection?.path) {
                 handledByFolderWindow = true;
                 Promise.all([
-                  import('@core/file-system'),
+                  import('@file-system/file-system'),
                   import('@core/desktop-shortcuts')
                 ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
                   const resolved = resolvePath(folderSelection.path);
@@ -400,10 +408,10 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
 
 
   const displayName = shortcut.customName || program.name;
-  const gridSize = getGridSize();
+  const { cellWidth, cellHeight } = getGridMetrics();
   const iconSize = Math.min(
     settings.iconSize,
-    getMaxIconSize(gridSize, settings.showIconLabels)
+    getMaxIconSize(Math.min(cellWidth, cellHeight), settings.showIconLabels)
   );
 
   return (
@@ -414,8 +422,8 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
           style={{
             left: `${gridPosition.x}px`,
             top: `${gridPosition.y}px`,
-            width: `${gridSize}px`,
-            height: `${gridSize}px`,
+            width: `${cellWidth}px`,
+            height: `${cellHeight}px`,
           }}
         />
       )}
@@ -425,8 +433,8 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
         style={{
           left: `${visualPosition.x}px`,
           top: `${visualPosition.y}px`,
-          width: `${gridSize}px`,
-          height: `${gridSize}px`,
+          width: `${cellWidth}px`,
+          height: `${cellHeight}px`,
           transition: isDragging ? 'none' : 'left 0.2s ease-out, top 0.2s ease-out',
         }}
         onMouseDown={handleMouseDown}
@@ -452,6 +460,7 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
             <Icon 
               name={program.icon as IconName} 
               size={iconSize * ICON_GLYPH_SCALE}
+              color="currentColor"
               fallback={typeof program.icon === 'string' && !hasIcon(program.icon as IconName) ? program.icon : undefined}
             />
           ) : (
@@ -472,9 +481,11 @@ interface FolderIconProps {
   onOpen: (folderId: string) => void;
   isSelected: boolean;
   onSelect: (e?: React.MouseEvent, forceSingle?: boolean) => void;
+  layoutTick: number;
 }
 
-const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelected, onSelect }: FolderIconProps) {
+const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelected, onSelect, layoutTick }: FolderIconProps) {
+  void layoutTick;
   const settings = useKernel((state) => state.settings);
   const [isDragging, setIsDragging] = useState(false);
   const [visualPosition, setVisualPosition] = useState({ x: folder.x, y: folder.y });
@@ -569,14 +580,18 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
           return;
         }
         
-        const gridSize = getGridSize();
         const currentDesktopRect = desktopElement.getBoundingClientRect();
+        const bounds = {
+          width: currentDesktopRect.width,
+          height: currentDesktopRect.height,
+        };
+        const { cellWidth, cellHeight } = getGridMetrics(bounds);
         let rawX = moveEvent.clientX - currentDesktopRect.left - initialOffsetX;
         let rawY = moveEvent.clientY - currentDesktopRect.top - initialOffsetY;
         
         // Icon fills one grid cell
-        const iconWidth = gridSize;
-        const iconHeight = gridSize;
+        const iconWidth = cellWidth;
+        const iconHeight = cellHeight;
         
         // Constrain position to desktop bounds
         const minX = 0;
@@ -588,11 +603,8 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
         rawY = Math.max(minY, Math.min(maxY, rawY));
         
         // Snap by icon center so adjacent cell highlights past midpoint
-        const snapped = pixelToGrid(rawX + gridSize / 2, rawY + gridSize / 2);
-        const gridPos = clampGridPosition(snapped.x, snapped.y, {
-          width: currentDesktopRect.width,
-          height: currentDesktopRect.height,
-        });
+        const snapped = pixelToGrid(rawX + cellWidth / 2, rawY + cellHeight / 2, bounds);
+        const gridPos = clampGridPosition(snapped.x, snapped.y, bounds);
         
         setVisualPosition({ x: rawX, y: rawY });
         setGridPosition(gridPos);
@@ -712,7 +724,7 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
               if (folderSelection?.path) {
                 handledByFolderWindow = true;
                 Promise.all([
-                  import('@core/file-system'),
+                  import('@file-system/file-system'),
                   import('@core/desktop-shortcuts')
                 ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
                   const resolved = resolvePath(folderSelection.path);
@@ -805,10 +817,10 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
     [folder.id, folder.x, folder.y, visualPosition, onUpdate, onSelect]
   );
 
-  const gridSize = getGridSize();
+  const { cellWidth, cellHeight } = getGridMetrics();
   const iconSize = Math.min(
     settings.iconSize,
-    getMaxIconSize(gridSize, settings.showIconLabels)
+    getMaxIconSize(Math.min(cellWidth, cellHeight), settings.showIconLabels)
   );
 
   return (
@@ -819,8 +831,8 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
           style={{
             left: `${gridPosition.x}px`,
             top: `${gridPosition.y}px`,
-            width: `${gridSize}px`,
-            height: `${gridSize}px`,
+            width: `${cellWidth}px`,
+            height: `${cellHeight}px`,
           }}
         />
       )}
@@ -830,8 +842,8 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
         style={{
           left: `${visualPosition.x}px`,
           top: `${visualPosition.y}px`,
-          width: `${gridSize}px`,
-          height: `${gridSize}px`,
+          width: `${cellWidth}px`,
+          height: `${cellHeight}px`,
           transition: isDragging ? 'none' : 'left 0.2s ease-out, top 0.2s ease-out',
         }}
         onMouseDown={handleMouseDown}
@@ -871,11 +883,13 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
   );
 });
 
+/** Renders desktop shortcuts and folders with selection, drag, and clipboard support. */
 export function DesktopIcons() {
   const [shortcuts, setShortcuts] = useState<DesktopShortcut[]>([]);
   const [folders, setFolders] = useState<DesktopFolder[]>([]);
   const [programData, setProgramData] = useState<Record<string, { id: string; name: string; icon: string }>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [layoutTick, setLayoutTick] = useState(0);
   const lastSelectedIndexRef = useRef<number>(-1);
 
   const loadItems = useCallback(() => {
@@ -934,6 +948,7 @@ export function DesktopIcons() {
     window.addEventListener('desktop-shortcuts-updated', handleShortcutUpdate);
 
     const handleResize = () => {
+      setLayoutTick((n) => n + 1);
       import('@core/desktop-shortcuts').then(({ clampAllIconsToDesktop }) => {
         clampAllIconsToDesktop();
       });
@@ -1130,8 +1145,7 @@ export function DesktopIcons() {
       return;
     }
 
-    const { addDesktopShortcut, getDesktopShortcuts, getDesktopFolders, getGridSize, findNextAvailablePosition, createDesktopFolder, getFolderById } = await import('@core/desktop-shortcuts');
-    const gridSize = getGridSize();
+    const { addDesktopShortcut, getDesktopShortcuts, getDesktopFolders, findNextAvailablePosition, createDesktopFolder, getFolderById } = await import('@core/desktop-shortcuts');
     const allShortcuts = getDesktopShortcuts();
     const allFolders = getDesktopFolders();
 
@@ -1237,6 +1251,7 @@ export function DesktopIcons() {
             onUpdate={handleUpdate}
             isSelected={selectedIds.has(shortcut.id)}
             onSelect={(e) => handleIconSelect(shortcut.id, e)}
+            layoutTick={layoutTick}
           />
         );
       })}
@@ -1248,6 +1263,7 @@ export function DesktopIcons() {
           onOpen={handleOpenFolder}
             isSelected={selectedIds.has(folder.id)}
             onSelect={(e) => handleIconSelect(folder.id, e)}
+            layoutTick={layoutTick}
         />
       ))}
     </div>

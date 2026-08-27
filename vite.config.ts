@@ -9,9 +9,11 @@ export default defineConfig({
     alias: {
       '@core': resolve(__dirname, 'core'),
       '@window-manager': resolve(__dirname, 'window-manager'),
-      '@system': resolve(__dirname, 'system'),
       '@programs': resolve(__dirname, 'programs'),
       '@components': resolve(__dirname, 'components'),
+      '@file-system': resolve(__dirname, 'file-system'),
+      '@dock': resolve(__dirname, 'dock'),
+      '@wallpapers': resolve(__dirname, 'wallpapers'),
     },
   },
   server: {

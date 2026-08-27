@@ -16,6 +16,7 @@
   --color-text-primary: #e8e8f0;
   --color-text-secondary: #a0a0b8;
   --color-text-muted: #606078;
+  --color-text: var(--color-text-primary);
   
   --color-accent: #5c9fff;
   --color-accent-rgb: 92, 159, 255;
@@ -83,6 +84,7 @@
   --color-text-primary: #1a1a25;
   --color-text-secondary: #505068;
   --color-text-muted: #909098;
+  --color-text: var(--color-text-primary);
   
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -112,7 +114,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Desktop */
+/* Desktop — fallback only; wallpaper comes from settings (not theme) */
 .desktop {
   position: relative;
   width: 100%;
@@ -122,10 +124,6 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   overflow: hidden;
-}
-
-[data-theme="light"] .desktop {
-  background: linear-gradient(135deg, #e8e8f0 0%, #f5f5fa 50%, #dcdce5 100%);
 }
 
 /* Dock (macOS style) */
@@ -594,15 +592,17 @@ body {
   position: relative;
   width: 44px;
   height: 24px;
-  border: none;
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 12px;
-  background: var(--color-bg-elevated);
+  background: #8b8b9a;
   cursor: pointer;
   transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .settings-toggle.active {
   background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .settings-toggle::after {
@@ -610,15 +610,26 @@ body {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: white;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: all var(--transition-fast);
 }
 
 .settings-toggle.active::after {
-  left: 22px;
+  left: 24px;
+}
+
+[data-theme="light"] .settings-toggle {
+  background: #9a9aac;
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .settings-toggle.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .settings-format-buttons {
@@ -817,6 +828,7 @@ body {
   --menu-item-active: rgba(var(--color-accent-rgb), 0.2);
   --menu-item-disabled: rgba(0, 0, 0, 0.3);
   --menu-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.05) inset;
+  --menu-border: rgba(0, 0, 0, 0.12);
   --menu-separator: rgba(0, 0, 0, 0.1);
 }
 
@@ -962,6 +974,7 @@ body {
   z-index: var(--z-context-menu);
   animation: contextMenuFadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   margin: 0;
+  color: var(--menu-text);
   backdrop-filter: blur(30px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
 }
@@ -1009,6 +1022,8 @@ body {
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 8px;
   transform-origin: center;
+  /* Wallpaper contrast (not UI theme) — default assumes dark wallpaper */
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .desktop-icon:hover {
@@ -1096,6 +1111,39 @@ body {
 .desktop-icon.selected .desktop-icon-label {
   background: rgba(var(--color-accent-rgb), 0.3);
   color: rgba(255, 255, 255, 1);
+}
+
+/* Light wallpaper → darker desktop icons (independent of UI theme) */
+.desktop[data-wallpaper-tone="light"] .desktop-icon {
+  color: rgba(20, 20, 30, 0.92);
+}
+
+.desktop[data-wallpaper-tone="light"] .desktop-icon:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.desktop[data-wallpaper-tone="light"] .desktop-icon-image {
+  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.6));
+}
+
+.desktop[data-wallpaper-tone="light"] .desktop-icon:hover .desktop-icon-image {
+  filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 0.7));
+}
+
+.desktop[data-wallpaper-tone="light"] .desktop-icon-label {
+  color: rgba(20, 20, 30, 0.95);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.desktop[data-wallpaper-tone="light"] .desktop-icon:hover .desktop-icon-label {
+  background: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.95);
+}
+
+.desktop[data-wallpaper-tone="light"] .desktop-icon.selected .desktop-icon-label {
+  background: rgba(var(--color-accent-rgb), 0.35);
+  color: rgba(20, 20, 30, 0.95);
 }
 
 .desktop.drag-over {
@@ -1438,7 +1486,7 @@ body {
   width: 3px;
   height: 0;
   background: var(--color-accent);
-  border-radius: 0 2px 2px 0;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
   transition: height var(--transition-fast);
 }
 
@@ -1449,7 +1497,7 @@ body {
 }
 
 .folder-sidebar-item:hover::before {
-  height: 60%;
+  height: 100%;
 }
 
 .folder-sidebar-item.active {

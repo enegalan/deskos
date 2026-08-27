@@ -73,12 +73,13 @@ export class ContextMenuManager {
   private boundHandlers: {
     contextmenu?: (e: MouseEvent) => void;
     keydown?: (e: KeyboardEvent) => void;
-    click?: (e: MouseEvent) => void;
+    pointerdown?: (e: PointerEvent) => void;
     blur?: () => void;
     touchstart?: (e: TouchEvent) => void;
     touchend?: (e: TouchEvent) => void;
     touchcancel?: (e: TouchEvent) => void;
   } = {};
+  private sourceObserver: MutationObserver | null = null;
 
   private constructor() {
     // Private constructor for singleton pattern
@@ -156,29 +157,16 @@ export class ContextMenuManager {
       }
     };
 
-    // Click outside to close
-    // Use bubble phase so MenuItem can handle clicks first
-    this.boundHandlers.click = (e: MouseEvent) => {
-      if (this.renderState.isOpen) {
-        const target = e.target as HTMLElement;
-        // Check if click is inside menu container or any context menu element
-        const isInsideMenu = (this.menuContainer && this.menuContainer.contains(target)) || 
-                           target.closest('.context-menu') !== null ||
-                           target.closest('.context-menu-item') !== null ||
-                           target.closest('.context-menu-submenu') !== null ||
-                           target.closest('.context-menu-container') !== null;
-        
-        if (!isInsideMenu) {
-          // Use setTimeout to allow the click event to propagate to MenuItem first
-          // If the click is on a menu item, it will handle it and close the menu
-          // If not, we close it here
-          setTimeout(() => {
-            if (this.renderState.isOpen) {
-              this.closeMenu();
-            }
-          }, 0);
-        }
+    // Close on pointer outside menu (capture: survives stopPropagation on window controls)
+    this.boundHandlers.pointerdown = (e: PointerEvent) => {
+      if (!this.renderState.isOpen) {
+        return;
       }
+      const target = e.target as HTMLElement | null;
+      if (!target || this.isInsideMenu(target)) {
+        return;
+      }
+      this.closeMenu();
     };
 
     // Window blur to close
@@ -208,12 +196,22 @@ export class ContextMenuManager {
     // Register all listeners
     document.addEventListener('contextmenu', this.boundHandlers.contextmenu);
     document.addEventListener('keydown', this.boundHandlers.keydown);
-    // Use bubble phase instead of capture phase so MenuItem can handle clicks first
-    document.addEventListener('click', this.boundHandlers.click, false);
+    document.addEventListener('pointerdown', this.boundHandlers.pointerdown, true);
     window.addEventListener('blur', this.boundHandlers.blur);
     document.addEventListener('touchstart', this.boundHandlers.touchstart);
     document.addEventListener('touchend', this.boundHandlers.touchend);
     document.addEventListener('touchcancel', this.boundHandlers.touchcancel);
+  }
+
+  /** Whether the event target is inside an open context menu */
+  private isInsideMenu(target: HTMLElement): boolean {
+    return (
+      (!!this.menuContainer && this.menuContainer.contains(target)) ||
+      target.closest('.context-menu') !== null ||
+      target.closest('.context-menu-item') !== null ||
+      target.closest('.context-menu-submenu') !== null ||
+      target.closest('.context-menu-container') !== null
+    );
   }
 
   /**
@@ -331,6 +329,7 @@ export class ContextMenuManager {
     }, this.longPressThreshold);
   }
 
+  /** Clear a pending long-press open timer */
   private cancelLongPressTimer(): void {
     if (this.longPressTimer !== null) {
       clearTimeout(this.longPressTimer);
@@ -463,6 +462,7 @@ export class ContextMenuManager {
       this.currentContext = context;
       this.renderState.isOpen = true;
       this.renderState.isPositioning = true;
+      this.watchSourceTarget(context.target);
 
       // Trigger render (will be handled by Renderer)
       this.emit('menu:open', { context, items });
@@ -476,6 +476,19 @@ export class ContextMenuManager {
   }
 
   /**
+   * Close menu if the element that opened it is removed (e.g. window closed)
+   */
+  private watchSourceTarget(target: HTMLElement): void {
+    this.sourceObserver?.disconnect();
+    this.sourceObserver = new MutationObserver(() => {
+      if (this.renderState.isOpen && !target.isConnected) {
+        this.closeMenu();
+      }
+    });
+    this.sourceObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  /**
    * Close context menu
    */
   closeMenu(): void {
@@ -483,6 +496,8 @@ export class ContextMenuManager {
       return;
     }
 
+    this.sourceObserver?.disconnect();
+    this.sourceObserver = null;
     this.renderState.isOpen = false;
     this.renderState.activeItemId = null;
     this.renderState.openSubmenuId = null;
@@ -758,8 +773,8 @@ export class ContextMenuManager {
     if (this.boundHandlers.keydown) {
       document.removeEventListener('keydown', this.boundHandlers.keydown);
     }
-    if (this.boundHandlers.click) {
-      document.removeEventListener('click', this.boundHandlers.click, false);
+    if (this.boundHandlers.pointerdown) {
+      document.removeEventListener('pointerdown', this.boundHandlers.pointerdown, true);
     }
     if (this.boundHandlers.blur) {
       window.removeEventListener('blur', this.boundHandlers.blur);

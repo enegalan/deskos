@@ -1,6 +1,7 @@
 import { defineProgram } from '@core/program';
 import { NotesWindow } from './NotesWindow';
 
+/** Notes program definition: opens a Notes window on launch. */
 export default defineProgram({
   id: 'notes',
   name: 'Notes',

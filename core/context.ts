@@ -66,8 +66,7 @@ export async function launchOrFocusProgram(
   
   // If forcing new window (e.g., "New window" menu option), always launch
   if (forceNewWindow) {
-    const programCtx = createProgramContext(programId, program.metadata.icon);
-    module.default.launch(programCtx);
+    module.default.launch(createProgramContext(programId, program.metadata.icon));
     return;
   }
   
@@ -86,8 +85,7 @@ export async function launchOrFocusProgram(
   }
   
   // No existing window, launch normally
-  const programCtx = createProgramContext(programId, program.metadata.icon);
-  module.default.launch(programCtx);
+  module.default.launch(createProgramContext(programId, program.metadata.icon));
 }
 
 /**
@@ -214,20 +212,14 @@ function createContextMenuAPI(programId: string): ContextMenuAPI {
  * Creates a complete ProgramContext for a specific program.
  * This is the only interface through which programs interact with the system.
  */
-export function createProgramContext(programId: string, icon: string = 'package'): ProgramContext {
-  const windowApi = createWindowAPI(programId, icon);
-  const storageApi = createSecureScopedStorage(programId);
-  const eventsApi = createScopedEventBus(programId);
-  const systemApi = createSystemAPI(programId);
-  const contextMenuApi = createContextMenuAPI(programId);
-
+function createProgramContext(programId: string, icon: string = 'package'): ProgramContext {
   // Wrap the entire context in a Proxy for additional security
   const context: ProgramContext = {
-    window: windowApi,
-    storage: storageApi,
-    events: eventsApi,
-    system: systemApi,
-    contextMenu: contextMenuApi,
+    window: createWindowAPI(programId, icon),
+    storage: createSecureScopedStorage(programId),
+    events: createScopedEventBus(programId),
+    system: createSystemAPI(programId),
+    contextMenu: createContextMenuAPI(programId),
   };
 
   return new Proxy(context, {

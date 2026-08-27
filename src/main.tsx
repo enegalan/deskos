@@ -1,3 +1,6 @@
+/**
+ * Application entry: mount App into `#root` and initialize keyboard shortcuts.
+ */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';

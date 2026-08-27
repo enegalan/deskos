@@ -9,9 +9,11 @@ interface Note {
 }
 
 interface NotesWindowProps {
+  /** Program context (storage + events) */
   ctx: ProgramContext;
 }
 
+/** Notes app UI: list, editor, and cross-window sync via program events. */
 export function NotesWindow({ ctx }: NotesWindowProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);

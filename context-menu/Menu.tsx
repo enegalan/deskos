@@ -8,6 +8,7 @@ interface MenuProps {
   onClose: () => void;
 }
 
+/** Root context menu: keyboard navigation, submenu open state, and item list */
 export function Menu({ items, position, onClose }: MenuProps) {
   const menuRef = useRef<HTMLUListElement>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);

@@ -1,10 +1,17 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
 
+/**
+ * Read the folder path from a folder-window host element.
+ *
+ * @param target - Element inside a folder window
+ * @returns Folder path or `null` if missing
+ */
 function getFolderWindowPath(target: HTMLElement): string | null {
   const host = target.closest('[data-folder-path]') as HTMLElement | null;
   return host?.dataset.folderPath || null;
 }
 
+/** Register the folder window background context menu provider */
 export function registerFolderWindowMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-folder-window-menu',

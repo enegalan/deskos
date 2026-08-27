@@ -1,6 +1,6 @@
 import { createScopedStorage } from './storage';
 import { useKernel } from './kernel';
-import { GRID_OCCUPANCY_RATIO, TASKBAR_HEIGHT } from './constants';
+import { GRID_OCCUPANCY_RATIO } from './constants';
 
 export interface DesktopShortcut {
   id: string;
@@ -23,10 +23,22 @@ export interface DesktopFolder {
 
 export type DesktopItem = DesktopShortcut | DesktopFolder;
 
+/**
+ * Type guard: whether a desktop item is a folder.
+ *
+ * @param item - Shortcut or folder
+ * @returns `true` if `item` is a `DesktopFolder`
+ */
 export function isDesktopFolder(item: DesktopItem): item is DesktopFolder {
   return 'name' in item && 'contents' in item;
 }
 
+/**
+ * Type guard: whether a desktop item is a program shortcut.
+ *
+ * @param item - Shortcut or folder
+ * @returns `true` if `item` is a `DesktopShortcut`
+ */
 export function isDesktopShortcut(item: DesktopItem): item is DesktopShortcut {
   return 'programId' in item;
 }
@@ -95,7 +107,12 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
   // Find next available position if not provided
   const positionNotSpecified = x === undefined || y === undefined;
   if (x === undefined || y === undefined) {
-    const position = findNextAvailablePosition(shortcuts.map(s => ({ x: s.x, y: s.y })));
+    const inFolders = getIdsInsideFolders();
+    const rootItems = [
+      ...shortcuts.filter((s) => !inFolders.has(s.id)),
+      ...folders.filter(isRootDesktopFolder),
+    ];
+    const position = findNextAvailablePosition(rootItems.map((item) => ({ x: item.x, y: item.y })));
     x = position.x;
     y = position.y;
   } else {
@@ -150,34 +167,48 @@ export function updateDesktopShortcutPosition(shortcutId: string, x: number, y: 
 }
 
 /**
- * Find any desktop item (shortcut or folder) at a given grid position
- * Only returns items that are exactly at the same grid position (same cell)
+ * Folder shown on the desktop surface (not nested inside another folder)
+ */
+function isRootDesktopFolder(folder: DesktopFolder): boolean {
+  return !folder.parentPath || folder.parentPath === '/Desktop';
+}
+
+/**
+ * Get all item IDs inside folders
+ */
+function getIdsInsideFolders(): Set<string> {
+  const ids = new Set<string>();
+  getDesktopFolders().forEach((folder) => {
+    folder.contents.forEach((id) => ids.add(id));
+  });
+  return ids;
+}
+
+/**
+ * Find any desktop-surface item at a grid cell (ignores nested folder contents)
  */
 export function findItemAtPosition(x: number, y: number, excludeId?: string): DesktopItem | null {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
-  // Use a very small threshold (1px) to only detect items exactly at the same grid position
-  // This prevents confusion when dragging between two adjacent items
-  const threshold = 1;
-  
-  // Check shortcuts - must be exactly at the same position
+  const inFolders = getIdsInsideFolders();
+  const metrics = getGridMetrics();
+  const col = Math.round(x / metrics.cellWidth);
+  const row = Math.round(y / metrics.cellHeight);
+
   const shortcut = shortcuts.find((s) => {
     if (excludeId && s.id === excludeId) return false;
-    const dx = Math.abs(s.x - x);
-    const dy = Math.abs(s.y - y);
-    return dx <= threshold && dy <= threshold;
+    if (inFolders.has(s.id)) return false;
+    return Math.round(s.x / metrics.cellWidth) === col && Math.round(s.y / metrics.cellHeight) === row;
   });
-  
+
   if (shortcut) return shortcut;
-  
-  // Check folders - must be exactly at the same position
+
   const folder = folders.find((f) => {
     if (excludeId && f.id === excludeId) return false;
-    const dx = Math.abs(f.x - x);
-    const dy = Math.abs(f.y - y);
-    return dx <= threshold && dy <= threshold;
+    if (!isRootDesktopFolder(f)) return false;
+    return Math.round(f.x / metrics.cellWidth) === col && Math.round(f.y / metrics.cellHeight) === row;
   });
-  
+
   return folder || null;
 }
 
@@ -210,7 +241,7 @@ export function swapItemPositions(itemId1: string, itemId2: string): void {
 }
 
 /**
- * Desktop element size, or viewport fallback
+ * Desktop element size, or viewport fallback (full height — dock overlays icons)
  */
 export function getDesktopBounds(): { width: number; height: number } {
   const el = document.querySelector('.desktop');
@@ -220,7 +251,51 @@ export function getDesktopBounds(): { width: number; height: number } {
   }
   return {
     width: window.innerWidth,
-    height: window.innerHeight - TASKBAR_HEIGHT,
+    height: window.innerHeight,
+  };
+}
+
+export interface GridMetrics {
+  /** Preferred cell size from settings (used to pick cols/rows) */
+  preferred: number;
+  cols: number;
+  rows: number;
+  /** Stretched so cols×rows tile the desktop exactly (origin 0,0) */
+  cellWidth: number;
+  cellHeight: number;
+}
+
+/**
+ * Grid that fills the entire desktop: cols/rows from preferred size,
+ * cellWidth/Height stretched so there is no leftover strip.
+ */
+export function getGridMetrics(
+  bounds: { width: number; height: number } = getDesktopBounds()
+): GridMetrics {
+  const preferred = getGridSize();
+  const cols = Math.max(1, Math.floor(bounds.width / preferred));
+  const rows = Math.max(1, Math.floor(bounds.height / preferred));
+  return {
+    preferred,
+    cols,
+    rows,
+    cellWidth: bounds.width / cols,
+    cellHeight: bounds.height / rows,
+  };
+}
+
+/**
+ * Pixel top-left of a grid cell.
+ *
+ * @param col - Column index (0-based)
+ * @param row - Row index (0-based)
+ * @param metrics - Current grid metrics
+ * @returns `{ x, y }` at the cell origin
+ */
+function cellTopLeft(col: number, row: number, metrics: GridMetrics): { x: number; y: number } {
+  return {
+    x: col * metrics.cellWidth,
+    y: row * metrics.cellHeight,
   };
 }
 
@@ -232,24 +307,24 @@ export function clampGridPosition(
   y: number,
   bounds: { width: number; height: number } = getDesktopBounds()
 ): { x: number; y: number } {
-  const gridSize = getGridSize();
-  const maxX = Math.max(0, Math.floor((bounds.width - gridSize) / gridSize) * gridSize);
-  const maxY = Math.max(0, Math.floor((bounds.height - gridSize) / gridSize) * gridSize);
-  return {
-    x: Math.max(0, Math.min(maxX, x)),
-    y: Math.max(0, Math.min(maxY, y)),
-  };
+  const metrics = getGridMetrics(bounds);
+  const col = Math.max(0, Math.min(metrics.cols - 1, Math.round(x / metrics.cellWidth)));
+  const row = Math.max(0, Math.min(metrics.rows - 1, Math.round(y / metrics.cellHeight)));
+  return cellTopLeft(col, row, metrics);
 }
 
 /**
  * Convert pixel coordinates to grid coordinates
  */
-export function pixelToGrid(x: number, y: number): { x: number; y: number } {
-  const gridSize = getGridSize();
-  return {
-    x: Math.floor(x / gridSize) * gridSize,
-    y: Math.floor(y / gridSize) * gridSize,
-  };
+export function pixelToGrid(
+  x: number,
+  y: number,
+  bounds: { width: number; height: number } = getDesktopBounds()
+): { x: number; y: number } {
+  const metrics = getGridMetrics(bounds);
+  const col = Math.max(0, Math.min(metrics.cols - 1, Math.floor(x / metrics.cellWidth)));
+  const row = Math.max(0, Math.min(metrics.rows - 1, Math.floor(y / metrics.cellHeight)));
+  return cellTopLeft(col, row, metrics);
 }
 
 /**
@@ -260,7 +335,7 @@ export function pixelToClampedGrid(
   y: number,
   bounds: { width: number; height: number } = getDesktopBounds()
 ): { x: number; y: number } {
-  const snapped = pixelToGrid(x, y);
+  const snapped = pixelToGrid(x, y, bounds);
   return clampGridPosition(snapped.x, snapped.y, bounds);
 }
 
@@ -268,31 +343,35 @@ export function pixelToClampedGrid(
  * Find next available grid position
  */
 export function findNextAvailablePosition(items: Array<{ x: number; y: number }>): { x: number; y: number } {
-  const { width: viewportWidth, height: viewportHeight } = getDesktopBounds();
-  const gridSize = getGridSize();
-  
-  const maxCols = Math.max(0, Math.floor(viewportWidth / gridSize));
-  const maxRows = Math.max(0, Math.floor(viewportHeight / gridSize));
+  const bounds = getDesktopBounds();
+  const metrics = getGridMetrics(bounds);
+  const thresholdX = metrics.cellWidth * GRID_OCCUPANCY_RATIO;
+  const thresholdY = metrics.cellHeight * GRID_OCCUPANCY_RATIO;
 
-  // Start from top-left and find first empty position
-  for (let row = 0; row < maxRows; row++) {
-    for (let col = 0; col < maxCols; col++) {
-      const x = col * gridSize;
-      const y = row * gridSize;
-      
-      const occupied = items.some((item) => {
-        const threshold = gridSize * GRID_OCCUPANCY_RATIO;
-        return Math.abs(item.x - x) < threshold && Math.abs(item.y - y) < threshold;
-      });
-      
+  for (let row = 0; row < metrics.rows; row++) {
+    for (let col = 0; col < metrics.cols; col++) {
+      const pos = cellTopLeft(col, row, metrics);
+
+      const occupied = items.some(
+        (item) => Math.abs(item.x - pos.x) < thresholdX && Math.abs(item.y - pos.y) < thresholdY
+      );
+
       if (!occupied) {
-        return { x, y };
+        return pos;
       }
     }
   }
 
-  // If all positions are occupied, place at origin
-  return { x: 0, y: 0 };
+  // If all visible cells are occupied, place past the grid (avoids overlapping origin)
+  let y = metrics.rows * metrics.cellHeight;
+  while (
+    items.some(
+      (item) => Math.abs(item.x - 0) < thresholdX && Math.abs(item.y - y) < thresholdY
+    )
+  ) {
+    y += metrics.cellHeight;
+  }
+  return { x: 0, y };
 }
 
 /**
@@ -338,7 +417,7 @@ export function realignIconsToGrid(): void {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const allItems: Array<{ id: string; x: number; y: number; type: 'shortcut' | 'folder' }> = [];
-  const gridSize = getGridSize();
+  const metrics = getGridMetrics();
   let hasChanges = false;
   
   // Collect all items with their current positions
@@ -350,14 +429,16 @@ export function realignIconsToGrid(): void {
   });
   
   // Track occupied grid positions
-  const occupiedPositions = new Map<string, string>(); // key: "x,y", value: itemId
+  const occupiedPositions = new Map<string, string>(); // key: "col,row", value: itemId
   
   // First pass: align all items to grid and detect collisions
   const collisions: Array<{ item: typeof allItems[0]; gridPos: { x: number; y: number } }> = [];
   
   allItems.forEach((item) => {
     const gridPos = pixelToGrid(item.x, item.y);
-    const posKey = `${gridPos.x},${gridPos.y}`;
+    const col = Math.round(gridPos.x / metrics.cellWidth);
+    const row = Math.round(gridPos.y / metrics.cellHeight);
+    const posKey = `${col},${row}`;
     
     if (occupiedPositions.has(posKey)) {
       // Collision detected - this item needs a new position
@@ -389,45 +470,42 @@ export function realignIconsToGrid(): void {
   
   // Second pass: resolve collisions by finding available positions
   if (collisions.length > 0) {
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight - TASKBAR_HEIGHT;
-    const maxCols = Math.floor(viewportWidth / gridSize);
-    const maxRows = Math.floor(viewportHeight / gridSize);
-    
     collisions.forEach(({ item, gridPos }) => {
       // Try to find an available position near the original position
       let found = false;
+      const startCol = Math.round(gridPos.x / metrics.cellWidth);
+      const startRow = Math.round(gridPos.y / metrics.cellHeight);
       
       // Search in a spiral pattern starting from the original grid position
-      for (let radius = 1; radius <= Math.max(maxCols, maxRows) && !found; radius++) {
+      for (let radius = 1; radius <= Math.max(metrics.cols, metrics.rows) && !found; radius++) {
         for (let dx = -radius; dx <= radius && !found; dx++) {
           for (let dy = -radius; dy <= radius && !found; dy++) {
             // Only check positions at the current radius
             if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
             
-            const newX = gridPos.x + (dx * gridSize);
-            const newY = gridPos.y + (dy * gridSize);
-            
-            // Check bounds
-            if (newX < 0 || newY < 0 || newX >= viewportWidth || newY >= viewportHeight) continue;
-            
-            const posKey = `${newX},${newY}`;
+            const col = startCol + dx;
+            const row = startRow + dy;
+            if (col < 0 || row < 0 || col >= metrics.cols || row >= metrics.rows) {
+              continue;
+            }
+
+            const pos = cellTopLeft(col, row, metrics);
+            const posKey = `${col},${row}`;
             if (!occupiedPositions.has(posKey)) {
-              // Found an available position
               occupiedPositions.set(posKey, item.id);
               
               if (item.type === 'shortcut') {
                 const shortcut = shortcuts.find(s => s.id === item.id);
                 if (shortcut) {
-                  shortcut.x = newX;
-                  shortcut.y = newY;
+                  shortcut.x = pos.x;
+                  shortcut.y = pos.y;
                   hasChanges = true;
                 }
               } else {
                 const folder = folders.find(f => f.id === item.id);
                 if (folder) {
-                  folder.x = newX;
-                  folder.y = newY;
+                  folder.x = pos.x;
+                  folder.y = pos.y;
                   hasChanges = true;
                 }
               }
@@ -441,12 +519,13 @@ export function realignIconsToGrid(): void {
       // If no position found in spiral search, use findNextAvailablePosition as fallback
       if (!found) {
         const allCurrentPositions = Array.from(occupiedPositions.keys()).map(key => {
-          const [x, y] = key.split(',').map(Number);
-          return { x, y };
+          const [col, row] = key.split(',').map(Number);
+          return cellTopLeft(col, row, metrics);
         });
         const availablePos = findNextAvailablePosition(allCurrentPositions);
-        const posKey = `${availablePos.x},${availablePos.y}`;
-        occupiedPositions.set(posKey, item.id);
+        const col = Math.round(availablePos.x / metrics.cellWidth);
+        const row = Math.round(availablePos.y / metrics.cellHeight);
+        occupiedPositions.set(`${col},${row}`, item.id);
         
         if (item.type === 'shortcut') {
           const shortcut = shortcuts.find(s => s.id === item.id);
@@ -488,17 +567,14 @@ export function autoArrangeIcons(): void {
   
   if (allItems.length === 0) return;
 
-  const gridSize = getGridSize();
-  const viewportWidth = window.innerWidth;
-  
-  const maxCols = Math.floor(viewportWidth / gridSize);
+  const metrics = getGridMetrics();
   let currentCol = 0;
   let currentRow = 0;
 
   // Sort items by their current position (top to bottom, left to right)
   // This preserves some order preference
   const sortedItems = [...allItems].sort((a, b) => {
-    if (Math.abs(a.y - b.y) < gridSize * GRID_OCCUPANCY_RATIO) {
+    if (Math.abs(a.y - b.y) < metrics.cellHeight * GRID_OCCUPANCY_RATIO) {
       // Same row, sort by x
       return a.x - b.x;
     }
@@ -507,14 +583,12 @@ export function autoArrangeIcons(): void {
 
   // Arrange each item in grid order
   sortedItems.forEach((item) => {
-    const x = currentCol * gridSize;
-    const y = currentRow * gridSize;
-    
-    item.x = x;
-    item.y = y;
+    const pos = cellTopLeft(currentCol, currentRow, metrics);
+    item.x = pos.x;
+    item.y = pos.y;
     
     currentCol++;
-    if (currentCol >= maxCols) {
+    if (currentCol >= metrics.cols) {
       currentCol = 0;
       currentRow++;
     }
@@ -547,9 +621,7 @@ export async function organizeIconsByName(): Promise<void> {
   
   if (rootShortcuts.length === 0 && rootFolders.length === 0) return;
 
-  const gridSize = getGridSize();
-  const viewportWidth = window.innerWidth;
-  const maxCols = Math.floor(viewportWidth / gridSize);
+  const metrics = getGridMetrics();
   let currentCol = 0;
   let currentRow = 0;
 
@@ -578,14 +650,12 @@ export async function organizeIconsByName(): Promise<void> {
 
   // Arrange each item in grid order
   itemsWithNames.forEach(({ item }) => {
-    const x = currentCol * gridSize;
-    const y = currentRow * gridSize;
-    
-    item.x = x;
-    item.y = y;
+    const pos = cellTopLeft(currentCol, currentRow, metrics);
+    item.x = pos.x;
+    item.y = pos.y;
     
     currentCol++;
-    if (currentCol >= maxCols) {
+    if (currentCol >= metrics.cols) {
       currentCol = 0;
       currentRow++;
     }
@@ -618,9 +688,7 @@ export function organizeIconsByDate(): void {
   
   if (rootShortcuts.length === 0 && rootFolders.length === 0) return;
 
-  const gridSize = getGridSize();
-  const viewportWidth = window.innerWidth;
-  const maxCols = Math.floor(viewportWidth / gridSize);
+  const metrics = getGridMetrics();
   let currentCol = 0;
   let currentRow = 0;
 
@@ -643,14 +711,12 @@ export function organizeIconsByDate(): void {
 
   // Arrange each item in grid order
   itemsWithDates.forEach(({ item }) => {
-    const x = currentCol * gridSize;
-    const y = currentRow * gridSize;
-    
-    item.x = x;
-    item.y = y;
+    const pos = cellTopLeft(currentCol, currentRow, metrics);
+    item.x = pos.x;
+    item.y = pos.y;
     
     currentCol++;
-    if (currentCol >= maxCols) {
+    if (currentCol >= metrics.cols) {
       currentCol = 0;
       currentRow++;
     }
@@ -721,11 +787,15 @@ export function createDesktopFolder(name: string, x?: number, y?: number, parent
   const folders = getDesktopFolders();
   const paths = getFolderPaths();
   
-  // Find next available position if not provided
+  // Find next available position if not provided (desktop surface only)
   if (x === undefined || y === undefined) {
     const shortcuts = getDesktopShortcuts();
-    const allItems = [...shortcuts, ...folders];
-    const position = findNextAvailablePosition(allItems.map(item => ({ x: item.x, y: item.y })));
+    const inFolders = getIdsInsideFolders();
+    const rootItems = [
+      ...shortcuts.filter((s) => !inFolders.has(s.id)),
+      ...folders.filter(isRootDesktopFolder),
+    ];
+    const position = findNextAvailablePosition(rootItems.map((item) => ({ x: item.x, y: item.y })));
     x = position.x;
     y = position.y;
   } else {

@@ -1,6 +1,7 @@
 import { defineProgram } from '@core/program';
 import { SettingsWindow } from './SettingsWindow';
 
+/** Settings program definition: opens a Settings window on launch. */
 export default defineProgram({
   id: 'settings',
   name: 'Settings',

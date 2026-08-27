@@ -8,20 +8,15 @@ import {
   MIN_ICON_SIZE,
 } from '@core/constants';
 import { saveCustomWallpaper, getCustomWallpapers, removeCustomWallpaper, type WallpaperMetadata } from '@core/wallpaper-storage';
+import { BUILTIN_WALLPAPERS } from '../../wallpapers/wallpapers';
 import { useState, useEffect } from 'react';
 
 interface SettingsWindowProps {
+  /** Program context (system info, etc.) */
   ctx: ProgramContext;
 }
 
-const WALLPAPERS = [
-  { name: 'None', value: '' },
-  { name: 'Gradient Blue', value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-  { name: 'Gradient Sunset', value: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
-  { name: 'Gradient Ocean', value: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
-  { name: 'Gradient Forest', value: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)' },
-];
-
+/** Common IANA timezones for the Date & Time settings. */
 const TIMEZONES = [
   { label: 'UTC', value: 'UTC' },
   { label: 'New York (EST/EDT)', value: 'America/New_York' },
@@ -45,6 +40,7 @@ const TIMEZONES = [
   { label: 'Auckland (NZDT/NZST)', value: 'Pacific/Auckland' },
 ];
 
+/** Settings app UI: appearance, wallpaper, desktop icons, and date/time. */
 export function SettingsWindow({ ctx }: SettingsWindowProps) {
   const settings = useKernel((state) => state.settings);
   const updateSettings = useKernel((state) => state.updateSettings);
@@ -237,7 +233,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
                     width: '24px',
                     height: '24px',
                     backgroundColor: color,
-                    border: settings.accentColor === color ? '2px solid var(--color-text)' : '1px solid var(--color-border)',
+                    border: settings.accentColor === color ? '2px solid var(--color-text-primary)' : '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-sm)',
                     cursor: 'pointer',
                   }}
@@ -253,9 +249,9 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
         <div className="settings-section-title">Wallpaper</div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-          {WALLPAPERS.map((wp) => (
+          {BUILTIN_WALLPAPERS.map((wp) => (
             <button
-              key={wp.name}
+              key={wp.id}
               onClick={() => handleWallpaperChange(wp.value)}
               style={{
                 width: 60,
@@ -334,12 +330,14 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
 
         <div style={{ marginTop: '8px' }}>
           <label
+            className="settings-action-button"
             style={{
               display: 'inline-block',
               padding: '6px 12px',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-sm)',
-              background: 'var(--color-surface)',
+              background: 'var(--color-bg-elevated)',
+              color: 'var(--color-text-primary)',
               cursor: 'pointer',
               fontSize: '12px',
             }}
@@ -393,8 +391,8 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
                 padding: '4px 8px',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-sm)',
-                background: 'var(--color-surface)',
-                color: 'var(--color-text)',
+                background: 'var(--color-bg-elevated)',
+                color: 'var(--color-text-primary)',
                 fontSize: '11px',
                 cursor: 'pointer',
               }}
@@ -424,8 +422,8 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
                 padding: '4px 8px',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-sm)',
-                background: 'var(--color-surface)',
-                color: 'var(--color-text)',
+                background: 'var(--color-bg-elevated)',
+                color: 'var(--color-text-primary)',
                 fontSize: '11px',
                 cursor: 'pointer',
               }}
@@ -467,8 +465,8 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
               padding: '4px 8px',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-sm)',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text)',
+              background: 'var(--color-bg-elevated)',
+              color: 'var(--color-text-primary)',
               fontSize: '12px',
               cursor: 'pointer',
             }}

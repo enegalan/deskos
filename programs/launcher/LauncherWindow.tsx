@@ -6,9 +6,11 @@ import { Icon } from '../../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
 interface LauncherWindowProps {
+  /** Program context (used to close the launcher after launch) */
   ctx: ProgramContext;
 }
 
+/** App launcher UI: searchable program grid; closes itself after launching. */
 export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWindowProps) {
   const [searchQuery, setSearchQuery] = useState('');
 

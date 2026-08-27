@@ -328,6 +328,11 @@ class KeyboardShortcutsManager {
 // Singleton instance
 let managerInstance: KeyboardShortcutsManager | null = null;
 
+/**
+ * Singleton keyboard shortcuts manager (creates on first call).
+ *
+ * @returns Shared `KeyboardShortcutsManager` instance
+ */
 export function getKeyboardShortcutsManager(): KeyboardShortcutsManager {
   if (!managerInstance) {
     managerInstance = new KeyboardShortcutsManager();

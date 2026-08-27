@@ -1,6 +1,7 @@
 import { defineProgram } from '@core/program';
 import { LauncherWindow } from './LauncherWindow';
 
+/** Launcher program definition: opens the app launcher window on launch. */
 export default defineProgram({
   id: 'launcher',
   name: 'Launcher',

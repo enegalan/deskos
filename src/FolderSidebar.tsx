@@ -1,26 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  SPECIAL_LOCATIONS,
   getFavorites,
   addFavorite,
   removeFavorite,
   isFavorite,
   getRecentItems,
   getPathIcon,
+  SPECIAL_LOCATIONS,
   type SpecialLocation,
-} from '@core/file-system';
+} from '../file-system/file-system';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
+/**
+ * Resolve a path/location icon name to a known `IconName`, falling back to `folder`.
+ *
+ * @param name - Preferred icon name
+ * @returns Valid icon name for `<Icon />`
+ */
 function sidebarIcon(name: string): IconName {
   return (hasIcon(name as IconName) ? name : 'folder') as IconName;
 }
 
 interface FolderSidebarProps {
+  /** Currently open path (highlights matching items) */
   currentPath: string;
+  /** Navigate the parent folder window to a path */
   onNavigate: (path: string) => void;
 }
 
+/** Folder-window sidebar: locations, favorites, and recent paths. */
 export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recentItems, setRecentItems] = useState<Array<{ path: string; timestamp: number }>>([]);

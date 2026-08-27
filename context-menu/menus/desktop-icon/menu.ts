@@ -1,5 +1,6 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
 
+/** Register the desktop icon context menu provider */
 export function registerDesktopIconMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-desktop-icon-menu',
@@ -202,13 +203,13 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
             const shortcutId = context.target.getAttribute('data-shortcut-id');
             if (shortcutId) {
               try {
-                const { getDesktopShortcuts, addDesktopShortcut, getGridSize } = await import('@core/desktop-shortcuts');
+                const { getDesktopShortcuts, addDesktopShortcut, getGridMetrics } = await import('@core/desktop-shortcuts');
                 const shortcuts = getDesktopShortcuts();
                 const shortcut = shortcuts.find(s => s.id === shortcutId);
                 if (shortcut) {
                   // Add duplicate at offset position
-                  const gridSize = getGridSize();
-                  addDesktopShortcut(shortcut.programId, shortcut.x + gridSize, shortcut.y);
+                  const { cellWidth } = getGridMetrics();
+                  addDesktopShortcut(shortcut.programId, shortcut.x + cellWidth, shortcut.y);
                   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
                 }
               } catch (error) {

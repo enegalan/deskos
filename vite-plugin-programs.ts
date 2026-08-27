@@ -37,7 +37,7 @@ function extractMetadata(filePath: string): ProgramMetadata | null {
 
 function scanProgramDirectories(rootDir: string): ProgramMetadata[] {
   const programs: ProgramMetadata[] = [];
-  const directories = ['programs', 'system'];
+  const directories = ['programs'];
 
   for (const dir of directories) {
     const fullPath = resolve(rootDir, dir);
@@ -47,7 +47,7 @@ function scanProgramDirectories(rootDir: string): ProgramMetadata[] {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       // Scaffolding only — not registered as runnable programs
-      if (dir === 'programs' && entry.name === 'templates') continue;
+      if (entry.name === 'templates') continue;
 
       const programFile = join(fullPath, entry.name, 'program.ts');
       const programFileTsx = join(fullPath, entry.name, 'program.tsx');

@@ -9,6 +9,11 @@ const STORE_NAME = 'wallpapers';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+/**
+ * Open (or reuse) the wallpaper IndexedDB database.
+ *
+ * @returns Promise resolving to the open `IDBDatabase`
+ */
 function openDatabase(): Promise<IDBDatabase> {
   if (dbPromise) {
     return dbPromise;

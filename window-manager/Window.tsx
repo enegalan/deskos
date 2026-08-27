@@ -32,6 +32,14 @@ const Z_INDEX = {
   TASKBAR: 6000,
 } as const;
 
+/**
+ * Compute stacking z-index from focus and window order.
+ *
+ * @param windowId - Window id
+ * @param windowOrder - Bottom-to-top ordered window ids
+ * @param isFocused - Whether this window is focused
+ * @returns CSS z-index value
+ */
 function calculateZIndex(windowId: string, windowOrder: string[], isFocused: boolean): number {
   if (isFocused) {
     return Z_INDEX.WINDOW_ACTIVE;
@@ -50,6 +58,7 @@ interface WindowProps {
   windowOrder: string[];
 }
 
+/** Draggable / resizable app window shell (title bar, controls, content) */
 export const Window = memo(function Window({ window: win, windowOrder }: WindowProps) {
   const focusWindow = useKernel((state) => state.focusWindow);
   const closeWindow = useKernel((state) => state.closeWindow);

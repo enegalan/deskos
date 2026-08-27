@@ -8,7 +8,7 @@ import {
   parsePath,
   addRecentItem,
   SPECIAL_LOCATIONS,
-} from '@core/file-system';
+} from '../file-system/file-system';
 import {
   getDesktopFolders,
   type DesktopItem,
@@ -27,10 +27,13 @@ import { registerSelectAllHandler } from '@core/selection';
 import { registerCopyHandler, registerCutHandler, registerPasteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, CLIPBOARD_PRIORITY, HandlerSkippedError, type ClipboardItem } from '@core/clipboard';
 
 interface FolderWindowProps {
+  /** Absolute path to open (default `/Desktop`) */
   initialPath?: string;
+  /** Open by folder id when path is unknown */
   folderId?: string;
 }
 
+/** File-browser window: sidebar, breadcrumbs, grid, and clipboard/DnD. */
 export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
   const [currentPath, setCurrentPath] = useState<string>(initialPath || '/Desktop');
   const [items, setItems] = useState<DesktopItem[]>([]);

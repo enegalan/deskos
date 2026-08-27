@@ -85,6 +85,11 @@ export interface KernelState {
 
 let windowIdCounter = 0;
 
+/**
+ * Generate a unique window id.
+ *
+ * @returns New window id string
+ */
 function generateWindowId(): string {
   return `window-${++windowIdCounter}-${Date.now()}`;
 }
@@ -104,6 +109,11 @@ const defaultSettings: SystemSettings = {
   showIconLabels: true,
 };
 
+/**
+ * Load system settings from localStorage (falls back to defaults).
+ *
+ * @returns Merged system settings
+ */
 function loadSettings(): SystemSettings {
   const [stored, error] = safeSync(() => localStorage.getItem(SETTINGS_STORAGE_KEY));
   
@@ -140,6 +150,11 @@ function loadSettings(): SystemSettings {
   return settings;
 }
 
+/**
+ * Persist system settings to localStorage.
+ *
+ * @param settings - Full settings object to store
+ */
 function saveSettings(settings: SystemSettings): void {
   const [, error] = safeSync(() => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { notificationManager, type Notification } from '@core/notifications';
 import { Icon } from './Icon';
 
+/** Host for stacked toast notifications from the notification manager */
 export function ToastContainer() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -30,6 +31,7 @@ interface ToastProps {
   notification: Notification;
 }
 
+/** Single dismissible toast for one notification */
 function Toast({ notification }: ToastProps) {
   const [isExiting, setIsExiting] = useState(false);
 

@@ -6,15 +6,18 @@ import { eventBus, SystemEvents } from '@core/event-bus';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { registerDefaultMenus } from '../context-menu/menus';
 import { DesktopIcons } from './DesktopIcons';
-import { addDesktopShortcut, pixelToClampedGrid, getFolderById, getGridSize } from '@core/desktop-shortcuts';
+import { addDesktopShortcut, pixelToClampedGrid, getFolderById, getGridMetrics } from '@core/desktop-shortcuts';
 import { FolderWindow } from './FolderWindow';
 import { getWallpaper, isWallpaperReference } from '@core/wallpaper-storage';
+import { getWallpaperTone, type WallpaperTone } from '../wallpapers/wallpapers';
 import { ToastContainer } from '@components/Toast';
 
+/** Desktop shell: wallpaper, icons, windows, dock, context menus, and drop targets. */
 export function Desktop() {
   const settings = useKernel((state) => state.settings);
   const desktopRef = useRef<HTMLDivElement>(null);
   const [wallpaperUrl, setWallpaperUrl] = useState<string>('');
+  const [wallpaperTone, setWallpaperTone] = useState<WallpaperTone>('dark');
   const [dragGridPosition, setDragGridPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Load wallpaper from IndexedDB if it's a reference
@@ -61,39 +64,37 @@ export function Desktop() {
     };
   }, [settings.wallpaper]);
 
-  // Determine if wallpaper is a gradient or an image URL
-  const isGradient = wallpaperUrl?.startsWith('linear-gradient') ||
-                     wallpaperUrl?.startsWith('radial-gradient');
+  const isGradient =
+    wallpaperUrl?.startsWith('linear-gradient') ||
+    wallpaperUrl?.startsWith('radial-gradient');
+  const isSolidColor = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(
+    wallpaperUrl?.trim() || ''
+  );
 
   // Build background style with all properties explicitly set
   const backgroundStyle: React.CSSProperties = wallpaperUrl
     ? isGradient
-      ? { 
-          background: wallpaperUrl,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
-        }
-      : { 
-          // Use backgroundImage for images to avoid conflicts
-          backgroundImage: `url(${wallpaperUrl})`,
+      ? {
+          backgroundImage: wallpaperUrl,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           backgroundAttachment: 'fixed',
-          // Explicitly reset background to avoid CSS conflicts
-          background: 'transparent'
         }
-    : {
-        // Clear all background properties when no wallpaper
-        backgroundImage: 'none',
-        background: 'transparent',
-        backgroundSize: 'initial',
-        backgroundPosition: 'initial',
-        backgroundRepeat: 'initial',
-        backgroundAttachment: 'initial'
-      };
+      : isSolidColor
+        ? {
+            // Shorthand clears CSS fallback gradient on .desktop
+            background: wallpaperUrl,
+          }
+        : {
+            backgroundImage: `url(${wallpaperUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            backgroundAttachment: 'fixed',
+          }
+    : {};
+
 
   // Debug logging
   useEffect(() => {
@@ -107,31 +108,54 @@ export function Desktop() {
     }
   }, [wallpaperUrl, backgroundStyle, isGradient]);
 
+  // Icon contrast follows wallpaper brightness, not UI theme
+  useEffect(() => {
+    let cancelled = false;
+    getWallpaperTone(wallpaperUrl).then((tone) => {
+      if (!cancelled) {
+        setWallpaperTone(tone);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wallpaperUrl]);
+
   // Apply accent color dynamically
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('--color-accent', settings.accentColor);
-    
-    // Calculate hover and glow colors (only if color is in hex format)
-    if (settings.accentColor.startsWith('#')) {
-      const hex = settings.accentColor.replace('#', '');
-      if (hex.length === 6) {
-        const r = parseInt(hex.substr(0, 2), 16);
-        const g = parseInt(hex.substr(2, 2), 16);
-        const b = parseInt(hex.substr(4, 2), 16);
-        
-        if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
-          const hoverR = Math.min(255, r + 30);
-          const hoverG = Math.min(255, g + 30);
-          const hoverB = Math.min(255, b + 30);
-          root.style.setProperty('--color-accent-rgb', `${r}, ${g}, ${b}`);
-          root.style.setProperty('--color-accent-hover', `rgb(${hoverR}, ${hoverG}, ${hoverB})`);
-          root.style.setProperty('--color-accent-glow', `rgba(${r}, ${g}, ${b}, 0.3)`);
-          root.style.setProperty('--color-border-focus', `rgba(${r}, ${g}, ${b}, 0.6)`);
-        }
-      }
+    const accent = settings.accentColor;
+    root.style.setProperty('--color-accent', accent);
+
+    if (!accent.startsWith('#')) {
+      return;
     }
+
+    const hex = accent.replace('#', '');
+    if (hex.length !== 6) {
+      return;
+    }
+
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+      return;
+    }
+
+    const hoverR = Math.min(255, r + 30);
+    const hoverG = Math.min(255, g + 30);
+    const hoverB = Math.min(255, b + 30);
+    root.style.setProperty('--color-accent-rgb', `${r}, ${g}, ${b}`);
+    root.style.setProperty('--color-accent-hover', `rgb(${hoverR}, ${hoverG}, ${hoverB})`);
+    root.style.setProperty('--color-accent-glow', `rgba(${r}, ${g}, ${b}, 0.3)`);
+    root.style.setProperty('--color-border-focus', `rgba(${r}, ${g}, ${b}, 0.6)`);
   }, [settings.accentColor]);
+
+  // Theme on <html> so portals (e.g. context-menu submenus) inherit light/dark tokens
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+  }, [settings.theme]);
 
   // Register default context menus and wire up events
   useEffect(() => {
@@ -394,7 +418,7 @@ export function Desktop() {
     }
   }, []);
 
-  const gridSize = getGridSize();
+  const { cellWidth, cellHeight } = getGridMetrics();
 
   return (
     <div
@@ -402,6 +426,7 @@ export function Desktop() {
       className="desktop"
       style={backgroundStyle}
       data-theme={settings.theme}
+      data-wallpaper-tone={wallpaperTone}
       data-program-id="system"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -414,8 +439,8 @@ export function Desktop() {
             position: 'absolute',
             left: `${dragGridPosition.x}px`,
             top: `${dragGridPosition.y}px`,
-            width: `${gridSize}px`,
-            height: `${gridSize}px`,
+            width: `${cellWidth}px`,
+            height: `${cellHeight}px`,
             pointerEvents: 'none',
             zIndex: 9999,
           }}
