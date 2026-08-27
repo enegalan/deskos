@@ -46,6 +46,8 @@ function scanProgramDirectories(rootDir: string): ProgramMetadata[] {
     const entries = readdirSync(fullPath, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
+      // Scaffolding only — not registered as runnable programs
+      if (dir === 'programs' && entry.name === 'templates') continue;
 
       const programFile = join(fullPath, entry.name, 'program.ts');
       const programFileTsx = join(fullPath, entry.name, 'program.tsx');

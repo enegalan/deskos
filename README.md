@@ -40,11 +40,11 @@ deskos/
 │   ├── launcher/           # Application launcher
 │   └── settings/           # System settings panel
 ├── programs/                # User-added programs
-│   └── notes/              # Example: Notes app
-├── program-templates/       # Scaffolding blueprints
-│   ├── base/               # Basic program template
-│   ├── webview/            # Browser/iframe template
-│   └── media/              # Audio/video player template
+│   ├── notes/              # Example: Notes app
+│   └── templates/          # Scaffolding blueprints
+│       ├── base/           # Basic program template
+│       ├── webview/        # Browser/iframe template
+│       └── media/          # Audio/video player template
 └── src/                     # App entry point
     ├── main.tsx
     ├── App.tsx
@@ -54,7 +54,7 @@ deskos/
 
 ## Creating a New Program
 
-Copy a template from `program-templates/` into `programs/<id>/` and replace `__PROGRAM_ID__` and `__PROGRAM_NAME__`.
+Copy a template from `programs/templates/` into `programs/<id>/` and replace `__PROGRAM_ID__` and `__PROGRAM_NAME__`.
 
 ### Program Structure
 

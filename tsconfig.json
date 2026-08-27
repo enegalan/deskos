@@ -25,5 +25,5 @@
       "virtual:programs": ["./virtual-programs.d.ts"]
     }
   },
-  "include": ["src", "core", "window-manager", "system", "programs", "program-templates", "context-menu", "components", "cli", "vite-plugin-programs.ts", "vite.config.ts", "virtual-programs.d.ts"]
+  "include": ["src", "core", "window-manager", "system", "programs", "context-menu", "components", "cli", "vite-plugin-programs.ts", "vite.config.ts", "virtual-programs.d.ts"]
 }
