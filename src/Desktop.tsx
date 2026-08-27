@@ -6,7 +6,7 @@ import { eventBus, SystemEvents } from '@core/event-bus';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { registerDefaultMenus } from '../context-menu/menus';
 import { DesktopIcons } from './DesktopIcons';
-import { addDesktopShortcut, pixelToClampedGrid, getFolderById, getGridMetrics } from '@core/desktop-shortcuts';
+import { addDesktopShortcut, pixelToClampedGrid, getFolderById, getGridMetrics, DESKOS_ITEM_IDS_MIME, readDraggedItemIds } from '@core/desktop-shortcuts';
 import { FolderWindow } from './FolderWindow';
 import { getWallpaper, isWallpaperReference } from '@core/wallpaper-storage';
 import { getWallpaperTone, type WallpaperTone } from '../wallpapers/wallpapers';
@@ -218,7 +218,8 @@ export function Desktop() {
     const hasDeskosData = types.some(type => 
       type === 'application/x-deskos-shortcut-id' || 
       type === 'application/x-deskos-folder-id' || 
-      type === 'application/x-deskos-program-id'
+      type === 'application/x-deskos-program-id' ||
+      type === DESKOS_ITEM_IDS_MIME
     );
     
     if (hasDeskosData && desktopRef.current) {
@@ -257,7 +258,8 @@ export function Desktop() {
       const hasDeskosData = types.some(type => 
         type === 'application/x-deskos-shortcut-id' || 
         type === 'application/x-deskos-folder-id' || 
-        type === 'application/x-deskos-program-id'
+        type === 'application/x-deskos-program-id' ||
+        type === DESKOS_ITEM_IDS_MIME
       );
       
       if (hasDeskosData) {
@@ -349,53 +351,58 @@ export function Desktop() {
     });
 
     // Check for items from folder windows
-    const shortcutId = e.dataTransfer.getData('application/x-deskos-shortcut-id');
-    const folderId = e.dataTransfer.getData('application/x-deskos-folder-id');
+    const itemIds = readDraggedItemIds(e.dataTransfer);
     
-    if (shortcutId || folderId) {
-      console.log('[Desktop] Drop: Moving item from folder to desktop', { shortcutId, folderId, gridPos });
+    if (itemIds.length > 0) {
+      console.log('[Desktop] Drop: Moving items from folder to desktop', { itemIds, gridPos });
       
-      // Item being moved from a folder to desktop
-      const { getDesktopFolders, getDesktopShortcuts, updateDesktopShortcutPosition, updateFolderPosition } = await import('@core/desktop-shortcuts');
+      const {
+        getDesktopFolders,
+        getDesktopShortcuts,
+        updateDesktopShortcutPosition,
+        updateFolderPosition,
+        removeItemFromFolder,
+        clampGridPosition,
+      } = await import('@core/desktop-shortcuts');
       
-      // Find the parent folder that contains this item
       const folders = getDesktopFolders();
-      const parentFolder = folders.find(f => f.contents.includes(shortcutId || folderId || ''));
-      
-      console.log('[Desktop] Drop: Parent folder found', parentFolder?.id);
-      
-      if (parentFolder) {
-        // Remove from parent folder first
-        const { removeItemFromFolder } = await import('@core/desktop-shortcuts');
-        removeItemFromFolder(parentFolder.id, shortcutId || folderId || '');
-        console.log('[Desktop] Drop: Removed from folder');
-      }
-      
-      // Verify the item exists and update its position
-      if (shortcutId) {
-        const shortcuts = getDesktopShortcuts();
-        const shortcut = shortcuts.find(s => s.id === shortcutId);
-        console.log('[Desktop] Drop: Shortcut found', shortcut);
+      const shortcuts = getDesktopShortcuts();
+
+      const primaryId = itemIds[0];
+      const primaryItem =
+        shortcuts.find((s) => s.id === primaryId) || folders.find((f) => f.id === primaryId);
+      const primaryOrigin = primaryItem
+        ? { x: primaryItem.x, y: primaryItem.y }
+        : { x: gridPos.x, y: gridPos.y };
+
+      for (const itemId of itemIds) {
+        const parentFolder = folders.find((f) => f.contents.includes(itemId));
+        if (parentFolder) {
+          removeItemFromFolder(parentFolder.id, itemId);
+        }
+
+        const shortcut = shortcuts.find((s) => s.id === itemId);
+        const folder = folders.find((f) => f.id === itemId);
+        const origin = shortcut
+          ? { x: shortcut.x, y: shortcut.y }
+          : folder
+            ? { x: folder.x, y: folder.y }
+            : primaryOrigin;
+        const offsetX = origin.x - primaryOrigin.x;
+        const offsetY = origin.y - primaryOrigin.y;
+        const pos = clampGridPosition(
+          gridPos.x + offsetX,
+          gridPos.y + offsetY,
+          { width: desktopRect.width, height: desktopRect.height }
+        );
+
         if (shortcut) {
-          // Update position on desktop
-          updateDesktopShortcutPosition(shortcutId, gridPos.x, gridPos.y);
-          console.log('[Desktop] Drop: Updated shortcut position', { x: gridPos.x, y: gridPos.y });
-        } else {
-          console.error('[Desktop] Drop: Shortcut not found:', shortcutId);
-        }
-      } else if (folderId) {
-        const folder = folders.find(f => f.id === folderId);
-        console.log('[Desktop] Drop: Folder found', folder);
-        if (folder) {
-          // Update position on desktop
-          updateFolderPosition(folderId, gridPos.x, gridPos.y);
-          console.log('[Desktop] Drop: Updated folder position', { x: gridPos.x, y: gridPos.y });
-        } else {
-          console.error('[Desktop] Drop: Folder not found:', folderId);
+          updateDesktopShortcutPosition(itemId, pos.x, pos.y);
+        } else if (folder) {
+          updateFolderPosition(itemId, pos.x, pos.y);
         }
       }
-      
-      // Dispatch custom event to notify DesktopIcons to refresh
+
       window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
       console.log('[Desktop] Drop: Dispatched desktop-shortcuts-updated event');
       return;

@@ -11,6 +11,11 @@
 - JSDoc on exported APIs and module helpers across the app
 - Dock clock: date format presets (`medium` / `long` / `iso` / `dmy` / `mdy`) and optional seconds in Settings
 - `DOCK_ITEMS` is the full dock layout: programs plus `separator`, `running`, and `clock` entries (order = left-to-right)
+- Drag-to-select (marquee) on desktop and in folder windows; Ctrl/Cmd keeps prior selection
+- Multi-item drag: dragging one selected icon/file moves the whole selection (desktop and folders)
+- Group drop finds nearest free cell when a relative slot is occupied (no overlap)
+- Folder sidebar highlights only the exact current path (not parent Recent/Favorites entries)
+- Window restore from maximized uses the same geometry transition as maximize
 
 ### Changed
 

@@ -74,9 +74,7 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
     onNavigate(locationInfo.path);
   }, [onNavigate]);
 
-  const isCurrentPath = (path: string) => {
-    return currentPath === path || currentPath.startsWith(path + '/');
-  };
+  const isCurrentPath = (path: string) => currentPath === path;
 
   return (
     <div className="folder-sidebar">

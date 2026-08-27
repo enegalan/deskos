@@ -17,13 +17,19 @@ import {
   getGridSize,
   addItemToFolder,
   getFolderByPath,
+  DESKOS_ITEM_IDS_MIME,
+  readDraggedItemIds,
 } from '@core/desktop-shortcuts';
 import { programs } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
 import { FolderSidebar } from './FolderSidebar';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
-import { registerSelectAllHandler } from '@core/selection';
+import {
+  registerSelectAllHandler,
+  startMarqueeSelection,
+  type MarqueeRect,
+} from '@core/selection';
 import { registerCopyHandler, registerCutHandler, registerPasteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, CLIPBOARD_PRIORITY, HandlerSkippedError, type ClipboardItem } from '@core/clipboard';
 
 interface FolderWindowProps {
@@ -41,10 +47,17 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [pathInput, setPathInput] = useState(initialPath || '/Desktop');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
   const lastSelectedIndexRef = useRef<number>(-1);
   const contentRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const pathInputRef = useRef<HTMLInputElement>(null);
   const isInitialMount = useRef(true);
+  const selectedIdsRef = useRef(selectedIds);
+  const itemsRef = useRef(items);
+  const suppressClickClearRef = useRef(false);
+  selectedIdsRef.current = selectedIds;
+  itemsRef.current = items;
 
   const loadItems = useCallback((path: string) => {
     const resolved = resolvePath(path);
@@ -490,9 +503,53 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     };
   }, [selectedIds, currentPath]);
 
-  // Handle click on folder window content to deselect
+  // Drag-to-select on empty grid + click to clear
   useEffect(() => {
+    const contentElement = contentRef.current;
+    const gridElement = gridRef.current;
+    if (!contentElement || !gridElement) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('.folder-window-item')) return;
+      if (!target.closest('.folder-window-grid')) return;
+
+      const additive = e.ctrlKey || e.metaKey;
+      startMarqueeSelection({
+        container: gridElement,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        additive,
+        baseSelection: new Set(selectedIdsRef.current),
+        getElements: () => gridElement.querySelectorAll('.folder-window-item'),
+        getId: (el) => el.getAttribute('data-item-id'),
+        onRect: setMarquee,
+        onSelection: (ids) => {
+          setSelectedIds(ids);
+          if (ids.size === 0) {
+            lastSelectedIndexRef.current = -1;
+            return;
+          }
+          let last = -1;
+          const list = itemsRef.current;
+          ids.forEach((id) => {
+            const idx = list.findIndex((item) => item.id === id);
+            if (idx > last) last = idx;
+          });
+          lastSelectedIndexRef.current = last;
+        },
+        onDragged: () => {
+          suppressClickClearRef.current = true;
+        },
+      });
+    };
+
     const handleContentClick = (e: MouseEvent) => {
+      if (suppressClickClearRef.current) {
+        suppressClickClearRef.current = false;
+        return;
+      }
       const target = e.target as HTMLElement;
       // Only deselect if clicking on the grid area, not on items
       if (target.classList.contains('folder-window-grid') || target.closest('.folder-window-grid') === target) {
@@ -501,25 +558,43 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
       }
     };
 
-    const contentElement = contentRef.current;
-    if (contentElement) {
-      contentElement.addEventListener('click', handleContentClick);
-      return () => {
-        contentElement.removeEventListener('click', handleContentClick);
-      };
-    }
+    contentElement.addEventListener('mousedown', handleMouseDown);
+    contentElement.addEventListener('click', handleContentClick);
+    return () => {
+      contentElement.removeEventListener('mousedown', handleMouseDown);
+      contentElement.removeEventListener('click', handleContentClick);
+    };
   }, []);
+
+  const handleItemDragStart = useCallback((item: DesktopItem, e: React.DragEvent) => {
+    const ids =
+      selectedIds.has(item.id) && selectedIds.size > 1
+        ? Array.from(selectedIds)
+        : [item.id];
+    e.dataTransfer.setData(DESKOS_ITEM_IDS_MIME, JSON.stringify(ids));
+    if (isDesktopFolder(item)) {
+      e.dataTransfer.setData('application/x-deskos-folder-id', item.id);
+    } else if (isDesktopShortcut(item)) {
+      e.dataTransfer.setData('application/x-deskos-shortcut-id', item.id);
+    }
+    e.dataTransfer.effectAllowed = 'move';
+  }, [selectedIds]);
 
   // Handle drag and drop from desktop to folder window
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     // Check if dragging a desktop item
-    const shortcutId = e.dataTransfer.getData('application/x-deskos-shortcut-id');
-    const folderId = e.dataTransfer.getData('application/x-deskos-folder-id');
-    const programId = e.dataTransfer.getData('application/x-deskos-program-id');
+    const types = Array.from(e.dataTransfer.types);
+    const hasDeskosData = types.some(
+      (type) =>
+        type === 'application/x-deskos-shortcut-id' ||
+        type === 'application/x-deskos-folder-id' ||
+        type === 'application/x-deskos-program-id' ||
+        type === DESKOS_ITEM_IDS_MIME
+    );
     
-    if (shortcutId || folderId || programId) {
+    if (hasDeskosData) {
       e.dataTransfer.dropEffect = 'move';
       if (contentRef.current) {
         contentRef.current.classList.add('drag-over');
@@ -577,26 +652,18 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     if (!currentFolder) return;
 
     // Check what type of item is being dropped
-    const shortcutId = e.dataTransfer.getData('application/x-deskos-shortcut-id');
-    const folderId = e.dataTransfer.getData('application/x-deskos-folder-id');
+    const itemIds = readDraggedItemIds(e.dataTransfer);
     const programId = e.dataTransfer.getData('application/x-deskos-program-id');
 
     try {
-      if (shortcutId) {
-        // Dropping an existing shortcut
-        console.log('[FolderWindow] Drop: Adding shortcut to folder', shortcutId);
-        addItemToFolder(currentFolder.id, shortcutId);
+      if (itemIds.length > 0) {
+        for (const itemId of itemIds) {
+          if (itemId !== currentFolder.id) {
+            addItemToFolder(currentFolder.id, itemId);
+          }
+        }
         loadItems(currentPath);
         window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-      } else if (folderId) {
-        // Dropping an existing folder
-        console.log('[FolderWindow] Drop: Adding folder to folder', folderId);
-        // Prevent adding folder to itself
-        if (folderId !== currentFolder.id) {
-          addItemToFolder(currentFolder.id, folderId);
-          loadItems(currentPath);
-          window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-        }
       } else if (programId) {
         // Dropping a new program (from launcher/taskbar)
         console.log('[FolderWindow] Drop: Creating new shortcut from program', programId);
@@ -663,7 +730,18 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
           onDrop={handleDrop}
         >
           <div className="folder-window-title">{folderName}</div>
-          <div className="folder-window-grid">
+          <div className="folder-window-grid" ref={gridRef}>
+            {marquee && (
+              <div
+                className="selection-marquee"
+                style={{
+                  left: `${marquee.left}px`,
+                  top: `${marquee.top}px`,
+                  width: `${marquee.width}px`,
+                  height: `${marquee.height}px`,
+                }}
+              />
+            )}
             {items.length === 0 ? (
               <div className="folder-window-empty">This folder is empty</div>
             ) : (
@@ -688,10 +766,7 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                         width: `${gridSize}px`,
                       }}
                       draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/x-deskos-folder-id', item.id);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
+                      onDragStart={(e) => handleItemDragStart(item, e)}
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
@@ -738,10 +813,7 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                         width: `${gridSize}px`,
                       }}
                       draggable={true}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/x-deskos-shortcut-id', item.id);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
+                      onDragStart={(e) => handleItemDragStart(item, e)}
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >

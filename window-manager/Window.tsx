@@ -250,6 +250,7 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
   }
 
   const zIndex = calculateZIndex(win.id, windowOrder, win.isFocused);
+  const isInteractiveMove = dragState.isDragging || resizeState.isResizing;
 
   return (
     <div
@@ -261,9 +262,10 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
         width: win.width,
         height: win.height,
         zIndex,
-        transition: win.isMaximized || (win.previousState && !win.isMaximized) 
-          ? 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' 
-          : 'box-shadow 0.2s ease',
+        // Animate maximize/restore; disable while dragging or resizing
+        transition: isInteractiveMove
+          ? 'none'
+          : 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1), top 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease',
       }}
       data-program-id={win.programId}
       data-window-id={win.id}

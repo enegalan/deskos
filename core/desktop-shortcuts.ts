@@ -189,7 +189,14 @@ function getIdsInsideFolders(): Set<string> {
 /**
  * Find any desktop-surface item at a grid cell (ignores nested folder contents)
  */
-export function findItemAtPosition(x: number, y: number, excludeId?: string): DesktopItem | null {
+export function findItemAtPosition(
+  x: number,
+  y: number,
+  excludeId?: string | string[]
+): DesktopItem | null {
+  const exclude = new Set(
+    excludeId == null ? [] : typeof excludeId === 'string' ? [excludeId] : excludeId
+  );
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const inFolders = getIdsInsideFolders();
@@ -198,7 +205,7 @@ export function findItemAtPosition(x: number, y: number, excludeId?: string): De
   const row = Math.round(y / metrics.cellHeight);
 
   const shortcut = shortcuts.find((s) => {
-    if (excludeId && s.id === excludeId) return false;
+    if (exclude.has(s.id)) return false;
     if (inFolders.has(s.id)) return false;
     return Math.round(s.x / metrics.cellWidth) === col && Math.round(s.y / metrics.cellHeight) === row;
   });
@@ -206,12 +213,35 @@ export function findItemAtPosition(x: number, y: number, excludeId?: string): De
   if (shortcut) return shortcut;
 
   const folder = folders.find((f) => {
-    if (excludeId && f.id === excludeId) return false;
+    if (exclude.has(f.id)) return false;
     if (!isRootDesktopFolder(f)) return false;
     return Math.round(f.x / metrics.cellWidth) === col && Math.round(f.y / metrics.cellHeight) === row;
   });
 
   return folder || null;
+}
+
+/** MIME type for multi-item drag payloads (JSON string[]) */
+export const DESKOS_ITEM_IDS_MIME = 'application/x-deskos-item-ids';
+
+/** Read dragged item ids from a DataTransfer (multi or single legacy fields) */
+export function readDraggedItemIds(dataTransfer: DataTransfer): string[] {
+  const raw = dataTransfer.getData(DESKOS_ITEM_IDS_MIME);
+  if (raw) {
+    try {
+      const ids = JSON.parse(raw);
+      if (Array.isArray(ids) && ids.length > 0) {
+        return ids.filter((id): id is string => typeof id === 'string');
+      }
+    } catch {
+      // fall through to single-id fields
+    }
+  }
+  const shortcutId = dataTransfer.getData('application/x-deskos-shortcut-id');
+  if (shortcutId) return [shortcutId];
+  const folderId = dataTransfer.getData('application/x-deskos-folder-id');
+  if (folderId) return [folderId];
+  return [];
 }
 
 /**
@@ -444,6 +474,105 @@ export function findNextAvailablePosition(items: Array<{ x: number; y: number }>
     y += metrics.cellHeight;
   }
   return { x: 0, y };
+}
+
+function isCellOccupied(
+  pos: { x: number; y: number },
+  occupied: Array<{ x: number; y: number }>,
+  metrics: ReturnType<typeof getGridMetrics>
+): boolean {
+  const thresholdX = metrics.cellWidth * GRID_OCCUPANCY_RATIO;
+  const thresholdY = metrics.cellHeight * GRID_OCCUPANCY_RATIO;
+  return occupied.some(
+    (item) => Math.abs(item.x - pos.x) < thresholdX && Math.abs(item.y - pos.y) < thresholdY
+  );
+}
+
+/**
+ * Prefer `preferred` cell; if taken, pick the nearest free desktop cell (Windows-like).
+ */
+export function findNearestAvailablePosition(
+  preferred: { x: number; y: number },
+  occupied: Array<{ x: number; y: number }>,
+  bounds: { width: number; height: number } = getDesktopBounds()
+): { x: number; y: number } {
+  const metrics = getGridMetrics(bounds);
+  const preferredClamped = clampGridPosition(preferred.x, preferred.y, bounds);
+  if (!isCellOccupied(preferredClamped, occupied, metrics)) {
+    return preferredClamped;
+  }
+
+  let best: { x: number; y: number } | null = null;
+  let bestDist = Infinity;
+  for (let row = 0; row < metrics.rows; row++) {
+    for (let col = 0; col < metrics.cols; col++) {
+      const pos = cellTopLeft(col, row, metrics);
+      if (isCellOccupied(pos, occupied, metrics)) continue;
+      const dx = pos.x - preferredClamped.x;
+      const dy = pos.y - preferredClamped.y;
+      const dist = dx * dx + dy * dy;
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = pos;
+      }
+    }
+  }
+
+  return best ?? findNextAvailablePosition(occupied);
+}
+
+/** Positions of root-desktop items, optionally excluding ids (e.g. the drag group) */
+export function getDesktopSurfacePositions(excludeIds: Iterable<string> = []): Array<{ x: number; y: number }> {
+  const exclude = new Set(excludeIds);
+  const inFolders = getIdsInsideFolders();
+  const positions: Array<{ x: number; y: number }> = [];
+
+  getDesktopShortcuts().forEach((s) => {
+    if (exclude.has(s.id) || inFolders.has(s.id)) return;
+    positions.push({ x: s.x, y: s.y });
+  });
+  getDesktopFolders().forEach((f) => {
+    if (exclude.has(f.id) || !isRootDesktopFolder(f)) return;
+    positions.push({ x: f.x, y: f.y });
+  });
+
+  return positions;
+}
+
+/**
+ * Place a dragged group: keep relative layout when free; otherwise nearest empty cell.
+ * Primary aims at `primaryFinal`; companions aim at origin + same delta.
+ */
+export function computeGroupDropPositions(
+  dragIds: string[],
+  origins: Record<string, { x: number; y: number }>,
+  primaryId: string,
+  primaryFinal: { x: number; y: number },
+  bounds: { width: number; height: number } = getDesktopBounds()
+): Record<string, { x: number; y: number }> {
+  const claimed = getDesktopSurfacePositions(dragIds);
+  const result: Record<string, { x: number; y: number }> = {};
+  const primaryOrigin = origins[primaryId] ?? primaryFinal;
+  const dx = primaryFinal.x - primaryOrigin.x;
+  const dy = primaryFinal.y - primaryOrigin.y;
+
+  const primaryPos = findNearestAvailablePosition(primaryFinal, claimed, bounds);
+  result[primaryId] = primaryPos;
+  claimed.push(primaryPos);
+
+  for (const id of dragIds) {
+    if (id === primaryId) continue;
+    const origin = origins[id] ?? primaryOrigin;
+    const preferred = {
+      x: origin.x + dx,
+      y: origin.y + dy,
+    };
+    const pos = findNearestAvailablePosition(preferred, claimed, bounds);
+    result[id] = pos;
+    claimed.push(pos);
+  }
+
+  return result;
 }
 
 /**
