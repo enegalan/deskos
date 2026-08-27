@@ -12,13 +12,14 @@
 
 ### Changed
 
-- Desktop icon grid fills the viewport: preferred `gridSize` picks cols/rows; `cellWidth`/`cellHeight` stretch so there is no leftover strip
+- Desktop icon grid fills the viewport: preferred `gridSize` picks density; cells stretch. On resize, icons keep the same cell (col/row); occupied cells are not dropped
 - Dock launcher identified by `programId === 'launcher'` (removed `launcher` boolean on dock items)
 - Special location registry keys use the `locations/<id>.ts` filename
 
 ### Fixed
 
 - Nested folders no longer block “New Folder” on empty desktop cells (`findItemAtPosition` / placement only consider root desktop items)
+- Desktop resize keeps each icon’s cell (col/row); grid only stretches — occupied cells are not dropped
 
 ## [1.1.0] - 2026-08-27
 

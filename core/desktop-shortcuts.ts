@@ -131,6 +131,7 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
 
   shortcuts.push(newShortcut);
   systemStorage.setItem(STORAGE_KEY, shortcuts);
+  rememberGridMetrics();
   
   // If auto arrange is enabled and position was not manually specified, arrange all icons
   if (positionNotSpecified && useKernel.getState().settings.autoArrange) {
@@ -163,6 +164,7 @@ export function updateDesktopShortcutPosition(shortcutId: string, x: number, y: 
     shortcut.x = clamped.x;
     shortcut.y = clamped.y;
     systemStorage.setItem(STORAGE_KEY, shortcuts);
+    rememberGridMetrics();
   }
 }
 
@@ -234,6 +236,7 @@ export function swapItemPositions(itemId1: string, itemId2: string): void {
     // Save changes
     systemStorage.setItem(STORAGE_KEY, shortcuts);
     systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+    rememberGridMetrics();
     
     // Dispatch event to notify DesktopIcons to refresh
     window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
@@ -266,15 +269,75 @@ export interface GridMetrics {
 }
 
 /**
- * Grid that fills the entire desktop: cols/rows from preferred size,
- * cellWidth/Height stretched so there is no leftover strip.
+ * Metrics last used to write icon pixel positions (so resize can keep the same cells).
+ */
+let lastAppliedMetrics: GridMetrics | null = null;
+
+/**
+ * Root desktop items that occupy grid cells.
+ */
+function getRootDesktopItems(): DesktopItem[] {
+  const inFolders = getIdsInsideFolders();
+  const shortcuts = getDesktopShortcuts().filter((s) => !inFolders.has(s.id));
+  const folders = getDesktopFolders().filter(isRootDesktopFolder);
+  return [...shortcuts, ...folders];
+}
+
+/**
+ * Cell index for a pixel position under the given metrics.
+ *
+ * @param x - Pixel X
+ * @param y - Pixel Y
+ * @param metrics - Metrics that produced (or match) those pixels
+ */
+function positionToCell(
+  x: number,
+  y: number,
+  metrics: { cellWidth: number; cellHeight: number }
+): { col: number; row: number } {
+  return {
+    col: Math.round(x / metrics.cellWidth),
+    row: Math.round(y / metrics.cellHeight),
+  };
+}
+
+/**
+ * Farthest occupied cell indices (root desktop items only).
+ * Uses last applied metrics, or preferred size for legacy pixel positions.
+ */
+function getOccupiedCellExtents(): { maxCol: number; maxRow: number } {
+  const preferred = getGridSize();
+  const indexMetrics = lastAppliedMetrics ?? {
+    cellWidth: preferred,
+    cellHeight: preferred,
+  };
+
+  let maxCol = -1;
+  let maxRow = -1;
+  getRootDesktopItems().forEach((item) => {
+    const { col, row } = positionToCell(item.x, item.y, indexMetrics);
+    maxCol = Math.max(maxCol, col);
+    maxRow = Math.max(maxRow, row);
+  });
+  return { maxCol, maxRow };
+}
+
+/**
+ * Grid that fills the desktop: preferred size picks density; cell size stretches.
+ * Occupied cells are never dropped when the viewport shrinks (cols/rows only grow
+ * to fit icons); icons keep the same cell index across resizes.
+ *
+ * @param bounds - Desktop pixel size
  */
 export function getGridMetrics(
   bounds: { width: number; height: number } = getDesktopBounds()
 ): GridMetrics {
   const preferred = getGridSize();
-  const cols = Math.max(1, Math.floor(bounds.width / preferred));
-  const rows = Math.max(1, Math.floor(bounds.height / preferred));
+  const baseCols = Math.max(1, Math.floor(bounds.width / preferred));
+  const baseRows = Math.max(1, Math.floor(bounds.height / preferred));
+  const { maxCol, maxRow } = getOccupiedCellExtents();
+  const cols = Math.max(baseCols, maxCol + 1);
+  const rows = Math.max(baseRows, maxRow + 1);
   return {
     preferred,
     cols,
@@ -282,6 +345,15 @@ export function getGridMetrics(
     cellWidth: bounds.width / cols,
     cellHeight: bounds.height / rows,
   };
+}
+
+/**
+ * Remember metrics after icon pixel positions were written for those metrics.
+ *
+ * @param metrics - Metrics to treat as source of truth for cell indices
+ */
+export function rememberGridMetrics(metrics: GridMetrics = getGridMetrics()): void {
+  lastAppliedMetrics = metrics;
 }
 
 /**
@@ -375,31 +447,76 @@ export function findNextAvailablePosition(items: Array<{ x: number; y: number }>
 }
 
 /**
- * Pull any icons that sit outside the desktop back into valid cells
+ * Relayout desktop icons for the current viewport while keeping each icon's cell
+ * (col/row). Cell size stretches; occupied cells are not dropped on shrink.
  */
 export function clampAllIconsToDesktop(): void {
   const bounds = getDesktopBounds();
+  const preferred = getGridSize();
+  const indexMetrics = lastAppliedMetrics ?? {
+    preferred,
+    cols: 1,
+    rows: 1,
+    cellWidth: preferred,
+    cellHeight: preferred,
+  };
+
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
-  let changed = false;
+  const inFolders = getIdsInsideFolders();
+
+  type Placement = { kind: 'shortcut' | 'folder'; id: string; col: number; row: number };
+  const placements: Placement[] = [];
+  let maxCol = -1;
+  let maxRow = -1;
 
   shortcuts.forEach((shortcut) => {
-    const clamped = clampGridPosition(shortcut.x, shortcut.y, bounds);
-    if (clamped.x !== shortcut.x || clamped.y !== shortcut.y) {
-      shortcut.x = clamped.x;
-      shortcut.y = clamped.y;
-      changed = true;
-    }
+    if (inFolders.has(shortcut.id)) return;
+    const { col, row } = positionToCell(shortcut.x, shortcut.y, indexMetrics);
+    placements.push({ kind: 'shortcut', id: shortcut.id, col, row });
+    maxCol = Math.max(maxCol, col);
+    maxRow = Math.max(maxRow, row);
   });
 
   folders.forEach((folder) => {
-    const clamped = clampGridPosition(folder.x, folder.y, bounds);
-    if (clamped.x !== folder.x || clamped.y !== folder.y) {
-      folder.x = clamped.x;
-      folder.y = clamped.y;
-      changed = true;
+    if (!isRootDesktopFolder(folder)) return;
+    const { col, row } = positionToCell(folder.x, folder.y, indexMetrics);
+    placements.push({ kind: 'folder', id: folder.id, col, row });
+    maxCol = Math.max(maxCol, col);
+    maxRow = Math.max(maxRow, row);
+  });
+
+  const baseCols = Math.max(1, Math.floor(bounds.width / preferred));
+  const baseRows = Math.max(1, Math.floor(bounds.height / preferred));
+  const metrics: GridMetrics = {
+    preferred,
+    cols: Math.max(baseCols, maxCol + 1),
+    rows: Math.max(baseRows, maxRow + 1),
+    cellWidth: bounds.width / Math.max(baseCols, maxCol + 1),
+    cellHeight: bounds.height / Math.max(baseRows, maxRow + 1),
+  };
+
+  let changed = false;
+  placements.forEach(({ kind, id, col, row }) => {
+    const pos = cellTopLeft(col, row, metrics);
+    if (kind === 'shortcut') {
+      const shortcut = shortcuts.find((s) => s.id === id);
+      if (shortcut && (shortcut.x !== pos.x || shortcut.y !== pos.y)) {
+        shortcut.x = pos.x;
+        shortcut.y = pos.y;
+        changed = true;
+      }
+    } else {
+      const folder = folders.find((f) => f.id === id);
+      if (folder && (folder.x !== pos.x || folder.y !== pos.y)) {
+        folder.x = pos.x;
+        folder.y = pos.y;
+        changed = true;
+      }
     }
   });
+
+  rememberGridMetrics(metrics);
 
   if (!changed) return;
 
@@ -550,9 +667,12 @@ export function realignIconsToGrid(): void {
     // Save updated positions
     systemStorage.setItem(STORAGE_KEY, shortcuts);
     systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+    rememberGridMetrics();
     
     // Dispatch event to notify DesktopIcons to refresh
     window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+  } else {
+    rememberGridMetrics();
   }
 }
 
@@ -597,6 +717,7 @@ export function autoArrangeIcons(): void {
   // Save updated positions
   systemStorage.setItem(STORAGE_KEY, shortcuts);
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+  rememberGridMetrics();
   
   // Dispatch event to notify DesktopIcons to refresh
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
@@ -664,6 +785,7 @@ export async function organizeIconsByName(): Promise<void> {
   // Save updated positions
   systemStorage.setItem(STORAGE_KEY, shortcuts);
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+  rememberGridMetrics();
   
   // Dispatch event to notify DesktopIcons to refresh
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
@@ -725,6 +847,7 @@ export function organizeIconsByDate(): void {
   // Save updated positions
   systemStorage.setItem(STORAGE_KEY, shortcuts);
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+  rememberGridMetrics();
   
   // Dispatch event to notify DesktopIcons to refresh
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
@@ -842,6 +965,7 @@ export function createDesktopFolder(name: string, x?: number, y?: number, parent
   
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);
+  rememberGridMetrics();
   
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
   
@@ -1096,5 +1220,6 @@ export function updateFolderPosition(folderId: string, x: number, y: number): vo
     folder.x = clamped.x;
     folder.y = clamped.y;
     systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+    rememberGridMetrics();
   }
 }
