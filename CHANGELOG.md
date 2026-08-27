@@ -9,12 +9,15 @@
 - Solid White wallpaper preset (`wallpapers/presets/solid-white.ts`)
 - `vite-env.d.ts` — Vite client types for `import.meta.glob`
 - JSDoc on exported APIs and module helpers across the app
+- Dock clock: date format presets (`medium` / `long` / `iso` / `dmy` / `mdy`) and optional seconds in Settings
+- `DOCK_ITEMS` is the full dock layout: programs plus `separator`, `running`, and `clock` entries (order = left-to-right)
 
 ### Changed
 
 - Desktop icon grid fills the viewport: preferred `gridSize` picks density; cells stretch. On resize, icons keep the same cell (col/row); occupied cells are not dropped
 - Dock launcher identified by `programId === 'launcher'` (removed `launcher` boolean on dock items)
 - Special location registry keys use the `locations/<id>.ts` filename
+- Settings → System Information: About card (DeskOS + version) plus runtime facts (browser, platform, display, local storage); removed redundant Current Theme row
 
 ### Fixed
 

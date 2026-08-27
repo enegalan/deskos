@@ -1,5 +1,5 @@
 import type { ProgramContext } from '@core/context';
-import { getMaxIconSize, useKernel } from '@core/kernel';
+import { getMaxIconSize, useKernel, type DateFormat } from '@core/kernel';
 import {
   DEFAULT_GRID_SIZE,
   DEFAULT_ICON_SIZE,
@@ -10,6 +10,40 @@ import {
 import { saveCustomWallpaper, getCustomWallpapers, removeCustomWallpaper, type WallpaperMetadata } from '@core/wallpaper-storage';
 import { BUILTIN_WALLPAPERS } from '../../wallpapers/wallpapers';
 import { useState, useEffect } from 'react';
+
+/** Host browser label from userAgent (no version noise). */
+function getBrowserLabel(): string {
+  const ua = navigator.userAgent;
+  if (ua.includes('Edg/')) return 'Microsoft Edge';
+  if (ua.includes('Firefox/')) return 'Firefox';
+  if (ua.includes('Chrome/') && !ua.includes('Edg/')) return 'Chrome';
+  if (ua.includes('Safari/') && !ua.includes('Chrome')) return 'Safari';
+  return 'Browser';
+}
+
+/** Host OS label from userAgent. */
+function getPlatformLabel(): string {
+  const ua = navigator.userAgent;
+  if (/Mac OS X|Macintosh/.test(ua)) return 'macOS';
+  if (/Windows NT/.test(ua)) return 'Windows';
+  if (/Android/.test(ua)) return 'Android';
+  if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+  if (/Linux/.test(ua)) return 'Linux';
+  return navigator.platform || 'Unknown';
+}
+
+/** Rough localStorage footprint used by DeskOS keys. */
+function getStorageUsageLabel(): string {
+  let bytes = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    bytes += key.length + (localStorage.getItem(key)?.length ?? 0);
+  }
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface SettingsWindowProps {
   /** Program context (system info, etc.) */
@@ -40,11 +74,25 @@ const TIMEZONES = [
   { label: 'Auckland (NZDT/NZST)', value: 'Pacific/Auckland' },
 ];
 
+/** Dock date format choices (label = example layout). */
+const DATE_FORMAT_OPTIONS: Array<{ id: DateFormat; label: string }> = [
+  { id: 'medium', label: 'Aug 27, 2026' },
+  { id: 'long', label: 'Thursday, August 27, 2026' },
+  { id: 'iso', label: '2026-08-27' },
+  { id: 'dmy', label: '27/08/2026' },
+  { id: 'mdy', label: '08/27/2026' },
+];
+
 /** Settings app UI: appearance, wallpaper, desktop icons, and date/time. */
 export function SettingsWindow({ ctx }: SettingsWindowProps) {
   const settings = useKernel((state) => state.settings);
   const updateSettings = useKernel((state) => state.updateSettings);
   const [customWallpapers, setCustomWallpapers] = useState<WallpaperMetadata[]>([]);
+  const [storageUsage, setStorageUsage] = useState(() => getStorageUsageLabel());
+
+  useEffect(() => {
+    setStorageUsage(getStorageUsageLabel());
+  }, [customWallpapers, settings]);
 
   // Load custom wallpapers on mount
   useEffect(() => {
@@ -73,6 +121,14 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
 
   const handleShowDateToggle = () => {
     updateSettings({ showDate: !settings.showDate });
+  };
+
+  const handleDateFormatChange = (dateFormat: DateFormat) => {
+    updateSettings({ dateFormat });
+  };
+
+  const handleShowSecondsToggle = () => {
+    updateSettings({ showSeconds: !settings.showSeconds });
   };
 
   const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -486,21 +542,70 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
             onClick={handleShowDateToggle}
           />
         </div>
+
+        <div className="settings-row">
+          <span className="settings-label">Date Format</span>
+          <select
+            value={settings.dateFormat}
+            onChange={(e) => handleDateFormatChange(e.target.value as DateFormat)}
+            disabled={!settings.showDate}
+            style={{
+              padding: '4px 8px',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--color-bg-elevated)',
+              color: 'var(--color-text-primary)',
+              fontSize: '12px',
+              cursor: settings.showDate ? 'pointer' : 'not-allowed',
+              opacity: settings.showDate ? 1 : 0.5,
+            }}
+          >
+            {DATE_FORMAT_OPTIONS.map((fmt) => (
+              <option key={fmt.id} value={fmt.id}>
+                {fmt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="settings-row">
+          <span className="settings-label">Show Seconds</span>
+          <button
+            className={`settings-toggle ${settings.showSeconds ? 'active' : ''}`}
+            onClick={handleShowSecondsToggle}
+          />
+        </div>
       </div>
 
       <div className="settings-section">
         <div className="settings-section-title">System Information</div>
 
-        <div className="settings-row">
-          <span className="settings-label">Version</span>
-          <span style={{ color: 'var(--color-text-secondary)' }}>{ctx.system.version}</span>
+        <div className="settings-about">
+          <div className="settings-about-name">DeskOS</div>
+          <div className="settings-about-tagline">Modular desktop environment in the browser</div>
+          <div className="settings-about-version">v{ctx.system.version}</div>
         </div>
 
         <div className="settings-row">
-          <span className="settings-label">Current Theme</span>
-          <span style={{ color: 'var(--color-text-secondary)', textTransform: 'capitalize' }}>
-            {settings.theme}
+          <span className="settings-label">Browser</span>
+          <span className="settings-info-value">{getBrowserLabel()}</span>
+        </div>
+
+        <div className="settings-row">
+          <span className="settings-label">Platform</span>
+          <span className="settings-info-value">{getPlatformLabel()}</span>
+        </div>
+
+        <div className="settings-row">
+          <span className="settings-label">Display</span>
+          <span className="settings-info-value">
+            {window.screen.width} × {window.screen.height}
           </span>
+        </div>
+
+        <div className="settings-row">
+          <span className="settings-label">Local storage</span>
+          <span className="settings-info-value">{storageUsage}</span>
         </div>
       </div>
     </div>

@@ -46,6 +46,20 @@ export interface WindowCreateOptions {
   component: ReactNode;
 }
 
+/** Dock date display presets */
+export type DateFormat = 'medium' | 'long' | 'iso' | 'dmy' | 'mdy';
+
+const DATE_FORMATS: DateFormat[] = ['medium', 'long', 'iso', 'dmy', 'mdy'];
+
+/**
+ * Whether a value is a known dock date format.
+ *
+ * @param value - Candidate format id
+ */
+export function isDateFormat(value: unknown): value is DateFormat {
+  return typeof value === 'string' && DATE_FORMATS.includes(value as DateFormat);
+}
+
 export interface SystemSettings {
   theme: 'light' | 'dark';
   wallpaper: string;
@@ -53,6 +67,10 @@ export interface SystemSettings {
   timeFormat: '12h' | '24h';
   timezone: string;
   showDate: boolean;
+  /** Dock date layout when Show Date is on */
+  dateFormat: DateFormat;
+  /** Include seconds in the dock clock */
+  showSeconds: boolean;
   iconSize: number;
   gridSize: number;
   autoArrange: boolean;
@@ -103,6 +121,8 @@ const defaultSettings: SystemSettings = {
   timeFormat: '24h',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   showDate: false,
+  dateFormat: 'medium',
+  showSeconds: false,
   iconSize: DEFAULT_ICON_SIZE,
   gridSize: DEFAULT_GRID_SIZE,
   autoArrange: false,
@@ -142,6 +162,12 @@ function loadSettings(): SystemSettings {
   });
   if (settings.gridSize < MIN_GRID_SIZE) {
     settings.gridSize = MIN_GRID_SIZE;
+  }
+  if (!isDateFormat(settings.dateFormat)) {
+    settings.dateFormat = defaultSettings.dateFormat;
+  }
+  if (typeof settings.showSeconds !== 'boolean') {
+    settings.showSeconds = defaultSettings.showSeconds;
   }
   const maxIconSize = getMaxIconSize(settings.gridSize, settings.showIconLabels);
   if (settings.iconSize > maxIconSize) {
