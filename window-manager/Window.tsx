@@ -1,8 +1,49 @@
 import { useState, useCallback, useEffect, useRef, memo, type MouseEvent as ReactMouseEvent } from 'react';
 import { useKernel } from '@core/kernel';
 import type { WindowState } from '@core/types';
-import { calculateZIndex, type ResizeDirection, type DragState, type ResizeState } from './types';
 import { Icon } from '../components/Icon';
+
+type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+interface DragState {
+  isDragging: boolean;
+  startX: number;
+  startY: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+interface ResizeState {
+  isResizing: boolean;
+  direction: ResizeDirection | null;
+  startX: number;
+  startY: number;
+  startWidth: number;
+  startHeight: number;
+  startPosX: number;
+  startPosY: number;
+}
+
+const Z_INDEX = {
+  DESKTOP: 0,
+  WINDOW_BASE: 1000,
+  WINDOW_ACTIVE: 4000,
+  OVERLAY: 5000,
+  TASKBAR: 6000,
+} as const;
+
+function calculateZIndex(windowId: string, windowOrder: string[], isFocused: boolean): number {
+  if (isFocused) {
+    return Z_INDEX.WINDOW_ACTIVE;
+  }
+
+  const position = windowOrder.indexOf(windowId);
+  if (position === -1) {
+    return Z_INDEX.WINDOW_BASE;
+  }
+
+  return Z_INDEX.WINDOW_BASE + position;
+}
 
 interface WindowProps {
   window: WindowState;
