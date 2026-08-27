@@ -16,6 +16,7 @@
 - Group drop finds nearest free cell when a relative slot is occupied (no overlap)
 - Folder sidebar highlights only the exact current path (not parent Recent/Favorites entries)
 - Window restore from maximized uses the same geometry transition as maximize
+- Keyboard editing shortcuts: Cmd/Ctrl+A/C/X/V, Delete/Backspace; cut ghost UI; paste folder→desktop; focus-aware handlers
 
 ### Changed
 

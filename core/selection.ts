@@ -5,29 +5,48 @@
 
 import { DRAG_START_THRESHOLD } from './constants';
 
-// Global handler registration
-let selectAllHandler: (() => void) | null = null;
+// Global handler registration (priority: folder window > desktop)
+let selectAllHandlers: Array<{ handler: () => void; priority: number }> = [];
+
+const PRIORITY_DESKTOP = 0;
+const PRIORITY_FOLDER_WINDOW = 1;
+
+export const SELECTION_PRIORITY = {
+  DESKTOP: PRIORITY_DESKTOP,
+  FOLDER_WINDOW: PRIORITY_FOLDER_WINDOW,
+};
 
 /**
  * Register a handler for "Select All" keyboard shortcut
  * @param handler Function to call when Cmd+A/Ctrl+A is pressed
+ * @param priority Higher wins (folder window over desktop)
  * @returns Unregister function
  */
-export function registerSelectAllHandler(handler: () => void): () => void {
-  selectAllHandler = handler;
+export function registerSelectAllHandler(
+  handler: () => void,
+  priority: number = PRIORITY_DESKTOP
+): () => void {
+  selectAllHandlers.push({ handler, priority });
+  selectAllHandlers.sort((a, b) => b.priority - a.priority);
   return () => {
-    if (selectAllHandler === handler) {
-      selectAllHandler = null;
-    }
+    selectAllHandlers = selectAllHandlers.filter((h) => h.handler !== handler);
   };
 }
 
 /**
- * Get the current "Select All" handler
+ * Get the current "Select All" handler (highest priority)
  * @internal Used by keyboard shortcuts manager
  */
 export function getSelectAllHandler(): (() => void) | null {
-  return selectAllHandler;
+  return selectAllHandlers.length > 0 ? selectAllHandlers[0].handler : null;
+}
+
+/**
+ * All Select All handlers in priority order
+ * @internal Used by keyboard shortcuts manager
+ */
+export function getAllSelectAllHandlers(): Array<{ handler: () => void; priority: number }> {
+  return [...selectAllHandlers];
 }
 
 /** Axis-aligned rectangle used for rubber-band selection */

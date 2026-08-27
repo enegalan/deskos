@@ -10,6 +10,24 @@ import {
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 import {
+  registerSelectAllHandler,
+  startMarqueeSelection,
+  type MarqueeRect,
+} from '@core/selection';
+import {
+  registerCopyHandler,
+  registerCutHandler,
+  registerPasteHandler,
+  registerDeleteHandler,
+  copy as clipboardCopy,
+  cut as clipboardCut,
+  getClipboard,
+  clearClipboard,
+  getCutItemIds,
+  HandlerSkippedError,
+  type ClipboardItem,
+} from '@core/clipboard';
+import {
   getDesktopShortcuts,
   getDesktopFolders,
   updateDesktopShortcutPosition,
@@ -22,23 +40,11 @@ import {
   isDesktopFolder,
   updateFolderPosition,
   computeGroupDropPositions,
+  removeDesktopShortcut,
+  deleteDesktopFolder,
   type DesktopShortcut,
   type DesktopFolder,
 } from '@core/desktop-shortcuts';
-
-/** Active multi-icon drag on the desktop surface */
-interface DesktopDragGroup {
-  ids: string[];
-  primaryId: string;
-  delta: { x: number; y: number };
-  origins: Record<string, { x: number; y: number }>;
-}
-import {
-  registerSelectAllHandler,
-  startMarqueeSelection,
-  type MarqueeRect,
-} from '@core/selection';
-import { registerCopyHandler, registerCutHandler, registerPasteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, type ClipboardItem } from '@core/clipboard';
 
 /**
  * Highlight the desktop icon under a drag, or clear all highlights.
@@ -57,6 +63,14 @@ function setDragOverTarget(itemId: string | null) {
   }
 }
 
+/** Active multi-icon drag on the desktop surface */
+interface DesktopDragGroup {
+  ids: string[];
+  primaryId: string;
+  delta: { x: number; y: number };
+  origins: Record<string, { x: number; y: number }>;
+}
+
 interface DesktopIconProps {
   shortcut: DesktopShortcut;
   program: {
@@ -66,6 +80,7 @@ interface DesktopIconProps {
   };
   onUpdate: () => void;
   isSelected: boolean;
+  isCut?: boolean;
   onSelect: (e?: React.MouseEvent, forceSingle?: boolean) => void;
   layoutTick: number;
   getDragIds: (id: string) => string[];
@@ -86,6 +101,7 @@ const DesktopIcon = memo(function DesktopIcon({
   program,
   onUpdate,
   isSelected,
+  isCut,
   onSelect,
   layoutTick,
   getDragIds,
@@ -507,7 +523,7 @@ const DesktopIcon = memo(function DesktopIcon({
       )}
       <div
         ref={iconRef}
-        className={`desktop-icon ${showDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+        className={`desktop-icon ${showDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${isCut ? 'cut' : ''}`}
         style={{
           left: `${displayPosition.x}px`,
           top: `${displayPosition.y}px`,
@@ -558,6 +574,7 @@ interface FolderIconProps {
   onUpdate: () => void;
   onOpen: (folderId: string) => void;
   isSelected: boolean;
+  isCut?: boolean;
   onSelect: (e?: React.MouseEvent, forceSingle?: boolean) => void;
   layoutTick: number;
   getDragIds: (id: string) => string[];
@@ -578,6 +595,7 @@ const FolderIcon = memo(function FolderIcon({
   onUpdate,
   onOpen,
   isSelected,
+  isCut,
   onSelect,
   layoutTick,
   getDragIds,
@@ -979,7 +997,7 @@ const FolderIcon = memo(function FolderIcon({
       )}
       <div
         ref={iconRef}
-        className={`desktop-icon folder-icon ${showDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+        className={`desktop-icon folder-icon ${showDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${isCut ? 'cut' : ''}`}
         style={{
           left: `${displayPosition.x}px`,
           top: `${displayPosition.y}px`,
@@ -1032,6 +1050,7 @@ export function DesktopIcons() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
   const [dragGroup, setDragGroup] = useState<DesktopDragGroup | null>(null);
+  const [cutIds, setCutIds] = useState<Set<string>>(() => getCutItemIds());
   const [layoutTick, setLayoutTick] = useState(0);
   const lastSelectedIndexRef = useRef<number>(-1);
   const selectedIdsRef = useRef(selectedIds);
@@ -1283,6 +1302,13 @@ export function DesktopIcons() {
 
   // Select All handler
   const handleSelectAll = useCallback(() => {
+    const kernel = useKernel.getState();
+    if (kernel.activeWindowId) {
+      const activeWindow = kernel.windows.find((w) => w.id === kernel.activeWindowId);
+      if (activeWindow && activeWindow.programId === 'folder') {
+        throw new HandlerSkippedError();
+      }
+    }
     const allItemIds = [
       ...shortcuts.map(s => s.id),
       ...folders.map(f => f.id),
@@ -1299,10 +1325,8 @@ export function DesktopIcons() {
 
   // Copy handler
   const handleCopy = useCallback(() => {
-    console.log('[DesktopIcons] Copy: Handler called, selectedIds:', selectedIds.size);
     if (selectedIds.size === 0) {
-      console.log('[DesktopIcons] Copy: No selection');
-      return;
+      throw new HandlerSkippedError();
     }
 
     const items: ClipboardItem[] = [];
@@ -1317,21 +1341,19 @@ export function DesktopIcons() {
     });
 
     if (items.length > 0) {
-      console.log('[DesktopIcons] Copy: Copying', items.length, 'items');
       clipboardCopy({
         type: 'desktop-items',
         items,
         operation: 'copy',
       });
-      console.log('[DesktopIcons] Copy: Clipboard saved', getClipboard());
-    } else {
-      console.log('[DesktopIcons] Copy: No valid items to copy');
     }
   }, [selectedIds, shortcuts, folders]);
 
   // Cut handler
   const handleCut = useCallback(() => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) {
+      throw new HandlerSkippedError();
+    }
 
     const items: ClipboardItem[] = [];
     selectedIds.forEach(id => {
@@ -1353,96 +1375,115 @@ export function DesktopIcons() {
     }
   }, [selectedIds, shortcuts, folders]);
 
+  // Delete handler
+  const handleDelete = useCallback(() => {
+    if (selectedIds.size === 0) {
+      throw new HandlerSkippedError();
+    }
+
+    const hasFolders = Array.from(selectedIds).some((id) =>
+      folders.some((f) => f.id === id)
+    );
+    if (hasFolders) {
+      const ok = confirm(
+        selectedIds.size === 1
+          ? 'Are you sure you want to delete this folder and all its contents?'
+          : `Are you sure you want to delete ${selectedIds.size} items?`
+      );
+      if (!ok) return;
+    }
+
+    selectedIds.forEach((id) => {
+      if (folders.some((f) => f.id === id)) {
+        deleteDesktopFolder(id);
+      } else {
+        removeDesktopShortcut(id);
+      }
+    });
+    setSelectedIds(new Set());
+    lastSelectedIndexRef.current = -1;
+    loadItems();
+    window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+  }, [selectedIds, folders, loadItems]);
+
   // Paste handler
   const handlePaste = useCallback(async () => {
-    console.log('[DesktopIcons] Paste: Handler called');
-    
-    // Check if there's an active folder window - if so, let FolderWindow handle it
     const kernel = useKernel.getState();
     if (kernel.activeWindowId) {
       const activeWindow = kernel.windows.find(w => w.id === kernel.activeWindowId);
       if (activeWindow && activeWindow.programId === 'folder') {
-        console.log('[DesktopIcons] Paste: Active folder window detected, skipping desktop paste');
-        return;
+        throw new HandlerSkippedError();
       }
     }
     
     const clipboard = getClipboard();
-    console.log('[DesktopIcons] Paste: Clipboard data', clipboard);
     if (!clipboard || clipboard.items.length === 0) {
-      console.log('[DesktopIcons] Paste: No clipboard data');
       return;
     }
 
-    // Only handle desktop-items clipboard
-    if (clipboard.type !== 'desktop-items') {
-      console.log('[DesktopIcons] Paste: Wrong clipboard type', clipboard.type);
+    if (clipboard.type !== 'desktop-items' && clipboard.type !== 'folder-items') {
       return;
     }
 
-    const { addDesktopShortcut, getDesktopShortcuts, getDesktopFolders, findNextAvailablePosition, createDesktopFolder, getFolderById } = await import('@core/desktop-shortcuts');
+    const {
+      addDesktopShortcut,
+      getDesktopShortcuts,
+      getDesktopFolders,
+      findNextAvailablePosition,
+      createDesktopFolder,
+      getFolderById,
+      removeItemFromFolder: removeFromFolder,
+      getFolderByPath: folderByPath,
+      updateFolderPosition: setFolderPos,
+    } = await import('@core/desktop-shortcuts');
     const allShortcuts = getDesktopShortcuts();
-    const allFolders = getDesktopFolders();
+
+    const occupied = () =>
+      [...getDesktopShortcuts(), ...getDesktopFolders()].map((i) => ({ x: i.x, y: i.y }));
 
     try {
       if (clipboard.operation === 'copy') {
-        console.log('[DesktopIcons] Paste: Copying', clipboard.items.length, 'items');
-        // Create copies of items
         for (const item of clipboard.items) {
           if (item.type === 'shortcut') {
             const shortcut = allShortcuts.find(s => s.id === item.id);
             if (shortcut) {
-              console.log('[DesktopIcons] Paste: Copying shortcut', shortcut.id);
-              const position = findNextAvailablePosition(
-                [...allShortcuts, ...allFolders].map(i => ({ x: i.x, y: i.y }))
-              );
-              console.log('[DesktopIcons] Paste: New position', position);
+              const position = findNextAvailablePosition(occupied());
               addDesktopShortcut(shortcut.programId, position.x, position.y, shortcut.customName);
-            } else {
-              console.warn('[DesktopIcons] Paste: Shortcut not found', item.id);
             }
           } else if (item.type === 'folder') {
             const folder = getFolderById(item.id);
             if (folder) {
-              console.log('[DesktopIcons] Paste: Copying folder', folder.id);
-              const position = findNextAvailablePosition(
-                [...allShortcuts, ...allFolders].map(i => ({ x: i.x, y: i.y }))
-              );
-              console.log('[DesktopIcons] Paste: New position', position);
+              const position = findNextAvailablePosition(occupied());
               createDesktopFolder(folder.name, position.x, position.y);
-            } else {
-              console.warn('[DesktopIcons] Paste: Folder not found', item.id);
             }
           }
         }
       } else if (clipboard.operation === 'cut') {
-        // Move items to new positions
-        for (const item of clipboard.items) {
-          if (item.type === 'shortcut') {
-            const shortcut = allShortcuts.find(s => s.id === item.id);
-            if (shortcut) {
-              const position = findNextAvailablePosition(
-                [...allShortcuts, ...allFolders].map(i => ({ x: i.x, y: i.y }))
-              );
-              updateDesktopShortcutPosition(item.id, position.x, position.y);
+        // Same surface: keep positions, only clear cut state
+        if (clipboard.type === 'desktop-items') {
+          setSelectedIds(new Set());
+          clearClipboard();
+        } else {
+          for (const item of clipboard.items) {
+            if (clipboard.sourcePath) {
+              const sourceFolder = folderByPath(clipboard.sourcePath);
+              if (sourceFolder) {
+                removeFromFolder(sourceFolder.id, item.id);
+              }
             }
-          } else if (item.type === 'folder') {
-            const folder = getFolderById(item.id);
-            if (folder) {
-              const position = findNextAvailablePosition(
-                [...allShortcuts, ...allFolders].map(i => ({ x: i.x, y: i.y }))
-              );
-              const { updateFolderPosition } = await import('@core/desktop-shortcuts');
-              updateFolderPosition(item.id, position.x, position.y);
+
+            const position = findNextAvailablePosition(occupied());
+            if (item.type === 'shortcut') {
+              updateDesktopShortcutPosition(item.id, position.x, position.y);
+            } else if (item.type === 'folder') {
+              setFolderPos(item.id, position.x, position.y);
             }
           }
+          setSelectedIds(new Set());
+          clearClipboard();
         }
-        // Clear selection and clipboard after cut
-        setSelectedIds(new Set());
-        clearClipboard();
       }
 
-      // Reload items to reflect changes
       loadItems();
       window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
     } catch (error) {
@@ -1450,27 +1491,32 @@ export function DesktopIcons() {
     }
   }, [loadItems]);
 
+  // Cut ghost UI
+  useEffect(() => {
+    const sync = () => setCutIds(getCutItemIds());
+    sync();
+    window.addEventListener('deskos-clipboard-updated', sync);
+    return () => window.removeEventListener('deskos-clipboard-updated', sync);
+  }, []);
+
   // Register keyboard shortcut handlers
   useEffect(() => {
-    console.log('[DesktopIcons] Registering handlers');
     const unregisterSelectAll = registerSelectAllHandler(handleSelectAll);
-    const unregisterCopy = registerCopyHandler(() => {
-      console.log('[DesktopIcons] Copy handler called from shortcut');
-      handleCopy();
-    });
+    const unregisterCopy = registerCopyHandler(handleCopy);
     const unregisterCut = registerCutHandler(handleCut);
     const unregisterPaste = registerPasteHandler(() => {
-      console.log('[DesktopIcons] Paste handler called from shortcut');
-      handlePaste();
+      void handlePaste();
     });
+    const unregisterDelete = registerDeleteHandler(handleDelete);
 
     return () => {
       unregisterSelectAll();
       unregisterCopy();
       unregisterCut();
       unregisterPaste();
+      unregisterDelete();
     };
-  }, [handleSelectAll, handleCopy, handleCut, handlePaste]);
+  }, [handleSelectAll, handleCopy, handleCut, handlePaste, handleDelete]);
 
   return (
     <div className="desktop-icons">
@@ -1496,6 +1542,7 @@ export function DesktopIcons() {
             program={program}
             onUpdate={handleUpdate}
             isSelected={selectedIds.has(shortcut.id)}
+            isCut={cutIds.has(shortcut.id)}
             onSelect={(e, forceSingle) => handleIconSelect(shortcut.id, e, forceSingle)}
             layoutTick={layoutTick}
             getDragIds={getDragIds}
@@ -1515,6 +1562,7 @@ export function DesktopIcons() {
           onUpdate={handleUpdate}
           onOpen={handleOpenFolder}
           isSelected={selectedIds.has(folder.id)}
+          isCut={cutIds.has(folder.id)}
           onSelect={(e, forceSingle) => handleIconSelect(folder.id, e, forceSingle)}
           layoutTick={layoutTick}
           getDragIds={getDragIds}

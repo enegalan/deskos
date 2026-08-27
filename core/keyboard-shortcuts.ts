@@ -4,10 +4,9 @@
 
 import { useKernel } from './kernel';
 import { launchOrFocusProgram } from './context';
-import { getSelectAllHandler } from './selection';
-import { getCopyHandler, getCutHandler, getPasteHandler } from './clipboard';
+import { getAllSelectAllHandlers } from './selection';
 
-export type ShortcutKey = 'Q' | 'W' | 'M' | 'H' | 'N' | 'T' | 'COMMA' | string;
+export type ShortcutKey = 'Q' | 'W' | 'M' | 'H' | 'N' | 'T' | 'COMMA' | 'DELETE' | 'BACKSPACE' | string;
 
 export interface KeyboardShortcut {
   key: ShortcutKey;
@@ -20,9 +19,29 @@ export interface KeyboardShortcut {
   preventDefault?: boolean;
 }
 
+async function runPriorityHandlers(
+  getHandlers: () => Array<{ handler: () => void; priority: number }>,
+  label: string
+): Promise<void> {
+  const { HandlerSkippedError } = await import('@core/clipboard');
+  const handlers = getHandlers();
+  for (const { handler } of handlers) {
+    try {
+      handler();
+      return;
+    } catch (error) {
+      if (error instanceof HandlerSkippedError) {
+        console.log(`[KeyboardShortcuts] ${label} handler skipped, trying next`);
+        continue;
+      }
+      console.log(`[KeyboardShortcuts] ${label} handler error, trying next`, error);
+    }
+  }
+  console.log(`[KeyboardShortcuts] No ${label} handler succeeded`);
+}
+
 class KeyboardShortcutsManager {
   private shortcuts: Map<string, KeyboardShortcut> = new Map();
-  private isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
 
   constructor() {
     this.registerDefaultShortcuts();
@@ -122,11 +141,8 @@ class KeyboardShortcutsManager {
     this.register({
       key: 'A',
       metaKey: true,
-      action: () => {
-        const handler = getSelectAllHandler();
-        if (handler) {
-          handler();
-        }
+      action: async () => {
+        await runPriorityHandlers(() => getAllSelectAllHandlers(), 'Select All');
       },
       description: 'Select All',
       preventDefault: true,
@@ -137,25 +153,8 @@ class KeyboardShortcutsManager {
       key: 'C',
       metaKey: true,
       action: async () => {
-        // Try handlers in priority order
-        const { getAllCopyHandlers, HandlerSkippedError } = await import('@core/clipboard');
-        const handlers = getAllCopyHandlers();
-        for (const { handler } of handlers) {
-          try {
-            handler();
-            // If handler executed without throwing HandlerSkippedError, we're done
-            return;
-          } catch (error) {
-            // If handler throws HandlerSkippedError, try next handler
-            if (error instanceof HandlerSkippedError) {
-              console.log('[KeyboardShortcuts] Copy handler skipped, trying next');
-              continue;
-            }
-            // For other errors, log and try next
-            console.log('[KeyboardShortcuts] Copy handler error, trying next', error);
-          }
-        }
-        console.log('[KeyboardShortcuts] No copy handler succeeded');
+        const { getAllCopyHandlers } = await import('@core/clipboard');
+        await runPriorityHandlers(() => getAllCopyHandlers(), 'Copy');
       },
       description: 'Copy',
       preventDefault: true,
@@ -166,25 +165,8 @@ class KeyboardShortcutsManager {
       key: 'X',
       metaKey: true,
       action: async () => {
-        // Try handlers in priority order
-        const { getAllCutHandlers, HandlerSkippedError } = await import('@core/clipboard');
-        const handlers = getAllCutHandlers();
-        for (const { handler } of handlers) {
-          try {
-            handler();
-            // If handler executed without throwing HandlerSkippedError, we're done
-            return;
-          } catch (error) {
-            // If handler throws HandlerSkippedError, try next handler
-            if (error instanceof HandlerSkippedError) {
-              console.log('[KeyboardShortcuts] Cut handler skipped, trying next');
-              continue;
-            }
-            // For other errors, log and try next
-            console.log('[KeyboardShortcuts] Cut handler error, trying next', error);
-          }
-        }
-        console.log('[KeyboardShortcuts] No cut handler succeeded');
+        const { getAllCutHandlers } = await import('@core/clipboard');
+        await runPriorityHandlers(() => getAllCutHandlers(), 'Cut');
       },
       description: 'Cut',
       preventDefault: true,
@@ -195,27 +177,28 @@ class KeyboardShortcutsManager {
       key: 'V',
       metaKey: true,
       action: async () => {
-        // Try handlers in priority order
-        const { getAllPasteHandlers, HandlerSkippedError } = await import('@core/clipboard');
-        const handlers = getAllPasteHandlers();
-        for (const { handler } of handlers) {
-          try {
-            handler();
-            // If handler executed without throwing HandlerSkippedError, we're done
-            return;
-          } catch (error) {
-            // If handler throws HandlerSkippedError, try next handler
-            if (error instanceof HandlerSkippedError) {
-              console.log('[KeyboardShortcuts] Paste handler skipped, trying next');
-              continue;
-            }
-            // For other errors, log and try next
-            console.log('[KeyboardShortcuts] Paste handler error, trying next', error);
-          }
-        }
-        console.log('[KeyboardShortcuts] No paste handler succeeded');
+        const { getAllPasteHandlers } = await import('@core/clipboard');
+        await runPriorityHandlers(() => getAllPasteHandlers(), 'Paste');
       },
       description: 'Paste',
+      preventDefault: true,
+    });
+
+    // Delete / Backspace - Delete selected items
+    const deleteAction = async () => {
+      const { getAllDeleteHandlers } = await import('@core/clipboard');
+      await runPriorityHandlers(() => getAllDeleteHandlers(), 'Delete');
+    };
+    this.register({
+      key: 'DELETE',
+      action: deleteAction,
+      description: 'Delete',
+      preventDefault: true,
+    });
+    this.register({
+      key: 'BACKSPACE',
+      action: deleteAction,
+      description: 'Delete',
       preventDefault: true,
     });
   }
@@ -224,12 +207,25 @@ class KeyboardShortcutsManager {
     document.addEventListener('keydown', (e) => {
       this.handleKeyDown(e);
     });
+    document.addEventListener('mousedown', (e) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        target.closest('input, textarea, [contenteditable="true"]')
+      ) {
+        return;
+      }
+      this.clearBrowserTextSelection();
+    });
   }
 
   private getShortcutKey(e: KeyboardEvent): string {
     const parts: string[] = [];
     
-    if (this.isMac ? e.metaKey : e.ctrlKey) {
+    // Accept Cmd (Mac) or Ctrl (Windows/Linux, and Ctrl on Mac) as the primary modifier
+    if (e.metaKey || e.ctrlKey) {
       parts.push('meta');
     }
     if (e.shiftKey) {
@@ -240,41 +236,32 @@ class KeyboardShortcutsManager {
     }
     
     const key = e.key.toUpperCase();
-    const keyName = key === ',' ? 'COMMA' : key;
+    const keyName =
+      key === ',' ? 'COMMA' :
+      key === 'BACKSPACE' ? 'BACKSPACE' :
+      key === 'DELETE' ? 'DELETE' :
+      key;
     parts.push(keyName);
     
     return parts.join('+');
   }
 
+  private clearBrowserTextSelection(): void {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      selection.removeAllRanges();
+    }
+  }
+
   private handleKeyDown(e: KeyboardEvent): void {
-    // Don't handle shortcuts when typing in inputs
+    // Never steal text editing shortcuts from inputs / contenteditable
     const target = e.target as HTMLElement;
     if (
       target.tagName === 'INPUT' ||
       target.tagName === 'TEXTAREA' ||
       target.isContentEditable
     ) {
-      // Allow some shortcuts even in inputs (like Cmd+A, Cmd+C, Cmd+X, Cmd+V for text operations)
-      const allowedKeys = ['a', 'A', 'c', 'C', 'x', 'X', 'v', 'V'];
-      if (!allowedKeys.includes(e.key)) {
-        return;
-      }
-      // For these keys, check if there's a registered handler for system operations
-      // If no handler is registered, allow default browser behavior
-      const keyUpper = e.key.toUpperCase();
-      if (keyUpper === 'A') {
-        const handler = getSelectAllHandler();
-        if (!handler) return; // Allow default text selection
-      } else if (keyUpper === 'C') {
-        const handler = getCopyHandler();
-        if (!handler) return; // Allow default text copy
-      } else if (keyUpper === 'X') {
-        const handler = getCutHandler();
-        if (!handler) return; // Allow default text cut
-      } else if (keyUpper === 'V') {
-        const handler = getPasteHandler();
-        if (!handler) return; // Allow default text paste
-      }
+      return;
     }
 
     const shortcutKey = this.getShortcutKey(e);
@@ -285,6 +272,7 @@ class KeyboardShortcutsManager {
         e.preventDefault();
         e.stopPropagation();
       }
+      this.clearBrowserTextSelection();
       shortcut.action();
     }
   }

@@ -102,6 +102,8 @@ html, body, #root {
   height: 100%;
   width: 100%;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 body {
@@ -112,6 +114,15 @@ body {
   background: var(--color-bg-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Allow text selection only in editable fields */
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable=""] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Desktop — fallback only; wallpaper comes from settings (not theme) */

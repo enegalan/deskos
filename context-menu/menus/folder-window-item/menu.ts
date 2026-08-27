@@ -141,6 +141,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
         id: 'folder-window-item-delete',
         label: isMultiple ? `Delete (${selectedIds.length} items)` : 'Delete',
         icon: 'delete',
+        shortcut: 'Delete',
         action: async () => {
           try {
             const { removeDesktopShortcut, deleteDesktopFolder, getDesktopFolders } = await import('@core/desktop-shortcuts');

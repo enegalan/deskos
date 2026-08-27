@@ -1,6 +1,6 @@
 /**
  * Clipboard system for DeskOS
- * Manages copy, cut, and paste operations for desktop items and folder items
+ * Manages copy, cut, paste, and delete operations for desktop items and folder items
  */
 
 export type ClipboardItemType = 'shortcut' | 'folder';
@@ -27,10 +27,15 @@ let clipboardData: ClipboardData | null = null;
 let copyHandlers: Array<{ handler: () => void; priority: number }> = [];
 let cutHandlers: Array<{ handler: () => void; priority: number }> = [];
 let pasteHandlers: Array<{ handler: () => void; priority: number }> = [];
+let deleteHandlers: Array<{ handler: () => void; priority: number }> = [];
 
 // Priority constants
 const PRIORITY_DESKTOP = 0;
 const PRIORITY_FOLDER_WINDOW = 1;
+
+function notifyClipboardUpdated(): void {
+  window.dispatchEvent(new CustomEvent('deskos-clipboard-updated'));
+}
 
 /**
  * Register a handler for "Copy" keyboard shortcut
@@ -68,6 +73,18 @@ export function registerPasteHandler(handler: () => void, priority: number = PRI
   
   return () => {
     pasteHandlers = pasteHandlers.filter(h => h.handler !== handler);
+  };
+}
+
+/**
+ * Register a handler for Delete / Backspace
+ */
+export function registerDeleteHandler(handler: () => void, priority: number = PRIORITY_DESKTOP): () => void {
+  deleteHandlers.push({ handler, priority });
+  deleteHandlers.sort((a, b) => b.priority - a.priority);
+
+  return () => {
+    deleteHandlers = deleteHandlers.filter((h) => h.handler !== handler);
   };
 }
 
@@ -120,6 +137,14 @@ export function getAllPasteHandlers(): Array<{ handler: () => void; priority: nu
 }
 
 /**
+ * Get all delete handlers in priority order
+ * @internal Used by keyboard shortcuts manager
+ */
+export function getAllDeleteHandlers(): Array<{ handler: () => void; priority: number }> {
+  return [...deleteHandlers];
+}
+
+/**
  * Copy items to clipboard
  */
 export function copy(data: ClipboardData): void {
@@ -128,6 +153,7 @@ export function copy(data: ClipboardData): void {
     ...data,
     operation: 'copy',
   };
+  notifyClipboardUpdated();
   console.log('[Clipboard] Copy: Clipboard saved', clipboardData);
 }
 
@@ -139,6 +165,7 @@ export function cut(data: ClipboardData): void {
     ...data,
     operation: 'cut',
   };
+  notifyClipboardUpdated();
 }
 
 /**
@@ -168,6 +195,7 @@ export class HandlerSkippedError extends Error {
  */
 export function clearClipboard(): void {
   clipboardData = null;
+  notifyClipboardUpdated();
 }
 
 /**
@@ -175,4 +203,12 @@ export function clearClipboard(): void {
  */
 export function hasClipboardData(): boolean {
   return clipboardData !== null && clipboardData.items.length > 0;
+}
+
+/** Ids currently marked as cut */
+export function getCutItemIds(): Set<string> {
+  if (!clipboardData || clipboardData.operation !== 'cut') {
+    return new Set();
+  }
+  return new Set(clipboardData.items.map((item) => item.id));
 }

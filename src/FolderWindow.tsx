@@ -19,6 +19,8 @@ import {
   getFolderByPath,
   DESKOS_ITEM_IDS_MIME,
   readDraggedItemIds,
+  removeDesktopShortcut,
+  deleteDesktopFolder,
 } from '@core/desktop-shortcuts';
 import { programs } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
@@ -28,9 +30,10 @@ import { hasIcon, type IconName } from '@core/icons';
 import {
   registerSelectAllHandler,
   startMarqueeSelection,
+  SELECTION_PRIORITY,
   type MarqueeRect,
 } from '@core/selection';
-import { registerCopyHandler, registerCutHandler, registerPasteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, CLIPBOARD_PRIORITY, HandlerSkippedError, type ClipboardItem } from '@core/clipboard';
+import { registerCopyHandler, registerCutHandler, registerPasteHandler, registerDeleteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, getCutItemIds, CLIPBOARD_PRIORITY, HandlerSkippedError, type ClipboardItem } from '@core/clipboard';
 
 interface FolderWindowProps {
   /** Absolute path to open (default `/Desktop`) */
@@ -47,6 +50,7 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [pathInput, setPathInput] = useState(initialPath || '/Desktop');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [cutIds, setCutIds] = useState<Set<string>>(() => getCutItemIds());
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
   const lastSelectedIndexRef = useRef<number>(-1);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -58,6 +62,13 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
   const suppressClickClearRef = useRef(false);
   selectedIdsRef.current = selectedIds;
   itemsRef.current = items;
+
+  useEffect(() => {
+    const sync = () => setCutIds(getCutItemIds());
+    sync();
+    window.addEventListener('deskos-clipboard-updated', sync);
+    return () => window.removeEventListener('deskos-clipboard-updated', sync);
+  }, []);
 
   const loadItems = useCallback((path: string) => {
     const resolved = resolvePath(path);
@@ -233,17 +244,28 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     setPathInput(currentPath);
   }, [currentPath]);
 
+  const assertThisFolderWindowActive = useCallback(() => {
+    const kernel = useKernel.getState();
+    const hostWindow = contentRef.current?.closest('[data-window-id]');
+    const thisWindowId = hostWindow?.getAttribute('data-window-id');
+    if (!thisWindowId || kernel.activeWindowId !== thisWindowId) {
+      throw new HandlerSkippedError();
+    }
+  }, []);
+
   // Select All handler
   const handleSelectAll = useCallback(() => {
+    assertThisFolderWindowActive();
     const allItemIds = items.map(item => item.id);
     setSelectedIds(new Set(allItemIds));
     if (allItemIds.length > 0) {
       lastSelectedIndexRef.current = allItemIds.length - 1;
     }
-  }, [items]);
+  }, [items, assertThisFolderWindowActive]);
 
   // Copy handler
   const handleCopy = useCallback(() => {
+    assertThisFolderWindowActive();
     // If no selection in this folder window, check if there's desktop selection
     if (selectedIds.size === 0) {
       const desktopSelection = (window as any).__desktopSelection as Set<string> | undefined;
@@ -251,8 +273,8 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
         // There's desktop selection, let DesktopIcons handle it
         throw new HandlerSkippedError();
       }
-      // No selection anywhere, nothing to copy
-      return;
+      // No selection anywhere — let other handlers try
+      throw new HandlerSkippedError();
     }
 
     const clipboardItems: ClipboardItem[] = [];
@@ -275,10 +297,11 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
         sourcePath: currentPath,
       });
     }
-  }, [selectedIds, items, currentPath]);
+  }, [selectedIds, items, currentPath, assertThisFolderWindowActive]);
 
   // Cut handler
   const handleCut = useCallback(() => {
+    assertThisFolderWindowActive();
     // If no selection in this folder window, check if there's desktop selection
     if (selectedIds.size === 0) {
       const desktopSelection = (window as any).__desktopSelection as Set<string> | undefined;
@@ -286,8 +309,8 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
         // There's desktop selection, let DesktopIcons handle it
         throw new HandlerSkippedError();
       }
-      // No selection anywhere, nothing to cut
-      return;
+      // No selection anywhere — let other handlers try
+      throw new HandlerSkippedError();
     }
 
     const clipboardItems: ClipboardItem[] = [];
@@ -310,26 +333,35 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
         sourcePath: currentPath,
       });
     }
-  }, [selectedIds, items, currentPath]);
+  }, [selectedIds, items, currentPath, assertThisFolderWindowActive]);
+
+  // Delete handler
+  const handleDelete = useCallback(() => {
+    assertThisFolderWindowActive();
+    if (selectedIds.size === 0) throw new HandlerSkippedError();
+    const folders = getDesktopFolders();
+    const hasFolders = Array.from(selectedIds).some(id => folders.some(f => f.id === id));
+    if (hasFolders) {
+      const ok = confirm(selectedIds.size === 1
+        ? 'Are you sure you want to delete this folder and all its contents?'
+        : `Are you sure you want to delete ${selectedIds.size} items?`);
+      if (!ok) return;
+    }
+    for (const id of selectedIds) {
+      if (folders.some(f => f.id === id)) deleteDesktopFolder(id);
+      else removeDesktopShortcut(id);
+    }
+    setSelectedIds(new Set());
+    lastSelectedIndexRef.current = -1;
+    loadItems(currentPath);
+    window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+  }, [selectedIds, currentPath, loadItems, assertThisFolderWindowActive]);
 
   // Paste handler
   const handlePaste = useCallback(async () => {
     console.log('[FolderWindow] Paste: Handler called');
     
-    // Verify this window is active before handling paste
-    // We need to check if ANY folder window is active, not just this specific instance
-    const kernel = useKernel.getState();
-    if (kernel.activeWindowId) {
-      const activeWindow = kernel.windows.find(w => w.id === kernel.activeWindowId);
-      if (!activeWindow || activeWindow.programId !== 'folder') {
-        console.log('[FolderWindow] Paste: Not a folder window active, skipping');
-        // Throw special error to indicate next handler should be tried
-        throw new HandlerSkippedError();
-      }
-    } else {
-      console.log('[FolderWindow] Paste: No active window, skipping');
-      throw new HandlerSkippedError();
-    }
+    assertThisFolderWindowActive();
     
     const clipboard = getClipboard();
     console.log('[FolderWindow] Paste: Clipboard data', clipboard);
@@ -428,48 +460,44 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
           }
         }
       } else if (clipboard.operation === 'cut') {
-        console.log('[FolderWindow] Paste: Moving', clipboard.items.length, 'items to folder');
-        // Move items to current folder
-        for (const item of clipboard.items) {
-          // Verify item exists
-          const shortcut = allShortcuts.find(s => s.id === item.id);
-          const folder = allFolders.find(f => f.id === item.id);
-          
-          if (!shortcut && !folder) {
-            console.warn('[FolderWindow] Paste: Item not found for cut', item.id);
-            continue;
-          }
+        // Same folder: keep items where they are
+        if (clipboard.type === 'folder-items' && clipboard.sourcePath === currentPath) {
+          setSelectedIds(new Set());
+          clearClipboard();
+        } else {
+          console.log('[FolderWindow] Paste: Moving', clipboard.items.length, 'items to folder');
+          for (const item of clipboard.items) {
+            const shortcut = allShortcuts.find(s => s.id === item.id);
+            const folder = allFolders.find(f => f.id === item.id);
+            
+            if (!shortcut && !folder) {
+              console.warn('[FolderWindow] Paste: Item not found for cut', item.id);
+              continue;
+            }
 
-          // Remove from source location
-          if (clipboard.type === 'folder-items' && clipboard.sourcePath) {
-            // Item is from another folder
-            if (clipboard.sourcePath !== currentPath) {
-              const sourceResolved = resolvePath(clipboard.sourcePath);
-              if (sourceResolved.type === 'folder') {
-                const sourceFolder = getFolderByPath(clipboard.sourcePath);
-                if (sourceFolder) {
-                  console.log('[FolderWindow] Paste: Removing item from source folder', item.id);
-                  removeItemFromFolder(sourceFolder.id, item.id);
+            if (clipboard.type === 'folder-items' && clipboard.sourcePath) {
+              if (clipboard.sourcePath !== currentPath) {
+                const sourceResolved = resolvePath(clipboard.sourcePath);
+                if (sourceResolved.type === 'folder') {
+                  const sourceFolder = getFolderByPath(clipboard.sourcePath);
+                  if (sourceFolder) {
+                    removeItemFromFolder(sourceFolder.id, item.id);
+                  }
                 }
               }
+            } else if (clipboard.type === 'desktop-items') {
+              allFolders.forEach(f => {
+                if (f.contents.includes(item.id)) {
+                  removeItemFromFolder(f.id, item.id);
+                }
+              });
             }
-          } else if (clipboard.type === 'desktop-items') {
-            // Item is from desktop - remove from any parent folder it might be in
-            allFolders.forEach(f => {
-              if (f.contents.includes(item.id)) {
-                console.log('[FolderWindow] Paste: Removing item from parent folder', item.id, f.id);
-                removeItemFromFolder(f.id, item.id);
-              }
-            });
-          }
 
-          // Add to current folder
-          console.log('[FolderWindow] Paste: Adding item to current folder', item.id);
-          addItemToFolder(currentFolder.id, item.id);
+            addItemToFolder(currentFolder.id, item.id);
+          }
+          setSelectedIds(new Set());
+          clearClipboard();
         }
-        // Clear selection and clipboard after cut
-        setSelectedIds(new Set());
-        clearClipboard();
       }
 
       // Reload items to reflect changes
@@ -478,22 +506,24 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     } catch (error) {
       console.error('[FolderWindow] Error pasting items:', error);
     }
-  }, [currentPath, loadItems]);
+  }, [currentPath, loadItems, assertThisFolderWindowActive]);
 
   // Register keyboard shortcut handlers with higher priority than desktop
   useEffect(() => {
-    const unregisterSelectAll = registerSelectAllHandler(handleSelectAll);
+    const unregisterSelectAll = registerSelectAllHandler(handleSelectAll, SELECTION_PRIORITY.FOLDER_WINDOW);
     const unregisterCopy = registerCopyHandler(handleCopy, CLIPBOARD_PRIORITY.FOLDER_WINDOW);
     const unregisterCut = registerCutHandler(handleCut, CLIPBOARD_PRIORITY.FOLDER_WINDOW);
     const unregisterPaste = registerPasteHandler(handlePaste, CLIPBOARD_PRIORITY.FOLDER_WINDOW);
+    const unregisterDelete = registerDeleteHandler(handleDelete, CLIPBOARD_PRIORITY.FOLDER_WINDOW);
 
     return () => {
       unregisterSelectAll();
       unregisterCopy();
       unregisterCut();
       unregisterPaste();
+      unregisterDelete();
     };
-  }, [handleSelectAll, handleCopy, handleCut, handlePaste]);
+  }, [handleSelectAll, handleCopy, handleCut, handlePaste, handleDelete]);
 
   // Store selection state globally for context menu access
   useEffect(() => {
@@ -757,7 +787,7 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                   return (
                     <div
                       key={item.id}
-                      className={`folder-window-item folder-item ${selectedIds.has(item.id) ? 'selected' : ''}`}
+                      className={`folder-window-item folder-item ${selectedIds.has(item.id) ? 'selected' : ''} ${cutIds.has(item.id) ? 'cut' : ''}`}
                       data-item-id={item.id}
                       data-item-type="folder"
                       style={{
@@ -803,7 +833,7 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                   return (
                     <div
                       key={item.id}
-                      className={`folder-window-item shortcut-item ${selectedIds.has(item.id) ? 'selected' : ''}`}
+                      className={`folder-window-item shortcut-item ${selectedIds.has(item.id) ? 'selected' : ''} ${cutIds.has(item.id) ? 'cut' : ''}`}
                       data-item-id={item.id}
                       data-item-type="shortcut"
                       data-program-id={item.programId}

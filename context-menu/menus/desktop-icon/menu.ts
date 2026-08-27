@@ -279,6 +279,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
         id: 'desktop-icon-delete',
         label: deleteLabel,
         icon: 'delete',
+        shortcut: 'Delete',
         action: async () => {
           try {
             const { removeDesktopShortcut, deleteDesktopFolder } = await import('@core/desktop-shortcuts');
