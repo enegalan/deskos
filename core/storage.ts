@@ -1,4 +1,10 @@
-import type { StorageAPI } from './types';
+export interface StorageAPI {
+  getItem<T = unknown>(key: string): T | null;
+  setItem<T = unknown>(key: string, value: T): void;
+  removeItem(key: string): void;
+  clear(): void;
+  keys(): string[];
+}
 
 const STORAGE_PREFIX = 'deskos';
 

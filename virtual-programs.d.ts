@@ -1,5 +1,5 @@
 declare module 'virtual:programs' {
-  import type { ProgramDefinition } from '@core/types';
+  import type { ProgramDefinition } from '@core/program';
 
   export interface ProgramRegistry {
     [id: string]: {

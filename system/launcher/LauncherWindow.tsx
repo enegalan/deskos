@@ -1,5 +1,5 @@
 import { useState, useMemo, memo } from 'react';
-import type { ProgramContext } from '@core/types';
+import type { ProgramContext } from '@core/context';
 import { programList } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
 import { Icon } from '../../components/Icon';

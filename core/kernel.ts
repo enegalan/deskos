@@ -1,6 +1,73 @@
 import { create } from 'zustand';
-import type { KernelState, WindowState, WindowCreateOptions, SystemSettings } from './types';
+import type { ReactNode } from 'react';
+import type { IconName } from './icons';
 import { WindowNotFoundError, StorageError, handleError, safeSync } from './errors';
+
+export interface WindowState {
+  id: string;
+  programId: string;
+  title: string;
+  icon: string | IconName;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  minWidth: number;
+  minHeight: number;
+  isMinimized: boolean;
+  isMaximized: boolean;
+  isFocused: boolean;
+  component: ReactNode;
+  previousState?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+export interface WindowCreateOptions {
+  title?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  minHeight?: number;
+  component: ReactNode;
+}
+
+export interface SystemSettings {
+  theme: 'light' | 'dark';
+  wallpaper: string;
+  accentColor: string;
+  timeFormat: '12h' | '24h';
+  timezone: string;
+  showDate: boolean;
+  iconSize: number;
+  iconSpacing: number;
+  gridSize: number;
+  autoArrange: boolean;
+  showIconLabels: boolean;
+}
+
+export interface KernelState {
+  windows: WindowState[];
+  windowOrder: string[];
+  activeWindowId: string | null;
+  settings: SystemSettings;
+
+  createWindow: (programId: string, icon: string, options: WindowCreateOptions) => string;
+  closeWindow: (windowId: string) => void;
+  focusWindow: (windowId: string) => void;
+  minimizeWindow: (windowId: string) => void;
+  maximizeWindow: (windowId: string) => void;
+  restoreWindow: (windowId: string) => void;
+  moveWindow: (windowId: string, x: number, y: number) => void;
+  resizeWindow: (windowId: string, width: number, height: number) => void;
+  setWindowTitle: (windowId: string, title: string) => void;
+  updateSettings: (settings: Partial<SystemSettings>) => void;
+}
 
 let windowIdCounter = 0;
 

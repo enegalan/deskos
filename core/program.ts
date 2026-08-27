@@ -1,4 +1,13 @@
-import type { ProgramContext, ProgramDefinition } from './types';
+import type { IconName } from './icons';
+import type { ProgramContext } from './context';
+
+export interface ProgramDefinition<T extends string = string> {
+  id: T;
+  name: string;
+  icon: string | IconName;
+  launch: (ctx: ProgramContext) => void;
+  allowMultipleWindows?: boolean;
+}
 
 /**
  * Type-safe helper function for defining programs.

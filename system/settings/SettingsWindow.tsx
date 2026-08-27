@@ -1,4 +1,4 @@
-import type { ProgramContext } from '@core/types';
+import type { ProgramContext } from '@core/context';
 import { useKernel } from '@core/kernel';
 import { saveCustomWallpaper, getCustomWallpapers, removeCustomWallpaper, type WallpaperMetadata } from '@core/wallpaper-storage';
 import { useState, useEffect } from 'react';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { ProgramContext } from '@core/types';
+import type { ProgramContext } from '@core/context';
 
 interface Note {
   id: string;

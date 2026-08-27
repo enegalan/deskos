@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, memo, type MouseEvent as ReactMouseEvent } from 'react';
 import { useKernel } from '@core/kernel';
-import type { WindowState } from '@core/types';
+import type { WindowState } from '@core/kernel';
 import { Icon } from '../components/Icon';
 
 type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { MenuItem as MenuItemType } from './types';
-import type { MenuPosition } from './types';
+import type { MenuItem as MenuItemType } from './ContextMenuManager';
+import type { MenuPosition } from './positioning';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 

@@ -1,4 +1,23 @@
-import type { MenuPosition, MenuDimensions, ViewportInfo } from './types';
+export interface MenuPosition {
+  x: number;
+  y: number;
+  flippedX: boolean;
+  flippedY: boolean;
+  shiftX: number;
+  shiftY: number;
+}
+
+export interface MenuDimensions {
+  width: number;
+  height: number;
+}
+
+export interface ViewportInfo {
+  width: number;
+  height: number;
+  scrollX: number;
+  scrollY: number;
+}
 
 /**
  * Calculate optimal menu position with collision detection and flipping

@@ -1,4 +1,11 @@
-import type { EventHandler, EventBusAPI } from './types';
+export type EventHandler<T = unknown> = (payload: T) => void;
+
+export interface EventBusAPI {
+  emit<T = unknown>(event: string, payload?: T): void;
+  on<T = unknown>(event: string, handler: EventHandler<T>): () => void;
+  off<T = unknown>(event: string, handler: EventHandler<T>): void;
+  once<T = unknown>(event: string, handler: EventHandler<T>): () => void;
+}
 
 type ListenerMap = Map<string, Set<EventHandler<unknown>>>;
 

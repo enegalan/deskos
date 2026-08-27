@@ -1,5 +1,4 @@
-import { ContextMenuManager } from './ContextMenuManager';
-import type { MenuContext, MenuItem } from './types';
+import { ContextMenuManager, type MenuContext, type MenuItem } from './ContextMenuManager';
 import { useKernel } from '@core/kernel';
 import { organizeIconsByName, organizeIconsByDate } from '@core/desktop-shortcuts';
 

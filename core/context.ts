@@ -1,9 +1,43 @@
-import type { ProgramContext, WindowAPI, SystemAPI, WindowCreateOptions, WindowState, ContextMenuAPI } from './types';
+import type { WindowCreateOptions, WindowState } from './kernel';
 import { useKernel } from './kernel';
-import { createSecureScopedStorage } from './storage';
-import { createScopedEventBus } from './event-bus';
-import { ContextMenuManager } from '../context-menu/ContextMenuManager';
-import type { ContextMenuProvider, MenuItem } from '../context-menu/types';
+import { createSecureScopedStorage, type StorageAPI } from './storage';
+import { createScopedEventBus, type EventBusAPI } from './event-bus';
+import { ContextMenuManager, type ContextMenuProvider, type MenuItem } from '../context-menu/ContextMenuManager';
+
+export interface WindowAPI {
+  create(options: WindowCreateOptions): string;
+  close(windowId: string): void;
+  focus(windowId: string): void;
+  minimize(windowId: string): void;
+  maximize(windowId: string): void;
+  restore(windowId: string): void;
+  setTitle(windowId: string, title: string): void;
+  getWindows(): WindowState[];
+}
+
+export interface SystemAPI {
+  readonly version: string;
+  readonly theme: 'light' | 'dark';
+  readonly programId: string;
+}
+
+export interface ContextMenuAPI {
+  register(target: string, provider: {
+    id: string;
+    items?: MenuItem[];
+    generator?: (context: unknown) => MenuItem[] | Promise<MenuItem[]>;
+    priority?: number;
+  }): () => void;
+  unregister(target: string, providerId: string): void;
+}
+
+export interface ProgramContext {
+  window: WindowAPI;
+  storage: StorageAPI;
+  events: EventBusAPI;
+  system: SystemAPI;
+  contextMenu: ContextMenuAPI;
+}
 
 const VERSION = '0.1.0';
 

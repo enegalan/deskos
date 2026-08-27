@@ -1,4 +1,4 @@
-import type { ProgramContext } from '@core/types';
+import type { ProgramContext } from '@core/context';
 
 interface MainWindowProps {
   ctx: ProgramContext;

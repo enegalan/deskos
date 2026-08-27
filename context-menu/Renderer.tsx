@@ -7,8 +7,10 @@ import {
   getViewportInfo,
   getTriggerCoordinates,
   measureMenuDimensions,
+  type MenuPosition,
+  type MenuDimensions,
 } from './positioning';
-import type { MenuItem, MenuContext, MenuPosition, MenuDimensions } from './types';
+import type { MenuItem, MenuContext } from './ContextMenuManager';
 
 interface RendererState {
   isVisible: boolean;

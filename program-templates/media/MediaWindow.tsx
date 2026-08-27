@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, type ChangeEvent } from 'react';
-import type { ProgramContext } from '@core/types';
+import type { ProgramContext } from '@core/context';
 
 interface MediaWindowProps {
   ctx: ProgramContext;

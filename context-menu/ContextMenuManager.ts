@@ -1,11 +1,60 @@
-import type {
-  MenuContext,
-  MenuItem,
-  ContextMenuProvider,
-  ContextMenuHooks,
-  MenuRenderState,
-  HapticPattern,
-} from './types';
+import type { MenuPosition, MenuDimensions } from './positioning';
+
+export type MenuItemType = 'action' | 'checkbox' | 'radio' | 'separator' | 'submenu';
+
+export interface MenuContext {
+  event: MouseEvent | KeyboardEvent | TouchEvent;
+  target: HTMLElement;
+  selection?: unknown;
+  data?: Record<string, unknown>;
+  programId?: string;
+  windowId?: string;
+}
+
+export interface MenuItem {
+  id: string;
+  label: string;
+  icon?: string;
+  type?: MenuItemType;
+  enabled?: boolean;
+  visible?: boolean;
+  checked?: boolean;
+  group?: string;
+  shortcut?: string;
+  action?: (context: MenuContext) => void | Promise<void>;
+  submenu?: MenuItem[];
+  metadata?: Record<string, unknown>;
+}
+
+export type MenuItemGenerator = (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
+
+export interface ContextMenuProvider {
+  id: string;
+  target: string;
+  items?: MenuItem[];
+  generator?: MenuItemGenerator;
+  priority?: number;
+  programId?: string;
+}
+
+export interface ContextMenuHooks {
+  onBeforeOpen?: (context: MenuContext, items: MenuItem[]) => MenuItem[] | void;
+  onAfterOpen?: (context: MenuContext) => void;
+  onMenuItemSelect?: (item: MenuItem, context: MenuContext) => boolean | void;
+  onBeforeClose?: (context: MenuContext) => void;
+  onAfterClose?: (context: MenuContext) => void;
+}
+
+export type HapticPattern = 'trigger' | 'success' | 'error';
+
+export interface MenuRenderState {
+  isOpen: boolean;
+  isPositioning: boolean;
+  activeItemId: string | null;
+  openSubmenuId: string | null;
+  position: MenuPosition | null;
+  dimensions: MenuDimensions | null;
+}
 
 /**
  * Singleton manager for the DeskOS context menu system.

@@ -1,5 +1,5 @@
 import { useState, useCallback, type FormEvent } from 'react';
-import type { ProgramContext } from '@core/types';
+import type { ProgramContext } from '@core/context';
 
 interface WebViewWindowProps {
   ctx: ProgramContext;

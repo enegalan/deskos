@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { MenuItem } from './MenuItem';
-import type { MenuItem as MenuItemType } from './types';
-import { ContextMenuManager } from './ContextMenuManager';
+import { ContextMenuManager, type MenuItem as MenuItemType } from './ContextMenuManager';
 
 interface MenuProps {
   items: MenuItemType[];
