@@ -506,24 +506,49 @@ export class ContextMenuManager {
     this.emit('menu:close', {});
   }
 
+  private static readonly SEMANTIC_TARGETS = new Set([
+    'desktop',
+    'window',
+    'file',
+    'folder-window',
+  ]);
+
   /**
    * Find providers matching the target element
    */
   private findProviders(target: HTMLElement, context?: MenuContext): ContextMenuProvider[] {
     const matches: ContextMenuProvider[] = [];
 
-    // Check semantic targets first
     for (const [targetSelector, providers] of this.providers.entries()) {
-      if (this.matchesTarget(target, targetSelector, context)) {
-        matches.push(...providers);
+      if (!this.matchesTarget(target, targetSelector, context)) {
+        continue;
+      }
+      for (const provider of providers) {
+        // App providers only apply inside that program's windows
+        if (
+          provider.programId &&
+          provider.programId !== 'system' &&
+          context?.programId !== provider.programId
+        ) {
+          continue;
+        }
+        matches.push(provider);
       }
     }
 
-    // Sort by priority (higher first)
-    matches.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    // Element-specific CSS providers win over the generic window chrome menu
+    const hasElementProvider = matches.some(
+      (provider) =>
+        !ContextMenuManager.SEMANTIC_TARGETS.has(provider.target) &&
+        provider.target !== '*'
+    );
+    const filtered = hasElementProvider
+      ? matches.filter((provider) => provider.target !== 'window')
+      : matches;
 
-    // Debug logging
-    if (matches.length === 0) {
+    filtered.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+
+    if (filtered.length === 0) {
       console.log('[ContextMenuManager] No providers found for target:', {
         tag: target.tagName,
         classes: Array.from(target.classList),
@@ -532,7 +557,7 @@ export class ContextMenuManager {
       });
     }
 
-    return matches;
+    return filtered;
   }
 
   /**

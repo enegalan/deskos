@@ -2,7 +2,7 @@ import type { WindowCreateOptions, WindowState } from './kernel';
 import { useKernel } from './kernel';
 import { createSecureScopedStorage, type StorageAPI } from './storage';
 import { createScopedEventBus, type EventBusAPI } from './event-bus';
-import { ContextMenuManager, type ContextMenuProvider, type MenuItem } from '../context-menu/ContextMenuManager';
+import { ContextMenuManager, type ContextMenuProvider, type MenuContext, type MenuItem } from '../context-menu/ContextMenuManager';
 import packageJson from '../package.json';
 
 export interface WindowAPI {
@@ -22,13 +22,44 @@ export interface SystemAPI {
   readonly programId: string;
 }
 
+/**
+ * Register context-menu providers for elements inside this program's windows.
+ * CSS targets are scoped to `[data-program-id="…"]` so they never leak to other apps.
+ *
+ * @example
+ * useEffect(() => {
+ *   return ctx.contextMenu.register('img', {
+ *     id: 'preview-image',
+ *     generator: (context) => [{
+ *       id: 'preview',
+ *       label: 'Preview',
+ *       icon: 'open',
+ *       action: () => previewImage(context.target as HTMLImageElement),
+ *     }],
+ *   });
+ * }, [ctx]);
+ */
 export interface ContextMenuAPI {
   register(target: string, provider: {
     id: string;
     items?: MenuItem[];
-    generator?: (context: unknown) => MenuItem[] | Promise<MenuItem[]>;
+    generator?: (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
     priority?: number;
   }): () => void;
+}
+
+const SEMANTIC_MENU_TARGETS = new Set(['desktop', 'window', 'file', 'folder-window']);
+
+/** Scope a CSS selector to this program's windows; leave semantic targets unchanged. */
+function scopeContextMenuTarget(target: string, programId: string): string {
+  if (SEMANTIC_MENU_TARGETS.has(target) || target === '*') {
+    return target;
+  }
+  const scope = `[data-program-id="${programId}"]`;
+  if (target.includes(scope)) {
+    return target;
+  }
+  return `${scope} ${target}`;
 }
 
 export interface ProgramContext {
@@ -195,12 +226,13 @@ function createContextMenuAPI(programId: string): ContextMenuAPI {
     register(target: string, provider: {
       id: string;
       items?: MenuItem[];
-      generator?: (context: unknown) => MenuItem[] | Promise<MenuItem[]>;
+      generator?: (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
       priority?: number;
     }): () => void {
       const fullProvider: ContextMenuProvider = {
         ...provider,
-        target,
+        id: `${programId}:${provider.id}`,
+        target: scopeContextMenuTarget(target, programId),
         programId,
       };
       return manager.registerProvider(fullProvider);

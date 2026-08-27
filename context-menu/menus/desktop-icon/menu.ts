@@ -47,6 +47,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
         const programId = context.target.getAttribute('data-program-id');
         let programName = '';
         let allowMultiple = false;
+        let iconContextMenuItems: MenuItem[] = [];
         
         if (programId) {
           try {
@@ -56,6 +57,25 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
               const module = await program.load();
               programName = module.default.name;
               allowMultiple = module.default.allowMultipleWindows ?? false;
+              if (module.default.iconContextMenu) {
+                try {
+                  const customPromise = Promise.resolve(
+                    module.default.iconContextMenu(context)
+                  );
+                  const timeoutPromise = new Promise<MenuItem[]>((resolve) => {
+                    setTimeout(() => resolve([]), 200);
+                  });
+                  iconContextMenuItems = await Promise.race([
+                    customPromise,
+                    timeoutPromise,
+                  ]);
+                } catch (error) {
+                  console.error(
+                    '[DesktopIcon] Error generating iconContextMenu:',
+                    error
+                  );
+                }
+              }
             }
           } catch (error) {
             console.error('[DesktopIcon] Error loading program metadata:', error);
@@ -96,6 +116,10 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
                 }
               },
             });
+          }
+
+          if (iconContextMenuItems.length > 0) {
+            items.push(...iconContextMenuItems);
           }
         }
       }
