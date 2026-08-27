@@ -3,6 +3,7 @@ import { useKernel } from './kernel';
 import { createSecureScopedStorage, type StorageAPI } from './storage';
 import { createScopedEventBus, type EventBusAPI } from './event-bus';
 import { ContextMenuManager, type ContextMenuProvider, type MenuItem } from '../context-menu/ContextMenuManager';
+import packageJson from '../package.json';
 
 export interface WindowAPI {
   create(options: WindowCreateOptions): string;
@@ -38,8 +39,6 @@ export interface ProgramContext {
   system: SystemAPI;
   contextMenu: ContextMenuAPI;
 }
-
-const VERSION = '0.1.0';
 
 /**
  * Launches a program or focuses an existing window if one already exists.
@@ -169,7 +168,7 @@ function createSystemAPI(programId: string): SystemAPI {
   // Use a Proxy to ensure read-only access to current state
   return new Proxy(
     {
-      version: VERSION,
+      version: packageJson.version,
       theme: state.settings.theme,
       programId,
     },

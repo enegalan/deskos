@@ -45,10 +45,18 @@ export interface SystemSettings {
   timezone: string;
   showDate: boolean;
   iconSize: number;
-  iconSpacing: number;
   gridSize: number;
   autoArrange: boolean;
   showIconLabels: boolean;
+}
+
+/** Cell padding (4+4) + label block so glyph + label fit in one grid cell */
+const ICON_CELL_PADDING = 8;
+const ICON_LABEL_SPACE = 22;
+
+export function getMaxIconSize(gridSize: number, showIconLabels: boolean): number {
+  const reserved = ICON_CELL_PADDING + (showIconLabels ? ICON_LABEL_SPACE : 0);
+  return Math.max(32, gridSize - reserved);
 }
 
 export interface KernelState {
@@ -85,7 +93,6 @@ const defaultSettings: SystemSettings = {
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   showDate: false,
   iconSize: 64,
-  iconSpacing: 80,
   gridSize: 100,
   autoArrange: false,
   showIconLabels: true,
@@ -110,10 +117,19 @@ function loadSettings(): SystemSettings {
     return defaultSettings;
   }
 
-  const settings = { ...defaultSettings, ...parsed };
-  // Ensure gridSize is at least 100
+  const settings = { ...defaultSettings };
+  (Object.keys(defaultSettings) as Array<keyof SystemSettings>).forEach((key) => {
+    const value = parsed[key];
+    if (value !== undefined) {
+      (settings[key] as SystemSettings[typeof key]) = value as SystemSettings[typeof key];
+    }
+  });
   if (settings.gridSize < 100) {
     settings.gridSize = 100;
+  }
+  const maxIconSize = getMaxIconSize(settings.gridSize, settings.showIconLabels);
+  if (settings.iconSize > maxIconSize) {
+    settings.iconSize = maxIconSize;
   }
   return settings;
 }
@@ -331,6 +347,13 @@ export const useKernel = create<KernelState>((set, get) => ({
   updateSettings: (newSettings: Partial<SystemSettings>): void => {
     set((state) => {
       const updatedSettings = { ...state.settings, ...newSettings };
+      if (updatedSettings.gridSize < 100) {
+        updatedSettings.gridSize = 100;
+      }
+      const maxIconSize = getMaxIconSize(updatedSettings.gridSize, updatedSettings.showIconLabels);
+      if (updatedSettings.iconSize > maxIconSize) {
+        updatedSettings.iconSize = maxIconSize;
+      }
       saveSettings(updatedSettings);
       return {
         settings: updatedSettings,

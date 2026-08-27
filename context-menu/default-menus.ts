@@ -128,7 +128,7 @@ export function registerDefaultMenus(): void {
               const y = context.event.clientY - rect.top;
               const gridPos = pixelToGrid(x, y);
               
-              // Check if there's already an item at this position
+              // Check if there's already an item at this position (should not happen because desktop apps fill a grid cell)
               const existingItem = findItemAtPosition(gridPos.x, gridPos.y);
               if (existingItem) {
                 console.warn('[Desktop] Cannot create folder: position already occupied by', existingItem);
@@ -174,6 +174,11 @@ export function registerDefaultMenus(): void {
                   console.error('[Desktop] Error pasting items:', error);
                 }
               },
+            },
+            {
+              id: 'desktop-separator-1',
+              type: 'separator',
+              label: '',
             });
           }
         }
@@ -182,11 +187,6 @@ export function registerDefaultMenus(): void {
       }
 
       items.push(
-        {
-          id: 'desktop-separator-1',
-          type: 'separator',
-          label: '',
-        },
         {
           id: 'desktop-settings',
           label: 'Settings',

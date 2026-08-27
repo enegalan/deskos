@@ -1,5 +1,5 @@
 import type { ProgramContext } from '@core/context';
-import { useKernel } from '@core/kernel';
+import { getMaxIconSize, useKernel } from '@core/kernel';
 import { saveCustomWallpaper, getCustomWallpapers, removeCustomWallpaper, type WallpaperMetadata } from '@core/wallpaper-storage';
 import { useState, useEffect } from 'react';
 
@@ -156,12 +156,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
     updateSettings({ iconSize: size });
   };
 
-  const handleIconSpacingChange = (spacing: number) => {
-    updateSettings({ iconSpacing: spacing });
-  };
-
   const handleGridSizeChange = (size: number) => {
-    // Ensure gridSize is at least 100
     const validSize = Math.max(100, size);
     updateSettings({ gridSize: validSize });
     // Realign all icons to the new grid size
@@ -188,10 +183,6 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
 
   const handleResetIconSize = () => {
     updateSettings({ iconSize: 64 });
-  };
-
-  const handleResetIconSpacing = () => {
-    updateSettings({ iconSpacing: 80 });
   };
 
   const handleResetGridSize = () => {
@@ -382,7 +373,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
             <input
               type="range"
               min="32"
-              max="100"
+              max={getMaxIconSize(settings.gridSize, settings.showIconLabels)}
               value={settings.iconSize}
               onChange={(e) => handleIconSizeChange(parseInt(e.target.value, 10))}
               style={{
@@ -401,37 +392,6 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
                 cursor: 'pointer',
               }}
               title="Reset to default (64px)"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-
-        <div className="settings-row">
-          <span className="settings-label">Icon Spacing: {settings.iconSpacing}px</span>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <input
-              type="range"
-              min="100"
-              max="120"
-              value={settings.iconSpacing}
-              onChange={(e) => handleIconSpacingChange(parseInt(e.target.value, 10))}
-              style={{
-                width: '150px',
-              }}
-            />
-            <button
-              onClick={handleResetIconSpacing}
-              style={{
-                padding: '4px 8px',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-sm)',
-                background: 'var(--color-surface)',
-                color: 'var(--color-text)',
-                fontSize: '11px',
-                cursor: 'pointer',
-              }}
-              title="Reset to default (80px)"
             >
               Reset
             </button>

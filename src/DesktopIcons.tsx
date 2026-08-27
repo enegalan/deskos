@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { programs } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
-import { useKernel } from '@core/kernel';
+import { getMaxIconSize, useKernel } from '@core/kernel';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 import {
@@ -151,9 +151,9 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
         let rawX = moveEvent.clientX - currentDesktopRect.left - initialOffsetX;
         let rawY = moveEvent.clientY - currentDesktopRect.top - initialOffsetY;
         
-        // Get icon dimensions for boundary checking
-        const iconWidth = settings.iconSpacing;
-        const iconHeight = settings.iconSpacing;
+        // Icon fills one grid cell
+        const iconWidth = gridSize;
+        const iconHeight = gridSize;
         
         // Constrain position to desktop bounds
         const minX = 0;
@@ -164,8 +164,8 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
         rawX = Math.max(minX, Math.min(maxX, rawX));
         rawY = Math.max(minY, Math.min(maxY, rawY));
         
-        // Snap to grid for final positioning
-        const gridPos = pixelToGrid(rawX, rawY);
+        // Snap by icon center so adjacent cell highlights past midpoint
+        const gridPos = pixelToGrid(rawX + gridSize / 2, rawY + gridSize / 2);
         
         // Ensure grid position is also within bounds
         gridPos.x = Math.max(0, Math.min(Math.floor((currentDesktopRect.width - iconWidth) / gridSize) * gridSize, gridPos.x));
@@ -389,12 +389,16 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [shortcut.id, shortcut.x, shortcut.y, visualPosition, onUpdate, settings.iconSpacing, onSelect]
+    [shortcut.id, shortcut.x, shortcut.y, visualPosition, onUpdate, onSelect]
   );
 
 
   const displayName = shortcut.customName || program.name;
   const gridSize = getGridSize();
+  const iconSize = Math.min(
+    settings.iconSize,
+    getMaxIconSize(gridSize, settings.showIconLabels)
+  );
 
   return (
     <>
@@ -415,7 +419,8 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
         style={{
           left: `${visualPosition.x}px`,
           top: `${visualPosition.y}px`,
-          width: `${settings.iconSpacing}px`,
+          width: `${gridSize}px`,
+          height: `${gridSize}px`,
           transition: isDragging ? 'none' : 'left 0.2s ease-out, top 0.2s ease-out',
         }}
         onMouseDown={handleMouseDown}
@@ -429,21 +434,22 @@ const DesktopIcon = memo(function DesktopIcon({ shortcut, program, onUpdate, isS
         <div 
           className="desktop-icon-image"
           style={{
-            width: `${settings.iconSize}px`,
-            height: `${settings.iconSize}px`,
+            width: `${iconSize}px`,
+            height: `${iconSize}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0,
           }}
         >
           {hasIcon(program.icon as IconName) ? (
             <Icon 
               name={program.icon as IconName} 
-              size={settings.iconSize * 0.8}
+              size={iconSize * 0.8}
               fallback={typeof program.icon === 'string' && !hasIcon(program.icon as IconName) ? program.icon : undefined}
             />
           ) : (
-            <span style={{ fontSize: `${settings.iconSize * 0.7}px` }}>{program.icon}</span>
+            <span style={{ fontSize: `${iconSize * 0.7}px` }}>{program.icon}</span>
           )}
         </div>
         {settings.showIconLabels && (
@@ -562,9 +568,9 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
         let rawX = moveEvent.clientX - currentDesktopRect.left - initialOffsetX;
         let rawY = moveEvent.clientY - currentDesktopRect.top - initialOffsetY;
         
-        // Get icon dimensions for boundary checking
-        const iconWidth = settings.iconSpacing;
-        const iconHeight = settings.iconSpacing;
+        // Icon fills one grid cell
+        const iconWidth = gridSize;
+        const iconHeight = gridSize;
         
         // Constrain position to desktop bounds
         const minX = 0;
@@ -575,7 +581,8 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
         rawX = Math.max(minX, Math.min(maxX, rawX));
         rawY = Math.max(minY, Math.min(maxY, rawY));
         
-        const gridPos = pixelToGrid(rawX, rawY);
+        // Snap by icon center so adjacent cell highlights past midpoint
+        const gridPos = pixelToGrid(rawX + gridSize / 2, rawY + gridSize / 2);
         
         // Ensure grid position is also within bounds
         gridPos.x = Math.max(0, Math.min(Math.floor((currentDesktopRect.width - iconWidth) / gridSize) * gridSize, gridPos.x));
@@ -789,10 +796,14 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [folder.id, folder.x, folder.y, visualPosition, onUpdate, settings.iconSpacing, onSelect]
+    [folder.id, folder.x, folder.y, visualPosition, onUpdate, onSelect]
   );
 
   const gridSize = getGridSize();
+  const iconSize = Math.min(
+    settings.iconSize,
+    getMaxIconSize(gridSize, settings.showIconLabels)
+  );
 
   return (
     <>
@@ -813,7 +824,8 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
         style={{
           left: `${visualPosition.x}px`,
           top: `${visualPosition.y}px`,
-          width: `${settings.iconSpacing}px`,
+          width: `${gridSize}px`,
+          height: `${gridSize}px`,
           transition: isDragging ? 'none' : 'left 0.2s ease-out, top 0.2s ease-out',
         }}
         onMouseDown={handleMouseDown}
@@ -826,21 +838,22 @@ const FolderIcon = memo(function FolderIcon({ folder, onUpdate, onOpen, isSelect
         <div 
           className="desktop-icon-image"
           style={{
-            width: `${settings.iconSize}px`,
-            height: `${settings.iconSize}px`,
+            width: `${iconSize}px`,
+            height: `${iconSize}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0,
           }}
         >
           {hasIcon(folder.icon as IconName) ? (
             <Icon 
               name={folder.icon as IconName} 
-              size={settings.iconSize * 0.8}
+              size={iconSize * 0.8}
               fallback={typeof folder.icon === 'string' && !hasIcon(folder.icon as IconName) ? folder.icon : undefined}
             />
           ) : (
-            <span style={{ fontSize: `${settings.iconSize * 0.7}px` }}>{folder.icon}</span>
+            <span style={{ fontSize: `${iconSize * 0.7}px` }}>{folder.icon}</span>
           )}
         </div>
         {settings.showIconLabels && (
