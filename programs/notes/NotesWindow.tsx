@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ProgramContext } from '@core/context';
 
+/** Single note document stored by the Notes program. */
 interface Note {
   id: string;
   title: string;
@@ -8,6 +9,7 @@ interface Note {
   updatedAt: number;
 }
 
+/** Props for the Notes program window. */
 interface NotesWindowProps {
   /** Program context (storage + events) */
   ctx: ProgramContext;

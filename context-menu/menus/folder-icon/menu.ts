@@ -160,11 +160,9 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
         });
       }
       
-      // Move to Trash — soft-delete
       const totalSelectedForDelete = selectedShortcuts.length + selectedFolders.length;
-      const deleteLabel = totalSelectedForDelete > 1
-        ? `Move to Trash (${totalSelectedForDelete} items)`
-        : 'Move to Trash';
+      const { getDeleteItemsLabel, deleteDesktopItems } = await import('@core/delete-items');
+      const deleteLabel = getDeleteItemsLabel(totalSelectedForDelete);
 
       items.push({
         id: 'folder-icon-delete',
@@ -173,10 +171,9 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
         shortcut: 'Delete',
         action: async () => {
           try {
-            const { moveToTrash } = await import('@core/trash');
-            moveToTrash([...selectedShortcuts, ...selectedFolders]);
+            await deleteDesktopItems([...selectedShortcuts, ...selectedFolders]);
           } catch (error) {
-            console.error('[FolderIcon] Error moving items to trash:', error);
+            console.error('[FolderIcon] Error deleting items:', error);
           }
         },
       });

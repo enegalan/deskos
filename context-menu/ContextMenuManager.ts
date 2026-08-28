@@ -1,8 +1,10 @@
 import type { MenuPosition, MenuDimensions } from './positioning';
 import { getActiveSelection } from '../core/selection';
 
+/** Context menu item kind. */
 export type MenuItemType = 'action' | 'checkbox' | 'radio' | 'separator' | 'submenu';
 
+/** Data passed to context-menu item generators and actions. */
 export interface MenuContext {
   event: MouseEvent | KeyboardEvent | TouchEvent;
   target: HTMLElement;
@@ -12,6 +14,7 @@ export interface MenuContext {
   windowId?: string;
 }
 
+/** Single context-menu row (action, separator, or submenu). */
 export interface MenuItem {
   id: string;
   label: string;
@@ -27,8 +30,10 @@ export interface MenuItem {
   metadata?: Record<string, unknown>;
 }
 
+/** Function that builds menu items for a given click context. */
 export type MenuItemGenerator = (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
 
+/** Registered context-menu provider (target selector + items/generator). */
 export interface ContextMenuProvider {
   id: string;
   target: string;
@@ -38,8 +43,10 @@ export interface ContextMenuProvider {
   programId?: string;
 }
 
+/** Haptic feedback pattern for long-press context menu trigger. */
 export type HapticPattern = 'trigger' | 'success' | 'error';
 
+/** Internal UI state while a context menu is open. */
 export interface MenuRenderState {
   isOpen: boolean;
   isPositioning: boolean;

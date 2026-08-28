@@ -10,6 +10,7 @@ import {
 import { registerProgramIconResolver } from './program-icons';
 import packageJson from '../package.json';
 
+/** Window lifecycle API exposed to programs via {@link ProgramContext}. */
 export interface WindowAPI {
   create(options: WindowCreateOptions): string;
   close(windowId: string): void;
@@ -21,6 +22,7 @@ export interface WindowAPI {
   getWindows(): WindowState[];
 }
 
+/** Read-only system metadata for the running program. */
 export interface SystemAPI {
   readonly version: string;
   readonly theme: 'light' | 'dark';
@@ -93,6 +95,7 @@ export interface IconAPI {
   register(resolver: () => string): () => void;
 }
 
+/** Semantic context-menu targets that are not scoped to a program window. */
 const SEMANTIC_MENU_TARGETS = new Set(['desktop', 'window', 'file', 'folder-window']);
 
 /** Scope a CSS selector to this program's windows; leave semantic targets unchanged. */
@@ -107,6 +110,7 @@ function scopeContextMenuTarget(target: string, programId: string): string {
   return `${scope} ${target}`;
 }
 
+/** Full program-facing API surface (window, storage, events, menus, selection). */
 export interface ProgramContext {
   window: WindowAPI;
   storage: StorageAPI;
@@ -148,9 +152,9 @@ export async function launchOrFocusProgram(
     return;
   }
   
-  // If there's an existing window, focus it instead of creating a new one
-  // (This applies regardless of allowMultiple - default behavior is to focus existing)
-  if (existingWindows.length > 0) {
+  // If there's an existing window and the program is single-window, focus it
+  const allowMultiple = module.default.allowMultipleWindows === true;
+  if (existingWindows.length > 0 && !forceNewWindow && !allowMultiple) {
     const windowToFocus = existingWindows[0];
     
     // Restore if minimized

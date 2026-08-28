@@ -6,6 +6,12 @@ export default defineProgram({
   id: 'launcher',
   name: 'Launcher',
   icon: 'launcher',
+  hideFromLauncher: true,
+  dock: { pin: true, order: 0, role: 'launcher' },
+  shortcuts: [
+    { key: 'N', metaKey: true, description: 'New window', action: 'launch' },
+    { key: 'T', metaKey: true, description: 'New tab', action: 'launch' },
+  ],
   launch: (ctx) => {
     ctx.window.create({
       title: 'Launcher',

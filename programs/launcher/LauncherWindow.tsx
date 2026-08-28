@@ -2,10 +2,12 @@ import { useState, useMemo, memo, useEffect } from 'react';
 import type { ProgramContext } from '@core/context';
 import { programList } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
-import { isTrashEmpty } from '@core/trash';
+import { isHiddenFromLauncher } from '@core/program-registry';
+import { resolveProgramIcon } from '@core/program-icons';
 import { Icon } from '../../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
+/** Props for the program launcher window. */
 interface LauncherWindowProps {
   /** Program context (used to close the launcher after launch) */
   ctx: ProgramContext;
@@ -14,26 +16,28 @@ interface LauncherWindowProps {
 /** App launcher UI: searchable program grid; closes itself after launching. */
 export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWindowProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [trashEmpty, setTrashEmpty] = useState(() => isTrashEmpty());
+  const [iconRevision, setIconRevision] = useState(0);
 
   useEffect(() => {
-    const refresh = () => setTrashEmpty(isTrashEmpty());
-    window.addEventListener('trash-updated', refresh);
-    return () => window.removeEventListener('trash-updated', refresh);
+    const refresh = () => setIconRevision((n) => n + 1);
+    window.addEventListener('program-icon-updated', refresh);
+    return () => window.removeEventListener('program-icon-updated', refresh);
   }, []);
+
+  const visiblePrograms = useMemo(
+    () => programList.filter((p) => !isHiddenFromLauncher(p.id)),
+    []
+  );
 
   const filteredPrograms = useMemo(() => {
     if (!searchQuery.trim()) {
-      // Filter out the launcher itself from the list
-      return programList.filter((p) => p.id !== 'launcher');
+      return visiblePrograms;
     }
     const query = searchQuery.toLowerCase();
-    return programList.filter(
-      (p) =>
-        p.id !== 'launcher' &&
-        (p.name.toLowerCase().includes(query) || p.id.toLowerCase().includes(query))
+    return visiblePrograms.filter(
+      (p) => p.name.toLowerCase().includes(query) || p.id.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, visiblePrograms]);
 
   const handleLaunchProgram = async (programId: string) => {
     await launchOrFocusProgram(programId);
@@ -44,6 +48,8 @@ export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWind
       ctx.window.close(windows[0].id);
     }
   };
+
+  void iconRevision;
 
   return (
     <div className="launcher-container">
@@ -60,9 +66,7 @@ export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWind
 
       <div className="launcher-grid">
         {filteredPrograms.map((program) => {
-          const iconName = program.id === 'trash'
-            ? (trashEmpty ? 'trash' : 'trash-full')
-            : program.icon;
+          const iconName = resolveProgramIcon(program.id, program.icon);
           return (
           <button
             key={program.id}

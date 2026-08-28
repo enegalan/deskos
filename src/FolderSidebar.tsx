@@ -22,6 +22,7 @@ function sidebarIcon(name: string): IconName {
   return (hasIcon(name as IconName) ? name : 'folder') as IconName;
 }
 
+/** Props for the folder sidebar navigation panel. */
 interface FolderSidebarProps {
   /** Currently open path (highlights matching items) */
   currentPath: string;

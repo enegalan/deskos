@@ -3,7 +3,8 @@
  */
 
 import { createScopedStorage } from './storage';
-import { notifyProgramIconChanged } from './program-icons';
+import { notifyProgramIconChanged, resolveProgramIcon } from './program-icons';
+import { isProtectedShortcutProgram } from './program-registry';
 import {
   getDesktopShortcuts,
   getDesktopFolders,
@@ -124,9 +125,9 @@ function findOriginalParentPath(
   return null;
 }
 
-/** True if the item is the Trash app desktop shortcut (never soft-deleted). */
-function isTrashProgramShortcut(item: DesktopItem): boolean {
-  return isDesktopShortcut(item) && item.programId === 'trash';
+/** True if the desktop shortcut must not be soft-deleted (program flag). */
+function isProtectedProgramShortcut(item: DesktopItem): boolean {
+  return isDesktopShortcut(item) && isProtectedShortcutProgram(item.programId);
 }
 
 /**
@@ -153,7 +154,7 @@ function captureFolderTree(
     const shortcutIndex = shortcuts.findIndex((s) => s.id === childId);
     if (shortcutIndex !== -1) {
       const shortcut = shortcuts[shortcutIndex];
-      if (!isTrashProgramShortcut(shortcut)) {
+      if (!isProtectedProgramShortcut(shortcut)) {
         nested.push({
           id: newTrashId(),
           deletedAt,
@@ -207,7 +208,7 @@ function captureShortcut(
   if (index === -1) return null;
 
   const shortcut = shortcuts[index];
-  if (isTrashProgramShortcut(shortcut)) {
+  if (isProtectedProgramShortcut(shortcut)) {
     // Trash desktop shortcut: permanent remove, never soft-delete into trash list
     for (const folder of folders) {
       if (folder.contents.includes(shortcutId)) {
@@ -508,5 +509,8 @@ export function getTrashEntryName(entry: TrashEntry): string {
  */
 export function getTrashEntryIcon(entry: TrashEntry): string {
   if (isDesktopFolder(entry.item)) return entry.item.icon || 'folder';
-  return entry.item.programId;
+  if (isDesktopShortcut(entry.item)) {
+    return resolveProgramIcon(entry.item.programId, entry.item.programId);
+  }
+  return 'package';
 }

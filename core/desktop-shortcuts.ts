@@ -2,6 +2,7 @@ import { createScopedStorage } from './storage';
 import { useKernel } from './kernel';
 import { GRID_OCCUPANCY_RATIO } from './constants';
 
+/** Shortcut pinned to the desktop grid. */
 export interface DesktopShortcut {
   id: string;
   programId: string;
@@ -10,6 +11,7 @@ export interface DesktopShortcut {
   customName?: string;
 }
 
+/** User-created folder on the desktop or inside another folder. */
 export interface DesktopFolder {
   id: string;
   name: string;
@@ -21,6 +23,7 @@ export interface DesktopFolder {
   parentPath?: string; // Path of parent folder, undefined for root
 }
 
+/** Desktop shortcut or folder item. */
 export type DesktopItem = DesktopShortcut | DesktopFolder;
 
 /**
@@ -43,8 +46,11 @@ export function isDesktopShortcut(item: DesktopItem): item is DesktopShortcut {
   return 'programId' in item;
 }
 
+/** System storage key for live desktop shortcuts. */
 const STORAGE_KEY = 'desktop-shortcuts';
+/** System storage key for live desktop folders. */
 const FOLDERS_STORAGE_KEY = 'desktop-folders';
+/** System storage key for folder id → absolute path map. */
 const FOLDER_PATHS_STORAGE_KEY = 'folder-paths';
 
 /**
@@ -54,7 +60,7 @@ export function getGridSize(): number {
   return useKernel.getState().settings.gridSize;
 }
 
-// Create system storage for desktop shortcuts
+/** Scoped system storage for desktop shortcut/folder persistence. */
 const systemStorage = createScopedStorage('system');
 
 /**
@@ -288,6 +294,7 @@ export function getDesktopBounds(): { width: number; height: number } {
   };
 }
 
+/** Computed desktop grid layout (cell count and stretched cell size). */
 export interface GridMetrics {
   /** Preferred cell size from settings (used to pick cols/rows) */
   preferred: number;
@@ -476,6 +483,7 @@ export function findNextAvailablePosition(items: Array<{ x: number; y: number }>
   return { x: 0, y };
 }
 
+/** Whether a grid cell at `pos` overlaps an occupied item. */
 function isCellOccupied(
   pos: { x: number; y: number },
   occupied: Array<{ x: number; y: number }>,
@@ -1109,9 +1117,9 @@ export function getDesktopItems(path?: string): DesktopItem[] {
   const folders = getDesktopFolders();
   
   if (!path || path === '/Desktop') {
-    // Return root items (items without parent or with parentPath === '/Desktop')
-    const rootShortcuts = shortcuts.filter(s => !s.programId.startsWith('folder-'));
-    const rootFolders = folders.filter(f => !f.parentPath || f.parentPath === '/Desktop');
+    const inFolders = getIdsInsideFolders();
+    const rootShortcuts = shortcuts.filter((s) => !inFolders.has(s.id));
+    const rootFolders = folders.filter((f) => !f.parentPath || f.parentPath === '/Desktop');
     return [...rootShortcuts, ...rootFolders];
   }
   

@@ -6,8 +6,7 @@ import { eventBus, SystemEvents } from '@core/event-bus';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { registerDefaultMenus } from '../context-menu/menus';
 import { DesktopIcons } from './DesktopIcons';
-import { addDesktopShortcut, pixelToClampedGrid, getFolderById, getGridMetrics, DESKOS_ITEM_IDS_MIME, readDraggedItemIds } from '@core/desktop-shortcuts';
-import { FolderWindow } from './FolderWindow';
+import { addDesktopShortcut, pixelToClampedGrid, getGridMetrics, DESKOS_ITEM_IDS_MIME, readDraggedItemIds } from '@core/desktop-shortcuts';
 import { getWallpaper, isWallpaperReference } from '@core/wallpaper-storage';
 import { getWallpaperTone, type WallpaperTone } from '../wallpapers/wallpapers';
 import { ToastContainer } from '@components/Toast';
@@ -178,33 +177,6 @@ export function Desktop() {
     return () => {
       document.removeEventListener('contextmenu:menu:open', handleMenuOpen);
       document.removeEventListener('contextmenu:menu:close', handleMenuClose);
-    };
-  }, []);
-
-  // Handle folder opening
-  useEffect(() => {
-    const handleOpenFolder = (e: Event) => {
-      const customEvent = e as CustomEvent<{ folderId: string }>;
-      const { folderId } = customEvent.detail;
-      const folder = getFolderById(folderId);
-      if (folder) {
-        const kernel = useKernel.getState();
-        kernel.createWindow(
-          'folder',
-          folder.icon,
-          {
-            title: folder.name,
-            width: 800,
-            height: 600,
-            component: <FolderWindow folderId={folderId} />,
-          }
-        );
-      }
-    };
-
-    window.addEventListener('open-folder', handleOpenFolder as EventListener);
-    return () => {
-      window.removeEventListener('open-folder', handleOpenFolder as EventListener);
     };
   }, []);
 

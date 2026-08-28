@@ -1,6 +1,10 @@
 import { defineProgram } from '@core/program';
-import { emptyTrash, isTrashEmpty } from '@core/trash';
+import { emptyTrash, isTrashEmpty, moveToTrash } from '@core/trash';
 import { TrashWindow } from './TrashWindow';
+
+/** Context-menu delete label for the Trash soft-delete handler. */
+const trashDeleteLabel = (count: number) =>
+  count > 1 ? `Move to Trash (${count} items)` : 'Move to Trash';
 
 /** Trash program: browse soft-deleted items, restore or purge. */
 export default defineProgram({
@@ -8,7 +12,11 @@ export default defineProgram({
   name: 'Trash',
   icon: 'trash',
   resolveIcon: () => (isTrashEmpty() ? 'trash' : 'trash-full'),
+  protectedShortcut: true,
   allowMultipleWindows: false,
+  dock: { pin: true, order: 30 },
+  deleteItems: moveToTrash,
+  getDeleteLabel: trashDeleteLabel,
   iconContextMenu: () => [
     {
       id: 'trash-empty',

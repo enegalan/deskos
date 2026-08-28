@@ -22,6 +22,7 @@ import {
 import { Icon } from '../../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
+/** Props for the Trash program window. */
 interface TrashWindowProps {
   /** Program context for this Trash window */
   ctx: ProgramContext;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { getIconSvg, getIconViewBox, type IconName } from '@core/icons';
 
+/** Props for the shared {@link Icon} SVG/emoji renderer. */
 export interface IconProps {
   name: IconName | string;
   size?: number | string;

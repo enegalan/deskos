@@ -3,6 +3,7 @@
  * Provides SVG icon registry and utilities
  */
 
+/** Built-in and custom icon names used across DeskOS UI. */
 export type IconName =
   | 'launcher'
   | 'settings'
@@ -51,15 +52,17 @@ export type IconName =
   | 'package'
   | string; // Allow custom icon names / emoji for user programs
 
+/** Registered SVG icon definition. */
 export interface IconDefinition {
   name: IconName;
   svg: string;
   viewBox?: string;
 }
 
+/** In-memory SVG icon registry. */
 const iconRegistry = new Map<IconName, IconDefinition>();
 
-// System icons
+/** Built-in system icons registered at startup. */
 const systemIcons: IconDefinition[] = [
   {
     name: 'launcher',

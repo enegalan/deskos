@@ -46,7 +46,7 @@ import {
   type DesktopShortcut,
   type DesktopFolder,
 } from '@core/desktop-shortcuts';
-import { moveToTrash } from '@core/trash';
+import { deleteDesktopItems } from '@core/delete-items';
 import { resolveProgramIcon } from '@core/program-icons';
 
 /**
@@ -74,6 +74,7 @@ interface DesktopDragGroup {
   origins: Record<string, { x: number; y: number }>;
 }
 
+/** Props for a single desktop shortcut icon. */
 interface DesktopIconProps {
   shortcut: DesktopShortcut;
   program: {
@@ -99,6 +100,7 @@ interface DesktopIconProps {
   resolveItemPosition: (id: string, x: number, y: number) => void;
 }
 
+/** Single desktop shortcut icon (drag, select, launch). */
 const DesktopIcon = memo(function DesktopIcon({
   shortcut,
   program,
@@ -571,6 +573,7 @@ const DesktopIcon = memo(function DesktopIcon({
   );
 });
 
+/** Props for a single desktop folder icon. */
 interface FolderIconProps {
   folder: DesktopFolder;
   onUpdate: () => void;
@@ -592,6 +595,7 @@ interface FolderIconProps {
   resolveItemPosition: (id: string, x: number, y: number) => void;
 }
 
+/** Single desktop folder icon (drag, select, open). */
 const FolderIcon = memo(function FolderIcon({
   folder,
   onUpdate,
@@ -1116,6 +1120,7 @@ export function DesktopIcons() {
     };
     
     window.addEventListener('desktop-shortcuts-updated', handleShortcutUpdate);
+    window.addEventListener('program-icon-updated', handleShortcutUpdate);
 
     const handleResize = () => {
       setLayoutTick((n) => n + 1);
@@ -1128,6 +1133,7 @@ export function DesktopIcons() {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('desktop-shortcuts-updated', handleShortcutUpdate);
+      window.removeEventListener('program-icon-updated', handleShortcutUpdate);
       window.removeEventListener('resize', handleResize);
     };
   }, [loadItems]);
@@ -1315,10 +1321,7 @@ export function DesktopIcons() {
   const handleSelectAll = useCallback(() => {
     const kernel = useKernel.getState();
     if (kernel.activeWindowId) {
-      const activeWindow = kernel.windows.find((w) => w.id === kernel.activeWindowId);
-      if (activeWindow && activeWindow.programId === 'folder') {
-        throw new HandlerSkippedError();
-      }
+      throw new HandlerSkippedError();
     }
     const allItemIds = [
       ...shortcuts.map(s => s.id),
@@ -1392,7 +1395,7 @@ export function DesktopIcons() {
       throw new HandlerSkippedError();
     }
 
-    moveToTrash(Array.from(selectedIds));
+    void deleteDesktopItems(Array.from(selectedIds));
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = -1;
     loadItems();
@@ -1402,10 +1405,7 @@ export function DesktopIcons() {
   const handlePaste = useCallback(async () => {
     const kernel = useKernel.getState();
     if (kernel.activeWindowId) {
-      const activeWindow = kernel.windows.find(w => w.id === kernel.activeWindowId);
-      if (activeWindow && activeWindow.programId === 'folder') {
-        throw new HandlerSkippedError();
-      }
+      throw new HandlerSkippedError();
     }
     
     const clipboard = getClipboard();

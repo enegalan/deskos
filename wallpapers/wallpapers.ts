@@ -10,6 +10,7 @@ import { wallpaper as gradientOcean } from './presets/gradient-ocean';
 import { wallpaper as gradientForest } from './presets/gradient-forest';
 import { wallpaper as solidWhite } from './presets/solid-white';
 
+/** Built-in wallpaper entry (id, label, CSS background value). */
 export interface WallpaperPreset {
   id: string;
   name: string;
@@ -27,8 +28,10 @@ export const BUILTIN_WALLPAPERS: WallpaperPreset[] = [
   solidWhite,
 ];
 
+/** UI tone inferred from wallpaper luminance. */
 export type WallpaperTone = 'light' | 'dark';
 
+/** Luminance cutoff when classifying wallpaper as light vs dark. */
 const LUMINANCE_THRESHOLD = 0.58;
 
 /**

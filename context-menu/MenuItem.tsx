@@ -5,6 +5,7 @@ import type { MenuPosition } from './positioning';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
+/** Props for a single context-menu row. */
 interface MenuItemProps {
   item: MenuItemType;
   isActive: boolean;
@@ -142,6 +143,7 @@ export function MenuItem({
   );
 }
 
+/** Props for a nested context submenu panel. */
 interface SubmenuProps {
   items: MenuItemType[];
   parentItem: HTMLLIElement | null;

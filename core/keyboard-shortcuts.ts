@@ -3,11 +3,12 @@
  */
 
 import { useKernel } from './kernel';
-import { launchOrFocusProgram } from './context';
 import { getAllSelectAllHandlers } from './selection';
 
+/** Key or key name accepted by the keyboard shortcuts manager. */
 export type ShortcutKey = 'Q' | 'W' | 'M' | 'H' | 'N' | 'T' | 'COMMA' | 'DELETE' | 'BACKSPACE' | string;
 
+/** Registered global keyboard shortcut. */
 export interface KeyboardShortcut {
   key: ShortcutKey;
   metaKey?: boolean;
@@ -19,6 +20,7 @@ export interface KeyboardShortcut {
   preventDefault?: boolean;
 }
 
+/** Run handlers in priority order until one succeeds (not skipped). */
 async function runPriorityHandlers(
   getHandlers: () => Array<{ handler: () => void; priority: number }>,
   label: string
@@ -40,6 +42,7 @@ async function runPriorityHandlers(
   console.log(`[KeyboardShortcuts] No ${label} handler succeeded`);
 }
 
+/** Global keyboard shortcut registry and listener wiring. */
 class KeyboardShortcutsManager {
   private shortcuts: Map<string, KeyboardShortcut> = new Map();
 
@@ -104,38 +107,7 @@ class KeyboardShortcutsManager {
       preventDefault: true,
     });
 
-    // Cmd+N or Ctrl+N - New window (launcher)
-    this.register({
-      key: 'N',
-      metaKey: true,
-      action: async () => {
-        await launchOrFocusProgram('launcher');
-      },
-      description: 'New window',
-      preventDefault: true,
-    });
-
-    // Cmd+T or Ctrl+T - New tab (if applicable)
-    this.register({
-      key: 'T',
-      metaKey: true,
-      action: async () => {
-        await launchOrFocusProgram('launcher');
-      },
-      description: 'New tab',
-      preventDefault: true,
-    });
-
-    // Cmd+, or Ctrl+, - Settings
-    this.register({
-      key: 'COMMA',
-      metaKey: true,
-      action: async () => {
-        await launchOrFocusProgram('settings');
-      },
-      description: 'Settings',
-      preventDefault: true,
-    });
+    // Cmd+N / Cmd+T / Cmd+, — registered by programs via defineProgram({ shortcuts })
 
     // Cmd+A or Ctrl+A - Select All
     this.register({

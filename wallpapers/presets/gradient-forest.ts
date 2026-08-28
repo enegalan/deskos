@@ -1,3 +1,4 @@
+/** Built-in wallpaper preset: forest gradient. */
 export const wallpaper = {
   id: 'gradient-forest',
   name: 'Gradient Forest',

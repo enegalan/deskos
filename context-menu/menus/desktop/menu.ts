@@ -172,20 +172,7 @@ export function registerDesktopMenu(manager: ContextMenuManager): void {
       }
 
       items.push(
-        {
-          id: 'desktop-settings',
-          label: 'Settings',
-          icon: 'settings',
-          action: async (context: MenuContext) => {
-            console.log('[Desktop] Open Settings', context);
-            try {
-              const { launchOrFocusProgram } = await import('@core/context');
-              await launchOrFocusProgram('settings');
-            } catch (error) {
-              console.error('[Desktop] Error opening Settings:', error);
-            }
-          },
-        }
+        ...(await import('@core/program-registry').then((m) => m.getDesktopMenuExtensionItems()))
       );
 
       return items;

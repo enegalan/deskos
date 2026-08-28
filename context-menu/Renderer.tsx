@@ -12,6 +12,7 @@ import {
 } from './positioning';
 import type { MenuItem, MenuContext } from './ContextMenuManager';
 
+/** Internal render state for the context menu portal. */
 interface RendererState {
   isVisible: boolean;
   items: MenuItem[];

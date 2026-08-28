@@ -4,7 +4,8 @@ import { formatDockClock } from '@core/dock-clock';
 import { programList } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
 import { resolveProgramIcon } from '@core/program-icons';
-import { DOCK_ITEMS, getDockPinnedProgramIds } from '../dock/dock';
+import { getDockRole } from '@core/program-registry';
+import { DOCK_ITEMS, getDockPinnedProgramIds } from '@core/dock';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
@@ -149,7 +150,7 @@ export function Taskbar() {
             );
           }
 
-          const variant = item.programId === 'launcher' ? 'launcher' : 'program';
+          const variant = getDockRole(item.programId) === 'launcher' ? 'launcher' : 'program';
           return renderProgramButton(item.programId, variant);
         })}
       </div>

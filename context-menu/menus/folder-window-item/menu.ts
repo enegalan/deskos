@@ -141,17 +141,18 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
         label: '',
       });
 
+      const { getDeleteItemsLabel, deleteDesktopItems } = await import('@core/delete-items');
+
       items.push({
         id: 'folder-window-item-delete',
-        label: isMultiple ? `Move to Trash (${selectedIds.length} items)` : 'Move to Trash',
+        label: getDeleteItemsLabel(selectedIds.length),
         icon: 'delete',
         shortcut: 'Delete',
         action: async () => {
           try {
-            const { moveToTrash } = await import('@core/trash');
-            moveToTrash(selectedIds);
+            await deleteDesktopItems(selectedIds);
           } catch (error) {
-            console.error('[FolderWindowItem] Error moving items to trash:', error);
+            console.error('[FolderWindowItem] Error deleting:', error);
           }
         },
       });

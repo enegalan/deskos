@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react
 import { MenuItem } from './MenuItem';
 import { ContextMenuManager, type MenuItem as MenuItemType } from './ContextMenuManager';
 
+/** Props for the floating context menu root. */
 interface MenuProps {
   items: MenuItemType[];
   position: { x: number; y: number };

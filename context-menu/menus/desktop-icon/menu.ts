@@ -291,23 +291,19 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
         });
       }
       
-      // Move to Trash — soft-delete
       const totalSelectedForDelete = selectedShortcuts.length + selectedFolders.length;
-      const deleteLabel = totalSelectedForDelete > 1
-        ? `Move to Trash (${totalSelectedForDelete} items)`
-        : 'Move to Trash';
+      const { getDeleteItemsLabel, deleteDesktopItems } = await import('@core/delete-items');
 
       items.push({
         id: 'desktop-icon-delete',
-        label: deleteLabel,
+        label: getDeleteItemsLabel(totalSelectedForDelete),
         icon: 'delete',
         shortcut: 'Delete',
         action: async () => {
           try {
-            const { moveToTrash } = await import('@core/trash');
-            moveToTrash([...selectedShortcuts, ...selectedFolders]);
+            await deleteDesktopItems([...selectedShortcuts, ...selectedFolders]);
           } catch (error) {
-            console.error('[DesktopIcon] Error moving items to trash:', error);
+            console.error('[DesktopIcon] Error deleting items:', error);
           }
         },
       });

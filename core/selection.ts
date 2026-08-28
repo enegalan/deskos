@@ -213,6 +213,7 @@ export function collectIntersectingIds(
   return ids;
 }
 
+/** Options for {@link createMarqueeSession} rubber-band selection. */
 export interface MarqueeSessionOptions {
   /** Origin container for relative marquee coordinates */
   container: HTMLElement;

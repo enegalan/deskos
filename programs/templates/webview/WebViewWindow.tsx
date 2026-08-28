@@ -6,11 +6,11 @@ interface WebViewWindowProps {
   defaultUrl?: string;
 }
 
-export function WebViewWindow({ ctx, defaultUrl = 'https://example.com' }: WebViewWindowProps) {
+export function WebViewWindow({ ctx: _ctx, defaultUrl = 'https://example.com' }: WebViewWindowProps) {
   const [url, setUrl] = useState(defaultUrl);
   const [inputUrl, setInputUrl] = useState(defaultUrl);
-  const [canGoBack, setCanGoBack] = useState(false);
-  const [canGoForward, setCanGoForward] = useState(false);
+  const [canGoBack, _setCanGoBack] = useState(false);
+  const [canGoForward, _setCanGoForward] = useState(false);
 
   const handleNavigate = useCallback((e: FormEvent) => {
     e.preventDefault();

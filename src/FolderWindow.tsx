@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useKernel, type FolderViewMode } from '@core/kernel';
 import { ICON_EMOJI_SCALE, ICON_GLYPH_SCALE } from '@core/constants';
 import {
-  getItemsByPath,
   getSpecialLocationItems,
   resolvePath,
   parsePath,
@@ -11,6 +10,7 @@ import {
 } from '../file-system/file-system';
 import {
   getDesktopFolders,
+  getItemsByPath,
   type DesktopItem,
   isDesktopFolder,
   isDesktopShortcut,
@@ -35,9 +35,14 @@ import {
   SELECTION_SOURCE_IDS,
   type MarqueeRect,
 } from '@core/selection';
+import type { ProgramContext } from '@core/context';
 import { registerCopyHandler, registerCutHandler, registerPasteHandler, registerDeleteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, getCutItemIds, CLIPBOARD_PRIORITY, HandlerSkippedError, type ClipboardItem } from '@core/clipboard';
+import { deleteDesktopItems } from '@core/delete-items';
 
+/** Props for the folder browser window. */
 interface FolderWindowProps {
+  /** Program context when opened via the folder program */
+  ctx?: ProgramContext;
   /** Absolute path to open (default `/Desktop`) */
   initialPath?: string;
   /** Open by folder id when path is unknown */
@@ -45,7 +50,7 @@ interface FolderWindowProps {
 }
 
 /** File-browser window: sidebar, breadcrumbs, grid/list, and clipboard/DnD. */
-export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
+export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowProps) {
   const settings = useKernel((state) => state.settings);
   const updateSettings = useKernel((state) => state.updateSettings);
   const viewMode: FolderViewMode = settings.folderViewMode === 'list' ? 'list' : 'grid';
@@ -350,11 +355,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
   }, [selectedIds, items, currentPath, assertThisFolderWindowActive]);
 
   // Delete handler — soft-delete into Trash
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(() => {
     assertThisFolderWindowActive();
     if (selectedIds.size === 0) throw new HandlerSkippedError();
-    const { moveToTrash } = await import('@core/trash');
-    moveToTrash(Array.from(selectedIds));
+    void deleteDesktopItems(Array.from(selectedIds));
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = -1;
     loadItems(currentPath);
