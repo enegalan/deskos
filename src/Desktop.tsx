@@ -1,4 +1,5 @@
 import { useKernel } from '@core/kernel';
+import { restoreDesktopSession } from '@core/context';
 import { WindowManager } from '@window-manager/WindowManager';
 import { Taskbar } from './Taskbar';
 import { ContextMenuRenderer } from '../context-menu/Renderer';
@@ -18,6 +19,11 @@ export function Desktop() {
   const [wallpaperUrl, setWallpaperUrl] = useState<string>('');
   const [wallpaperTone, setWallpaperTone] = useState<WallpaperTone>('dark');
   const [dragGridPosition, setDragGridPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Restore open windows from the last desktop session
+  useEffect(() => {
+    void restoreDesktopSession();
+  }, []);
 
   // Load wallpaper from IndexedDB if it's a reference
   useEffect(() => {

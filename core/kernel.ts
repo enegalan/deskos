@@ -11,6 +11,18 @@ import {
   MIN_ICON_SIZE,
   TASKBAR_HEIGHT,
 } from './constants';
+import { getSavedWindowLayout, saveWindowLayout } from './window-layout';
+import {
+  type SessionSnapshot,
+  type SessionWindowEntry,
+  clampSessionWindowBounds,
+  getAllWindowSessionState,
+  initWindowSessionState,
+  registerSessionPersistCallback,
+  saveSession,
+  scheduleSessionPersist,
+  clearWindowSessionState,
+} from './session';
 
 /** Runtime state of a single program window. */
 export interface WindowState {
@@ -47,6 +59,9 @@ export interface WindowCreateOptions {
   minHeight?: number;
   component: ReactNode;
 }
+
+/** Restore payload when reopening a window from a saved session. */
+export type WindowRestoreOptions = SessionWindowEntry;
 
 /** Dock date display presets */
 export type DateFormat = 'medium' | 'long' | 'iso' | 'dmy' | 'mdy';
@@ -99,7 +114,12 @@ export interface KernelState {
   activeWindowId: string | null;
   settings: SystemSettings;
 
-  createWindow: (programId: string, icon: string, options: WindowCreateOptions) => string;
+  createWindow: (
+    programId: string,
+    icon: string,
+    options: WindowCreateOptions,
+    restore?: WindowRestoreOptions
+  ) => string;
   closeWindow: (windowId: string) => void;
   focusWindow: (windowId: string) => void;
   minimizeWindow: (windowId: string) => void;
@@ -107,10 +127,15 @@ export interface KernelState {
   restoreWindow: (windowId: string) => void;
   moveWindow: (windowId: string, x: number, y: number) => void;
   resizeWindow: (windowId: string, width: number, height: number) => void;
+  persistWindowLayout: (windowId: string) => void;
+  persistAllWindowLayouts: () => void;
+  persistSession: () => void;
+  applySessionOrder: (windowOrder: string[], activeWindowId: string | null) => void;
   setWindowTitle: (windowId: string, title: string) => void;
   updateSettings: (settings: Partial<SystemSettings>) => void;
 }
 
+/** Monotonic counter for generated window ids (synced on session restore). */
 let windowIdCounter = 0;
 
 /**
@@ -120,6 +145,44 @@ let windowIdCounter = 0;
  */
 function generateWindowId(): string {
   return `window-${++windowIdCounter}-${Date.now()}`;
+}
+
+/** Keep generated ids ahead of restored session window ids. */
+function syncWindowIdCounter(windowIds: string[]): void {
+  let maxCounter = 0;
+  for (const id of windowIds) {
+    const match = id.match(/^window-(\d+)-/);
+    if (match) {
+      maxCounter = Math.max(maxCounter, Number.parseInt(match[1], 10));
+    }
+  }
+  windowIdCounter = Math.max(windowIdCounter, maxCounter);
+}
+
+/** Build a session snapshot from current kernel and window state. */
+function buildSessionSnapshot(state: KernelState): SessionSnapshot {
+  return {
+    version: 1,
+    windows: state.windows.map((win) =>
+      clampSessionWindowBounds({
+        id: win.id,
+        programId: win.programId,
+        title: win.title,
+        x: win.x,
+        y: win.y,
+        width: win.width,
+        height: win.height,
+        minWidth: win.minWidth,
+        minHeight: win.minHeight,
+        isMinimized: win.isMinimized,
+        isMaximized: win.isMaximized,
+        previousState: win.previousState,
+        state: getAllWindowSessionState(win.id),
+      })
+    ),
+    windowOrder: [...state.windowOrder],
+    activeWindowId: state.activeWindowId,
+  };
 }
 
 /** localStorage key for persisted {@link SystemSettings}. */
@@ -209,6 +272,34 @@ function saveSettings(settings: SystemSettings): void {
   }
 }
 
+/** Persist one window's geometry to localStorage. */
+function persistWindowGeometry(win: WindowState): void {
+  if (win.isMaximized && win.previousState) {
+    saveWindowLayout(win.programId, {
+      ...win.previousState,
+      isMaximized: true,
+    });
+    return;
+  }
+
+  saveWindowLayout(win.programId, {
+    x: win.x,
+    y: win.y,
+    width: win.width,
+    height: win.height,
+    isMaximized: false,
+  });
+}
+
+/** Sync the window id counter with ids from a restored session. */
+export function prepareWindowIdsForSession(windowIds: string[]): void {
+  syncWindowIdCounter(windowIds);
+}
+
+registerSessionPersistCallback(() => {
+  saveSession(buildSessionSnapshot(useKernel.getState()));
+});
+
 /**
  * Zustand hook for kernel state (windows, focus, settings).
  * Used by the shell and {@link createProgramContext}.
@@ -219,48 +310,96 @@ export const useKernel = create<KernelState>((set, get) => ({
   activeWindowId: null,
   settings: loadSettings(),
 
-  createWindow: (programId: string, icon: string, options: WindowCreateOptions): string => {
-    const windowId = generateWindowId();
+  createWindow: (
+    programId: string,
+    icon: string,
+    options: WindowCreateOptions,
+    restore?: WindowRestoreOptions
+  ): string => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight - TASKBAR_HEIGHT;
+    const saved = restore ? undefined : getSavedWindowLayout(programId);
 
-    const width = options.width ?? 600;
-    const height = options.height ?? 400;
-    const x = options.x ?? Math.max(50, (viewportWidth - width) / 2 + Math.random() * 50);
-    const y = options.y ?? Math.max(50, (viewportHeight - height) / 2 + Math.random() * 50);
+    const width = restore?.width ?? saved?.width ?? options.width ?? 600;
+    const height = restore?.height ?? saved?.height ?? options.height ?? 400;
+    const x =
+      restore?.x ??
+      saved?.x ??
+      options.x ??
+      Math.max(50, (viewportWidth - width) / 2 + Math.random() * 50);
+    const y =
+      restore?.y ??
+      saved?.y ??
+      options.y ??
+      Math.max(50, (viewportHeight - height) / 2 + Math.random() * 50);
+
+    const windowId = restore?.id ?? generateWindowId();
+    if (get().windows.some((w) => w.id === windowId)) {
+      return windowId;
+    }
+
+    if (restore) {
+      syncWindowIdCounter([restore.id]);
+      initWindowSessionState(restore.id, restore.state);
+    }
 
     const newWindow: WindowState = {
       id: windowId,
       programId,
-      title: options.title ?? 'Untitled',
+      title: restore?.title ?? options.title ?? 'Untitled',
       icon,
       x,
       y,
       width,
       height,
-      minWidth: options.minWidth ?? 200,
-      minHeight: options.minHeight ?? 150,
-      isMinimized: false,
-      isMaximized: false,
-      isFocused: true,
+      minWidth: restore?.minWidth ?? options.minWidth ?? 200,
+      minHeight: restore?.minHeight ?? options.minHeight ?? 150,
+      isMinimized: restore?.isMinimized ?? false,
+      isMaximized: restore?.isMaximized ?? false,
+      isFocused: !restore?.isMinimized,
       component: options.component,
+      previousState: restore?.previousState,
     };
+
+    if (!restore && saved?.isMaximized) {
+      newWindow.previousState = { x, y, width, height };
+      newWindow.isMaximized = true;
+      newWindow.x = 0;
+      newWindow.y = 0;
+      newWindow.width = viewportWidth;
+      newWindow.height = viewportHeight;
+    }
+
+    if (restore?.isMaximized) {
+      newWindow.isMaximized = true;
+      newWindow.x = 0;
+      newWindow.y = 0;
+      newWindow.width = viewportWidth;
+      newWindow.height = viewportHeight;
+    }
 
     set((state) => ({
       windows: state.windows.map((w) => ({ ...w, isFocused: false })).concat(newWindow),
       windowOrder: [...state.windowOrder, windowId],
-      activeWindowId: windowId,
+      activeWindowId: restore?.isMinimized ? state.activeWindowId : windowId,
     }));
 
+    scheduleSessionPersist();
     return windowId;
   },
 
   closeWindow: (windowId: string): void => {
     set((state) => {
+      const closing = state.windows.find((w) => w.id === windowId);
+      if (closing) {
+        persistWindowGeometry(closing);
+      }
+
       const newWindows = state.windows.filter((w) => w.id !== windowId);
       const newOrder = state.windowOrder.filter((id) => id !== windowId);
       const newActiveId = newOrder.length > 0 ? newOrder[newOrder.length - 1] : null;
 
+      scheduleSessionPersist();
       return {
         windows: newWindows.map((w) => ({
           ...w,
@@ -270,6 +409,7 @@ export const useKernel = create<KernelState>((set, get) => ({
         activeWindowId: newActiveId,
       };
     });
+    clearWindowSessionState(windowId);
   },
 
   focusWindow: (windowId: string): void => {
@@ -282,6 +422,7 @@ export const useKernel = create<KernelState>((set, get) => ({
 
       const newOrder = state.windowOrder.filter((id) => id !== windowId).concat(windowId);
 
+      scheduleSessionPersist();
       return {
         windows: state.windows.map((w) => ({
           ...w,
@@ -306,6 +447,7 @@ export const useKernel = create<KernelState>((set, get) => ({
           ? state.windowOrder.filter((id) => visibleWindows.some((w) => w.id === id)).pop() ?? null
           : null;
 
+      scheduleSessionPersist();
       return {
         windows: newWindows.map((w) => ({
           ...w,
@@ -339,27 +481,27 @@ export const useKernel = create<KernelState>((set, get) => ({
         return w;
       }),
     }));
+    const win = get().windows.find((w) => w.id === windowId);
+    if (win) persistWindowGeometry(win);
+    scheduleSessionPersist();
   },
 
   restoreWindow: (windowId: string): void => {
     set((state) => ({
       windows: state.windows.map((w) => {
         if (w.id === windowId) {
-          // Restore from previous state if available
-          const restoreState = w.previousState || {
-            x: Math.max(50, (window.innerWidth - 600) / 2),
-            y: Math.max(50, (window.innerHeight - 448) / 2),
-            width: 600,
-            height: 400,
-          };
+          const bounds =
+            w.isMaximized && w.previousState
+              ? w.previousState
+              : { x: w.x, y: w.y, width: w.width, height: w.height };
           return {
             ...w,
             isMinimized: false,
             isMaximized: false,
-            x: restoreState.x,
-            y: restoreState.y,
-            width: restoreState.width,
-            height: restoreState.height,
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
             previousState: undefined,
           };
         }
@@ -367,6 +509,9 @@ export const useKernel = create<KernelState>((set, get) => ({
       }),
     }));
     get().focusWindow(windowId);
+    const win = get().windows.find((w) => w.id === windowId);
+    if (win) persistWindowGeometry(win);
+    scheduleSessionPersist();
   },
 
   moveWindow: (windowId: string, x: number, y: number): void => {
@@ -403,12 +548,50 @@ export const useKernel = create<KernelState>((set, get) => ({
     });
   },
 
+  persistWindowLayout: (windowId: string): void => {
+    const win = get().windows.find((w) => w.id === windowId);
+    if (win) persistWindowGeometry(win);
+    scheduleSessionPersist();
+  },
+
+  persistAllWindowLayouts: (): void => {
+    get().windows.forEach(persistWindowGeometry);
+  },
+
+  persistSession: (): void => {
+    saveSession(buildSessionSnapshot(get()));
+  },
+
+  applySessionOrder: (windowOrder: string[], activeWindowId: string | null): void => {
+    set((state) => {
+      const knownIds = new Set(state.windows.map((w) => w.id));
+      const orderedIds = windowOrder.filter((id) => knownIds.has(id));
+      const missingIds = state.windows
+        .map((w) => w.id)
+        .filter((id) => !orderedIds.includes(id));
+      const nextOrder = [...orderedIds, ...missingIds];
+      const resolvedActiveId =
+        activeWindowId && knownIds.has(activeWindowId) ? activeWindowId : nextOrder.at(-1) ?? null;
+
+      return {
+        windowOrder: nextOrder,
+        activeWindowId: resolvedActiveId,
+        windows: state.windows.map((w) => ({
+          ...w,
+          isFocused: w.id === resolvedActiveId && !w.isMinimized,
+        })),
+      };
+    });
+    scheduleSessionPersist();
+  },
+
   setWindowTitle: (windowId: string, title: string): void => {
     set((state) => ({
       windows: state.windows.map((w) =>
         w.id === windowId ? { ...w, title } : w
       ),
     }));
+    scheduleSessionPersist();
   },
 
   updateSettings: (newSettings: Partial<SystemSettings>): void => {

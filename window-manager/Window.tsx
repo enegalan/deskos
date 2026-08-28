@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, memo, type MouseEvent as ReactMouseEvent } from 'react';
 import { useKernel } from '@core/kernel';
 import type { WindowState } from '@core/kernel';
+import { WindowSessionProvider } from '@core/window-session';
 import { Icon } from '../components/Icon';
 
 /** Resize handle direction for window edges and corners. */
@@ -72,6 +73,7 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
   const restoreWindow = useKernel((state) => state.restoreWindow);
   const moveWindow = useKernel((state) => state.moveWindow);
   const resizeWindow = useKernel((state) => state.resizeWindow);
+  const persistWindowLayout = useKernel((state) => state.persistWindowLayout);
 
   const windowRef = useRef<HTMLDivElement>(null);
 
@@ -185,8 +187,12 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
     };
 
     const handleMouseUp = () => {
+      const wasInteracting = dragState.isDragging || resizeState.isResizing;
       setDragState((prev) => ({ ...prev, isDragging: false }));
       setResizeState((prev) => ({ ...prev, isResizing: false, direction: null }));
+      if (wasInteracting) {
+        persistWindowLayout(win.id);
+      }
     };
 
     if (dragState.isDragging || resizeState.isResizing) {
@@ -208,6 +214,7 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
     win.y,
     moveWindow,
     resizeWindow,
+    persistWindowLayout,
   ]);
 
   const handleClose = useCallback(
@@ -316,7 +323,9 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
       </div>
 
       {/* Content */}
-      <div className="window-content">{win.component}</div>
+      <div className="window-content">
+        <WindowSessionProvider windowId={win.id}>{win.component}</WindowSessionProvider>
+      </div>
 
       {/* Resize Handles */}
       {!win.isMaximized && (

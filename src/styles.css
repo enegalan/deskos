@@ -226,6 +226,10 @@ textarea,
   transition: opacity 0.2s ease;
 }
 
+.dock-item.running .dock-indicator {
+  opacity: 0.45;
+}
+
 .dock-item.active .dock-indicator,
 .dock-item:hover .dock-indicator {
   opacity: 1;
@@ -825,6 +829,603 @@ textarea,
   align-items: center;
   justify-content: center;
   color: var(--color-text-muted);
+}
+
+/* Browser */
+.ie-window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #ece9d8;
+  color: #000;
+}
+
+.ie-menubar {
+  display: flex;
+  gap: 2px;
+  padding: 2px 6px;
+  font-size: 12px;
+  background: linear-gradient(180deg, #f6f4ec 0%, #ece9d8 100%);
+  border-bottom: 1px solid #aca899;
+}
+
+.ie-menu-wrap {
+  position: relative;
+}
+
+.ie-menu-trigger {
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  color: #000;
+  font-size: 12px;
+  cursor: default;
+}
+
+.ie-menu-trigger:hover,
+.ie-menu-trigger.active {
+  background: #316ac5;
+  color: #fff;
+}
+
+.ie-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  min-width: 160px;
+  padding: 2px 0;
+  background: #fff;
+  border: 1px solid #aca899;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.ie-menu-item {
+  display: block;
+  width: 100%;
+  padding: 4px 24px 4px 12px;
+  border: none;
+  background: transparent;
+  color: #000;
+  font-size: 12px;
+  text-align: left;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.ie-menu-item:hover:not(:disabled) {
+  background: #316ac5;
+  color: #fff;
+}
+
+.ie-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ie-tabbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 4px 6px 0;
+  background: #dcd9ce;
+  border-bottom: 1px solid #aca899;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.ie-tabbar.bookmark-drag-over {
+  background: #d4e4f7;
+}
+
+.ie-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  min-width: 0;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid #aca899;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: #ece9d8;
+  color: #000;
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ie-tab:hover {
+  background: #f0ede4;
+}
+
+.ie-tab.active {
+  background: #f0ede4;
+  padding-bottom: 5px;
+  margin-bottom: -1px;
+  border-bottom: 1px solid #f0ede4;
+}
+
+.ie-tab.dragging {
+  opacity: 0.55;
+}
+
+.ie-tab.insert-before {
+  box-shadow: inset 2px 0 0 #316ac5;
+}
+
+.ie-tab-drop-end {
+  flex: 1;
+  min-width: 32px;
+  align-self: stretch;
+  margin-bottom: 2px;
+}
+
+.ie-tab-drop-end.active {
+  box-shadow: inset 2px 0 0 #316ac5;
+}
+
+.ie-tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ie-tab-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  color: #444;
+  cursor: pointer;
+}
+
+.ie-tab-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.ie-tab-new {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 2px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #000;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ie-tab-new:hover {
+  border-color: #aca899;
+  background: #ece9d8;
+}
+
+.ie-tab-panel {
+  display: none;
+  height: 100%;
+}
+
+.ie-tab-panel.active {
+  display: block;
+}
+
+.ie-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  background: linear-gradient(180deg, #f0ede4 0%, #dcd9ce 100%);
+  border-bottom: 1px solid #aca899;
+}
+
+.ie-nav-buttons {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ie-btn {
+  padding: 2px 8px;
+  border: 1px solid #aca899;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #fff 0%, #ece9d8 100%);
+  color: #000;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ie-btn:hover:not(:disabled) {
+  border-color: #316ac5;
+}
+
+.ie-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ie-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 2px 4px;
+}
+
+.ie-address-bar {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ie-address-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid #7f9db9;
+  background: #fff;
+}
+
+.ie-address-field.drag-over {
+  border-color: #316ac5;
+  box-shadow: inset 0 0 0 1px #316ac5;
+}
+
+.ie-bookmark-star {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-right: 1px solid #c5d4e4;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+}
+
+.ie-bookmark-star:hover:not(:disabled) {
+  color: #f5b800;
+}
+
+.ie-bookmark-star.active {
+  color: #f5b800;
+}
+
+.ie-bookmark-star:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ie-address-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: none;
+  background: transparent;
+  color: #000;
+  font-size: 12px;
+  outline: none;
+}
+
+.ie-go-btn {
+  flex-shrink: 0;
+}
+
+.ie-bookmarks-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  background: #f0ede4;
+  border-bottom: 1px solid #aca899;
+  overflow-x: auto;
+}
+
+.ie-bookmark-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #000;
+  font-size: 11px;
+  cursor: grab;
+  white-space: nowrap;
+}
+
+.ie-bookmark-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.ie-bookmark-fallback {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  background: #316ac5;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.ie-bookmark-label {
+  line-height: 1.2;
+}
+
+.ie-bookmark-btn:hover {
+  border-color: #aca899;
+  background: #fff;
+}
+
+.ie-content {
+  flex: 1;
+  min-height: 0;
+  background: #fff;
+}
+
+.ie-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+}
+
+.ie-home {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: linear-gradient(180deg, #fff 0%, #e8f0fe 100%);
+  text-align: center;
+  padding: 32px 24px;
+  overflow-y: auto;
+}
+
+.ie-home-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(560px, 100%);
+  padding: 12px 18px;
+  margin-bottom: 36px;
+  border: 1px solid #dadce0;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.ie-home-search:focus-within {
+  border-color: #1a73e8;
+  box-shadow: 0 2px 12px rgba(26, 115, 232, 0.18);
+}
+
+.ie-home-search-icon {
+  flex-shrink: 0;
+  color: #5f6368;
+}
+
+.ie-home-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #202124;
+  font-size: 16px;
+  outline: none;
+}
+
+.ie-home-search-input::placeholder {
+  color: #80868b;
+}
+
+.ie-home-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  width: min(560px, 100%);
+}
+
+.ie-home-shortcut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 96px;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #202124;
+  cursor: pointer;
+}
+
+.ie-home-shortcut:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.ie-home-shortcut-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.ie-home-favicon {
+  width: 32px;
+  height: 32px;
+}
+
+.ie-home-shortcut .ie-bookmark-fallback {
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  border-radius: 50%;
+}
+
+.ie-home-shortcut-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.ie-home-shortcut-add-icon {
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
+  color: #5f6368;
+}
+
+.ie-shortcut-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(32, 33, 36, 0.32);
+}
+
+.ie-shortcut-modal {
+  width: min(320px, 100%);
+  padding: 20px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+}
+
+.ie-shortcut-modal-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #202124;
+  text-align: left;
+}
+
+.ie-shortcut-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ie-shortcut-modal-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #202124;
+  outline: none;
+}
+
+.ie-shortcut-modal-input:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+}
+
+.ie-shortcut-modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ie-shortcut-modal-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  background: #f8f9fa;
+  font-size: 13px;
+  color: #202124;
+  cursor: pointer;
+}
+
+.ie-shortcut-modal-btn:hover {
+  background: #e8f0fe;
+}
+
+.ie-shortcut-modal-btn-primary {
+  border-color: #1a73e8;
+  background: #1a73e8;
+  color: #fff;
+}
+
+.ie-shortcut-modal-btn-primary:hover {
+  background: #1765cc;
+}
+
+.ie-home-title {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #0b3d91;
+}
+
+.ie-home-subtitle {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #333;
+}
+
+.ie-home-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.ie-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: #ece9d8;
+  border-top: 1px solid #aca899;
+}
+
+.ie-status-text {
+  flex: 1;
 }
 
 /* Trash app */

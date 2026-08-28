@@ -6,6 +6,7 @@ interface MediaWindowProps {
   ctx: ProgramContext;
 }
 
+/** Media player window template for local audio and video files. */
 export function MediaWindow({ ctx: _ctx }: MediaWindowProps) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'audio' | 'video' | null>(null);

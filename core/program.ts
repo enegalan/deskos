@@ -46,6 +46,9 @@ export interface ProgramDefinition<T extends string = string> {
  *     ctx.window.create({ title: 'My Program', component: <App ctx={ctx} /> });
  *   },
  * });
+ *
+ * Persist per-window UI state with {@link useWindowSessionState} from `@core/window-session`
+ * (drop-in replacement for useState inside program windows).
  */
 export function defineProgram<T extends string>(config: {
   id: T;

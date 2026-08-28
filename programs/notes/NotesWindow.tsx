@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ProgramContext } from '@core/context';
+import { useWindowSessionState } from '@core/window-session';
 
 /** Single note document stored by the Notes program. */
 interface Note {
@@ -18,16 +19,21 @@ interface NotesWindowProps {
 /** Notes app UI: list, editor, and cross-window sync via program events. */
 export function NotesWindow({ ctx }: NotesWindowProps) {
   const [notes, setNotes] = useState<Note[]>([]);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useWindowSessionState<string | null>(
+    'selectedNoteId',
+    null
+  );
 
   // Load notes from storage on mount
   useEffect(() => {
     const savedNotes = ctx.storage.getItem<Note[]>('notes');
     if (savedNotes && savedNotes.length > 0) {
       setNotes(savedNotes);
-      setSelectedNoteId(savedNotes[0].id);
+      setSelectedNoteId((current) =>
+        current && savedNotes.some((note) => note.id === current) ? current : savedNotes[0].id
+      );
     }
-  }, [ctx.storage]);
+  }, [ctx.storage, setSelectedNoteId]);
 
   // Save notes to storage whenever they change
   useEffect(() => {
@@ -50,7 +56,7 @@ export function NotesWindow({ ctx }: NotesWindowProps) {
 
     // Emit event for other windows to sync
     ctx.events.emit('note:created', newNote);
-  }, [ctx.events]);
+  }, [ctx.events, setSelectedNoteId]);
 
   const updateNote = useCallback(
     (id: string, updates: Partial<Note>) => {

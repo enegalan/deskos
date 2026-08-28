@@ -285,7 +285,7 @@ class KeyboardShortcutsManager {
   }
 }
 
-// Singleton instance
+/** Singleton keyboard shortcuts manager instance. */
 let managerInstance: KeyboardShortcutsManager | null = null;
 
 /**

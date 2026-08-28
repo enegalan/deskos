@@ -36,6 +36,7 @@ import {
   type MarqueeRect,
 } from '@core/selection';
 import type { ProgramContext } from '@core/context';
+import { useWindowSessionState } from '@core/window-session';
 import { registerCopyHandler, registerCutHandler, registerPasteHandler, registerDeleteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, getCutItemIds, CLIPBOARD_PRIORITY, HandlerSkippedError, type ClipboardItem } from '@core/clipboard';
 import { deleteDesktopItems } from '@core/delete-items';
 
@@ -54,11 +55,17 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
   const settings = useKernel((state) => state.settings);
   const updateSettings = useKernel((state) => state.updateSettings);
   const viewMode: FolderViewMode = settings.folderViewMode === 'list' ? 'list' : 'grid';
-  const [currentPath, setCurrentPath] = useState<string>(initialPath || '/Desktop');
+  const [currentPath, setCurrentPath] = useWindowSessionState(
+    'currentPath',
+    () => initialPath || '/Desktop'
+  );
   const [items, setItems] = useState<DesktopItem[]>([]);
   const [folderName, setFolderName] = useState<string>('Folder');
   const [isEditingPath, setIsEditingPath] = useState(false);
-  const [pathInput, setPathInput] = useState(initialPath || '/Desktop');
+  const [pathInput, setPathInput] = useWindowSessionState(
+    'pathInput',
+    () => initialPath || '/Desktop'
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [cutIds, setCutIds] = useState<Set<string>>(() => getCutItemIds());
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
