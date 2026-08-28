@@ -36,10 +36,7 @@ function createInitialPreviewState(
   initialStartIndex = 0
 ): PhotosPreviewState {
   const images = initialImages ?? [];
-  const index = Math.min(
-    Math.max(initialStartIndex, 0),
-    Math.max(images.length - 1, 0)
-  );
+  const index = Math.min(Math.max(initialStartIndex, 0), Math.max(images.length - 1, 0));
   return { images, index, zoom: 1, rotation: 0 };
 }
 
@@ -69,9 +66,8 @@ export function PhotosWindow({ ctx, initialImages, initialStartIndex }: PhotosWi
   const windowId = useWindowId();
   const isActive = useKernel((state) => state.activeWindowId === windowId);
 
-  const [preview, setPreview] = useWindowSessionState(
-    'preview',
-    () => createInitialPreviewState(initialImages, initialStartIndex)
+  const [preview, setPreview] = useWindowSessionState('preview', () =>
+    createInitialPreviewState(initialImages, initialStartIndex)
   );
   const { images, index, zoom, rotation } = preview;
 
