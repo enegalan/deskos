@@ -264,8 +264,8 @@ class KeyboardShortcutsManager {
 
   private buildShortcutKey(shortcut: KeyboardShortcut): string {
     const parts: string[] = [];
-    
-    if (shortcut.metaKey) {
+
+    if (shortcut.metaKey || shortcut.ctrlKey) {
       parts.push('meta');
     }
     if (shortcut.shiftKey) {
