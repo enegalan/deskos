@@ -1,5 +1,6 @@
 import { defineProgram } from '@core/program';
 import { launchOrFocusProgram } from '@core/context';
+import { isSessionRestoreActive } from '@core/session';
 import { PhotosWindow } from './PhotosWindow';
 
 /** One image the previewer can show. */
@@ -43,6 +44,11 @@ export default defineProgram({
   allowMultipleWindows: true,
   launch: (ctx) => {
     const request = pendingOpens.shift();
+    // Fresh launches need a queued open-image request. Session restore has no
+    // queue — the window is recreated and PhotosWindow loads images from
+    // persisted window session state instead.
+    if (!request && !isSessionRestoreActive()) return;
+
     const first = request?.images[request.startIndex] ?? request?.images[0];
 
     ctx.window.create({

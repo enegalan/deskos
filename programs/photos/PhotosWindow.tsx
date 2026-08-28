@@ -70,32 +70,37 @@ export function PhotosWindow({ ctx, initialImages, initialStartIndex }: PhotosWi
     createInitialPreviewState(initialImages, initialStartIndex)
   );
   const { images, index, zoom, rotation } = preview;
-
   const current = images[index] ?? images[0];
-  const canNavigate = images.length > 1;
-  const canZoomIn = zoom < ZOOM_MAX;
-  const canZoomOut = zoom > ZOOM_MIN;
-  const angle = normalizeAngle(rotation);
-  const isPristine = zoom === 1 && angle === 0;
+
+  // Restore without preview payload (or empty open) — nothing to show.
+  useEffect(() => {
+    if (!current) ctx.window.close(windowId);
+  }, [ctx, windowId, current]);
 
   const goPrev = useCallback(
     () =>
-      setPreview((p) => ({
-        ...p,
-        index: (p.index - 1 + p.images.length) % p.images.length,
-        zoom: 1,
-        rotation: 0,
-      })),
+      setPreview((p) => {
+        if (p.images.length === 0) return p;
+        return {
+          ...p,
+          index: (p.index - 1 + p.images.length) % p.images.length,
+          zoom: 1,
+          rotation: 0,
+        };
+      }),
     [setPreview]
   );
   const goNext = useCallback(
     () =>
-      setPreview((p) => ({
-        ...p,
-        index: (p.index + 1) % p.images.length,
-        zoom: 1,
-        rotation: 0,
-      })),
+      setPreview((p) => {
+        if (p.images.length === 0) return p;
+        return {
+          ...p,
+          index: (p.index + 1) % p.images.length,
+          zoom: 1,
+          rotation: 0,
+        };
+      }),
     [setPreview]
   );
 
@@ -132,13 +137,20 @@ export function PhotosWindow({ ctx, initialImages, initialStartIndex }: PhotosWi
 
   // Keep the window title in sync with the visible image.
   useEffect(() => {
+    if (!current) return;
     ctx.window.setTitle(windowId, current.name);
-  }, [ctx, windowId, current.name]);
+  }, [ctx, windowId, current]);
+
+  const canNavigate = images.length > 1;
+  const canZoomIn = zoom < ZOOM_MAX;
+  const canZoomOut = zoom > ZOOM_MIN;
+  const angle = normalizeAngle(rotation);
+  const isPristine = zoom === 1 && angle === 0;
 
   // Keyboard (focused window only): Left/Right navigate, +/- zoom, [ ] rotate,
   // 0 resets, Escape closes.
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || !current) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -170,6 +182,7 @@ export function PhotosWindow({ ctx, initialImages, initialStartIndex }: PhotosWi
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
     isActive,
+    current,
     ctx,
     windowId,
     canNavigate,
@@ -181,6 +194,8 @@ export function PhotosWindow({ ctx, initialImages, initialStartIndex }: PhotosWi
     rotateRight,
     resetView,
   ]);
+
+  if (!current) return null;
 
   return (
     <div className="photos-viewer">
