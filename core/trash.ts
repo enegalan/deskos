@@ -3,11 +3,11 @@
  */
 
 import { createScopedStorage } from './storage';
+import { notifyProgramIconChanged } from './program-icons';
 import {
   getDesktopShortcuts,
   getDesktopFolders,
   findNextAvailablePosition,
-  getFolderByPath,
   isDesktopFolder,
   isDesktopShortcut,
   type DesktopShortcut,
@@ -66,6 +66,7 @@ function saveFolders(folders: DesktopFolder[]): void {
 function notifyTrashUpdated(): void {
   window.dispatchEvent(new CustomEvent('trash-updated'));
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+  notifyProgramIconChanged('trash');
 }
 
 /** Generate a unique trash-list entry id. */
@@ -167,9 +168,7 @@ function captureFolderTree(
   const parentPath = findOriginalParentPath(folderId, folders, paths);
   const snapshot: DesktopFolder = {
     ...folder,
-    contents: nested.map((entry) =>
-      isDesktopFolder(entry.item) ? entry.item.id : entry.item.id
-    ),
+    contents: nested.map((entry) => entry.item.id),
   };
 
   // Remove this folder from any parent contents
@@ -452,7 +451,11 @@ export function restoreFromTrash(entryIds: string[]): void {
     }
 
     let parentPath = entry.originalParentPath;
-    if (parentPath && parentPath !== '/Desktop' && !getFolderByPath(parentPath)) {
+    if (
+      parentPath &&
+      parentPath !== '/Desktop' &&
+      !findFolderByPathInMemory(parentPath, folders, paths)
+    ) {
       parentPath = null;
     }
 
@@ -506,19 +509,4 @@ export function getTrashEntryName(entry: TrashEntry): string {
 export function getTrashEntryIcon(entry: TrashEntry): string {
   if (isDesktopFolder(entry.item)) return entry.item.icon || 'folder';
   return entry.item.programId;
-}
-
-/**
- * Trash program icon: empty vs full based on contents.
- */
-export function getTrashIconName(): 'trash' | 'trash-full' {
-  return isTrashEmpty() ? 'trash' : 'trash-full';
-}
-
-/**
- * Resolve a program's display icon (Trash switches when it has items).
- */
-export function resolveProgramIcon(programId: string, fallbackIcon: string): string {
-  if (programId === 'trash') return getTrashIconName();
-  return fallbackIcon;
 }

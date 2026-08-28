@@ -40,6 +40,8 @@ export interface SelectionSource {
   id: string;
   /** Higher wins when resolving the active selection */
   priority?: number;
+  /** When false, this source is ignored by {@link getActiveSelection} */
+  isActive?: () => boolean;
   /** Return null/undefined when nothing is selected */
   getSelection: () => unknown | null | undefined;
 }
@@ -86,6 +88,9 @@ export function getActiveSelection(): unknown | undefined {
   );
   for (const source of sorted) {
     try {
+      if (source.isActive && !source.isActive()) {
+        continue;
+      }
       const selection = source.getSelection();
       if (isMeaningfulSelection(selection)) {
         return selection;

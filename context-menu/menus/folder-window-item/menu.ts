@@ -20,9 +20,13 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
         return items;
       }
 
+      const containerPath =
+        (itemEl.closest('[data-folder-path]') as HTMLElement | null)?.dataset.folderPath;
       const selection = context.selection as { type: string; ids: string[]; path?: string } | undefined;
       const selectedIds =
-        selection?.type === 'folder-items' && selection.ids.length > 0
+        selection?.type === 'folder-items' &&
+        selection.ids.length > 0 &&
+        selection.path === containerPath
           ? selection.ids
           : [itemId];
       const isMultiple = selectedIds.length > 1;

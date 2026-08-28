@@ -71,8 +71,17 @@ function scanProgramDirectories(rootDir: string): ProgramMetadata[] {
   return programs;
 }
 
+function hasResolveIcon(filePath: string): boolean {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    return /resolveIcon\s*:/.test(content);
+  } catch {
+    return false;
+  }
+}
+
 function generateVirtualModule(programs: ProgramMetadata[], rootDir: string): string {
-  const imports: string[] = [];
+  const eagerImports: string[] = [];
   const registryEntries: string[] = [];
   const listEntries: string[] = [];
 
@@ -82,6 +91,10 @@ function generateVirtualModule(programs: ProgramMetadata[], rootDir: string): st
       .replace(rootDir, '')
       .replace(/\\/g, '/')
       .replace(/^\//, '');
+
+    if (hasResolveIcon(program.path)) {
+      eagerImports.push(`import '/${relativePath}';`);
+    }
 
     registryEntries.push(`
   '${program.id}': {
@@ -101,7 +114,7 @@ function generateVirtualModule(programs: ProgramMetadata[], rootDir: string): st
   }`);
   }
 
-  return `${imports.join('\n')}
+  return `${eagerImports.join('\n')}
 
 export const programs = {${registryEntries.join(',')},
 };

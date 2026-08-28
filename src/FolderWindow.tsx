@@ -25,7 +25,7 @@ import { launchOrFocusProgram } from '@core/context';
 import { FolderSidebar } from './FolderSidebar';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
-import { resolveProgramIcon } from '@core/trash';
+import { resolveProgramIcon } from '@core/program-icons';
 import {
   registerSelectAllHandler,
   registerSelectionSource,
@@ -530,9 +530,19 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
 
   // Publish selection for context menus / clipboard coordination
   useEffect(() => {
+    const hostWindow = contentRef.current?.closest('[data-window-id]');
+    const thisWindowId = hostWindow?.getAttribute('data-window-id');
+    if (!thisWindowId) return;
+
     return registerSelectionSource({
-      id: SELECTION_SOURCE_IDS.FOLDER_WINDOW,
+      id: `${SELECTION_SOURCE_IDS.FOLDER_WINDOW}:${thisWindowId}`,
       priority: SELECTION_PRIORITY.FOLDER_WINDOW,
+      isActive: () => {
+        const kernel = useKernel.getState();
+        const host = contentRef.current?.closest('[data-window-id]');
+        const windowId = host?.getAttribute('data-window-id');
+        return !!windowId && kernel.activeWindowId === windowId;
+      },
       getSelection: () => {
         const ids = Array.from(selectedIdsRef.current);
         if (ids.length === 0) return null;

@@ -7,6 +7,7 @@ export default defineProgram({
   id: 'trash',
   name: 'Trash',
   icon: 'trash',
+  resolveIcon: () => (isTrashEmpty() ? 'trash' : 'trash-full'),
   allowMultipleWindows: false,
   iconContextMenu: () => [
     {

@@ -11,9 +11,9 @@ import {
   isTrashEmpty,
   getTrashEntryName,
   getTrashEntryIcon,
-  resolveProgramIcon,
   type TrashEntry,
 } from '@core/trash';
+import { resolveProgramIcon } from '@core/program-icons';
 import {
   getGridSize,
   isDesktopFolder,
@@ -87,11 +87,21 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
   selectedIdsRef.current = selectedIds;
 
   useEffect(() => {
-    return ctx.selection.register(() => {
-      const ids = Array.from(selectedIdsRef.current);
-      if (ids.length === 0) return null;
-      return { type: 'trash-items', ids, count: ids.length };
-    });
+    return ctx.selection.register(
+      () => {
+        const ids = Array.from(selectedIdsRef.current);
+        if (ids.length === 0) return null;
+        return { type: 'trash-items', ids, count: ids.length };
+      },
+      {
+        isActive: () => {
+          const kernel = useKernel.getState();
+          const host = contentRef.current?.closest('[data-window-id]');
+          const windowId = host?.getAttribute('data-window-id');
+          return !!windowId && kernel.activeWindowId === windowId;
+        },
+      }
+    );
   }, [ctx]);
 
   useEffect(() => {

@@ -46,7 +46,8 @@ import {
   type DesktopShortcut,
   type DesktopFolder,
 } from '@core/desktop-shortcuts';
-import { resolveProgramIcon } from '@core/trash';
+import { moveToTrash } from '@core/trash';
+import { resolveProgramIcon } from '@core/program-icons';
 
 /**
  * Highlight the desktop icon under a drag, or clear all highlights.
@@ -1187,6 +1188,7 @@ export function DesktopIcons() {
     return registerSelectionSource({
       id: SELECTION_SOURCE_IDS.DESKTOP,
       priority: SELECTION_PRIORITY.DESKTOP,
+      isActive: () => !useKernel.getState().activeWindowId,
       getSelection: () => {
         const ids = selectedIdsRef.current;
         if (ids.size === 0) return null;
@@ -1385,12 +1387,11 @@ export function DesktopIcons() {
   }, [selectedIds, shortcuts, folders]);
 
   // Delete handler — soft-delete into Trash
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(() => {
     if (selectedIds.size === 0) {
       throw new HandlerSkippedError();
     }
 
-    const { moveToTrash } = await import('@core/trash');
     moveToTrash(Array.from(selectedIds));
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = -1;

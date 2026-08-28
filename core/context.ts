@@ -7,6 +7,7 @@ import {
   registerSelectionSource,
   SELECTION_PRIORITY,
 } from './selection';
+import { registerProgramIconResolver } from './program-icons';
 import packageJson from '../package.json';
 
 export interface WindowAPI {
@@ -71,12 +72,25 @@ export interface SelectionAPI {
    * @param getSelection - Return null/undefined when nothing is selected
    * @param options.id - Source id suffix (`{programId}:{id}`, default `default`)
    * @param options.priority - Override {@link SELECTION_PRIORITY.PROGRAM}
+   * @param options.isActive - Return true if the selection is active
    * @returns Unregister function
    */
   register(
     getSelection: () => unknown | null | undefined,
-    options?: { id?: string; priority?: number }
+    options?: { id?: string; priority?: number; isActive?: () => boolean }
   ): () => void;
+}
+
+/**
+ * Register a dynamic icon resolver for this program (overrides {@link defineProgram.resolveIcon}).
+ *
+ * @example
+ * useEffect(() => {
+ *   return ctx.icon.register(() => (hasUnread ? 'mail-unread' : 'mail'));
+ * }, [ctx, hasUnread]);
+ */
+export interface IconAPI {
+  register(resolver: () => string): () => void;
 }
 
 const SEMANTIC_MENU_TARGETS = new Set(['desktop', 'window', 'file', 'folder-window']);
@@ -100,6 +114,7 @@ export interface ProgramContext {
   system: SystemAPI;
   contextMenu: ContextMenuAPI;
   selection: SelectionAPI;
+  icon: IconAPI;
 }
 
 /**
@@ -279,13 +294,25 @@ function createSelectionAPI(programId: string): SelectionAPI {
   return {
     register(
       getSelection: () => unknown | null | undefined,
-      options?: { id?: string; priority?: number }
+      options?: { id?: string; priority?: number; isActive?: () => boolean }
     ): () => void {
       return registerSelectionSource({
         id: `${programId}:${options?.id ?? 'default'}`,
         priority: options?.priority ?? SELECTION_PRIORITY.PROGRAM,
+        isActive: options?.isActive,
         getSelection,
       });
+    },
+  };
+}
+
+/**
+ * Creates an IconAPI for a specific program.
+ */
+function createIconAPI(programId: string): IconAPI {
+  return {
+    register(resolver: () => string): () => void {
+      return registerProgramIconResolver(programId, resolver);
     },
   };
 }
@@ -303,6 +330,7 @@ function createProgramContext(programId: string, icon: string = 'package'): Prog
     system: createSystemAPI(programId),
     contextMenu: createContextMenuAPI(programId),
     selection: createSelectionAPI(programId),
+    icon: createIconAPI(programId),
   };
 
   return new Proxy(context, {

@@ -238,13 +238,8 @@ export class ContextMenuManager {
         continue;
       }
       
-      // Check if this element matches a specific CSS selector provider
-      try {
-        if (element.matches(targetSelector) || element.closest(targetSelector) === element) {
-          return true;
-        }
-      } catch {
-        // Invalid selector, skip
+      if (this.matchesCssSelector(element, targetSelector)) {
+        return true;
       }
     }
     return false;

@@ -3,7 +3,7 @@ import { useKernel } from '@core/kernel';
 import { formatDockClock } from '@core/dock-clock';
 import { programList } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
-import { isTrashEmpty } from '@core/trash';
+import { resolveProgramIcon } from '@core/program-icons';
 import { DOCK_ITEMS, getDockPinnedProgramIds } from '../dock/dock';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
@@ -16,7 +16,7 @@ export function Taskbar() {
   const restoreWindow = useKernel((state) => state.restoreWindow);
   const settings = useKernel((state) => state.settings);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [trashEmpty, setTrashEmpty] = useState(() => isTrashEmpty());
+  const [iconRevision, setIconRevision] = useState(0);
 
   const handleLaunchProgram = async (programId: string) => {
     await launchOrFocusProgram(programId);
@@ -37,9 +37,9 @@ export function Taskbar() {
   }, []);
 
   useEffect(() => {
-    const refreshTrashIcon = () => setTrashEmpty(isTrashEmpty());
-    window.addEventListener('trash-updated', refreshTrashIcon);
-    return () => window.removeEventListener('trash-updated', refreshTrashIcon);
+    const refreshIcons = () => setIconRevision((n) => n + 1);
+    window.addEventListener('program-icon-updated', refreshIcons);
+    return () => window.removeEventListener('program-icon-updated', refreshIcons);
   }, []);
 
   const windowsByProgram = new Map<string, typeof windows>();
@@ -67,9 +67,8 @@ export function Taskbar() {
     const isActive = programWindows.some((w) => w.id === activeWindowId);
     const isLauncher = variant === 'launcher';
     const isRunningSlot = variant === 'window';
-    const iconName = programId === 'trash'
-      ? (trashEmpty ? 'trash' : 'trash-full')
-      : program.icon;
+    const iconName = resolveProgramIcon(programId, program.icon);
+    void iconRevision;
 
     return (
       <button
