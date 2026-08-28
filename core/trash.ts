@@ -11,6 +11,7 @@ import {
   findNextAvailablePosition,
   isDesktopFolder,
   isDesktopShortcut,
+  isImageItem,
   type DesktopShortcut,
   type DesktopFolder,
   type DesktopItem,
@@ -496,6 +497,7 @@ export function emptyTrash(): void {
  */
 export function getTrashEntryName(entry: TrashEntry): string {
   if (isDesktopFolder(entry.item)) return entry.item.name;
+  if (isImageItem(entry.item)) return entry.item.name;
   return entry.item.customName || entry.item.programId;
 }
 

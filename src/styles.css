@@ -2198,6 +2198,15 @@ textarea,
   line-height: 1;
 }
 
+/* Real image preview shown in place of an item icon (e.g. inside /Images). */
+.folder-window-item-thumb {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-xs, 2px);
+  box-shadow: var(--shadow-sm);
+}
+
 .folder-window-item-label {
   font-size: 11px;
   text-align: center;
@@ -2575,4 +2584,140 @@ textarea,
 .toast-close:hover {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.9);
+}
+
+/* Photos app — image previewer / carousel */
+.photos-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-primary);
+}
+
+.photos-viewer-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: var(--space-md);
+  /* Allow a zoomed-in image to be scrolled into view, with a white scrollbar. */
+  overflow: auto;
+  scrollbar-color: #fff transparent;
+}
+
+.photos-viewer-stage::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.photos-viewer-stage::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.photos-viewer-stage::-webkit-scrollbar-thumb {
+  background: #fff;
+  border-radius: 5px;
+}
+
+.photos-viewer-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  transform-origin: center;
+  transition: transform var(--transition-fast);
+}
+
+.photos-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.photos-nav:hover {
+  background: var(--color-surface-active);
+}
+
+.photos-nav-prev {
+  left: var(--space-md);
+}
+
+.photos-nav-next {
+  right: var(--space-md);
+}
+
+/* Floating control clusters over the image stage: rotate on the left, zoom on
+   the right, both pinned to the bottom. */
+.photos-tools {
+  position: absolute;
+  bottom: var(--space-md);
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.photos-tools-left {
+  left: var(--space-md);
+}
+
+.photos-tools-right {
+  right: var(--space-md);
+}
+
+.photos-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.photos-tool-btn:hover:not(:disabled) {
+  background: var(--color-surface-active);
+}
+
+.photos-tool-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Middle zoom button: shows the current zoom and resets zoom + rotation. */
+.photos-tool-reset {
+  width: auto;
+  min-width: 48px;
+  padding: 0 var(--space-sm);
+  border-radius: 16px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.photos-viewer-caption {
+  flex-shrink: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

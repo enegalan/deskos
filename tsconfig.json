@@ -22,7 +22,8 @@
       "@components/*": ["./components/*"],
       "@file-system/*": ["./file-system/*"],
       "@wallpapers/*": ["./wallpapers/*"],
-      "virtual:programs": ["./virtual-programs.d.ts"]
+      "virtual:programs": ["./virtual-programs.d.ts"],
+      "virtual:images": ["./virtual-images.d.ts"]
     }
   },
   "include": [
@@ -36,8 +37,10 @@
     "components",
     "cli",
     "vite-plugin-programs.ts",
+    "vite-plugin-images.ts",
     "vite.config.ts",
     "virtual-programs.d.ts",
+    "virtual-images.d.ts",
     "vite-env.d.ts"
   ]
 }

@@ -15,7 +15,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
       }
 
       const itemId = itemEl.dataset.itemId;
-      const itemType = itemEl.dataset.itemType as 'folder' | 'shortcut' | undefined;
+      const itemType = itemEl.dataset.itemType as 'folder' | 'shortcut' | 'image' | undefined;
       if (!itemId || !itemType) {
         return items;
       }
@@ -31,6 +31,41 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
           ? selection.ids
           : [itemId];
       const isMultiple = selectedIds.length > 1;
+
+      // Read-only image entries (e.g. inside /Images) get only a "Preview"
+      // action that opens the hidden image previewer. It browses just the
+      // selected images: one selected image opens on its own, several open as
+      // a carousel. Copy/cut/rename/delete do not apply to a bundled asset.
+      if (itemType === 'image') {
+        const picked = (isMultiple ? selectedIds : [itemId])
+          .map((id) => document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
+          .filter((el): el is HTMLElement => !!el && el.dataset.itemType === 'image')
+          .map((el) => ({
+            src: el.dataset.itemUrl as string,
+            name: el.dataset.itemName as string,
+          }));
+
+        if (picked.length > 0) {
+          // Start on the image the user actually right-clicked.
+          const startIndex = Math.max(
+            0,
+            picked.findIndex(
+              (img) => img.src === itemEl.dataset.itemUrl && img.name === itemEl.dataset.itemName
+            )
+          );
+          items.push({
+            id: 'folder-window-item-preview',
+            label: picked.length > 1 ? `Preview ${picked.length} images` : 'Preview',
+            icon: 'view',
+            action: async () => {
+              window.dispatchEvent(
+                new CustomEvent('open-image', { detail: { images: picked, startIndex } })
+              );
+            },
+          });
+        }
+        return items;
+      }
 
       if (!isMultiple) {
         items.push({

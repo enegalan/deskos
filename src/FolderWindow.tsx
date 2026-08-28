@@ -14,6 +14,7 @@ import {
   type DesktopItem,
   isDesktopFolder,
   isDesktopShortcut,
+  isImageItem,
   getGridSize,
   addItemToFolder,
   getFolderByPath,
@@ -228,6 +229,16 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
         handleNavigate(path);
       } else if (isDesktopShortcut(item)) {
         await launchOrFocusProgram(item.programId);
+      } else if (isImageItem(item)) {
+        // Double-click previews just this image, on its own.
+        window.dispatchEvent(
+          new CustomEvent('open-image', {
+            detail: {
+              images: [{ src: item.imageUrl, name: item.name }],
+              startIndex: 0,
+            },
+          })
+        );
       }
     },
     [currentPath, handleNavigate]
@@ -820,6 +831,28 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
     [updateSettings]
   );
 
+  // Real image thumbnail rendered in the same box as a regular item icon.
+  const renderImageThumb = (url: string, name: string, size: number) => (
+    <div
+      className="folder-window-item-icon"
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <img
+        className="folder-window-item-thumb"
+        src={url}
+        alt={name}
+        loading="lazy"
+        draggable={false}
+      />
+    </div>
+  );
+
   const renderItemIcon = (icon: string, size: number, color?: string) => (
     <div
       className="folder-window-item-icon"
@@ -990,6 +1023,25 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                         <div className="folder-window-item-label">
                           {item.customName || program.metadata.name}
                         </div>
+                      )}
+                    </div>
+                  );
+                } else if (isImageItem(item)) {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`folder-window-item image-item ${selectedClass} ${cutClass}`}
+                      data-item-id={item.id}
+                      data-item-type="image"
+                      data-item-url={item.imageUrl}
+                      data-item-name={item.name}
+                      style={gridStyle}
+                      onClick={(e) => handleItemClick(item, e)}
+                      onDoubleClick={() => handleItemDoubleClick(item)}
+                    >
+                      {renderImageThumb(item.imageUrl, item.name, iconSize)}
+                      {(isList || settings.showIconLabels) && (
+                        <div className="folder-window-item-label">{item.name}</div>
                       )}
                     </div>
                   );
