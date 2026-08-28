@@ -168,10 +168,7 @@ export async function getWallpaperTone(wallpaperUrl: string): Promise<WallpaperT
     return toneFromCssColors(wallpaperUrl) ?? 'dark';
   }
 
-  if (
-    wallpaperUrl.startsWith('linear-gradient') ||
-    wallpaperUrl.startsWith('radial-gradient')
-  ) {
+  if (wallpaperUrl.startsWith('linear-gradient') || wallpaperUrl.startsWith('radial-gradient')) {
     return toneFromCssColors(wallpaperUrl) ?? 'dark';
   }
 

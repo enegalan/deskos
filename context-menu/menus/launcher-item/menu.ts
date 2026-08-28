@@ -18,7 +18,7 @@ export function registerLauncherItemMenu(manager: ContextMenuManager): void {
             try {
               const { addDesktopShortcut } = await import('@core/desktop-shortcuts');
               addDesktopShortcut(programId);
-              
+
               // Dispatch custom event to notify DesktopIcons to refresh
               window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
             } catch (error) {

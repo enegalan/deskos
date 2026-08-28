@@ -24,10 +24,7 @@ export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWind
     return () => window.removeEventListener('program-icon-updated', refresh);
   }, []);
 
-  const visiblePrograms = useMemo(
-    () => programList.filter((p) => !isHiddenFromLauncher(p.id)),
-    []
-  );
+  const visiblePrograms = useMemo(() => programList.filter((p) => !isHiddenFromLauncher(p.id)), []);
 
   const filteredPrograms = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -68,30 +65,34 @@ export const LauncherWindow = memo(function LauncherWindow({ ctx }: LauncherWind
         {filteredPrograms.map((program) => {
           const iconName = resolveProgramIcon(program.id, program.icon);
           return (
-          <button
-            key={program.id}
-            className="launcher-item"
-            onClick={() => handleLaunchProgram(program.id)}
-            draggable={true}
-            onDragStart={(e) => {
-              e.dataTransfer.setData('application/x-deskos-program-id', program.id);
-              e.dataTransfer.effectAllowed = 'copy';
-            }}
-            data-program-id={program.id}
-          >
-            <div className="launcher-item-icon">
-              {hasIcon(iconName as IconName) ? (
-                <Icon 
-                  name={iconName as IconName} 
-                  size={56}
-                  fallback={typeof iconName === 'string' && !hasIcon(iconName as IconName) ? iconName : undefined}
-                />
-              ) : (
-                <span>{iconName}</span>
-              )}
-            </div>
-            <div className="launcher-item-name">{program.name}</div>
-          </button>
+            <button
+              key={program.id}
+              className="launcher-item"
+              onClick={() => handleLaunchProgram(program.id)}
+              draggable={true}
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/x-deskos-program-id', program.id);
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+              data-program-id={program.id}
+            >
+              <div className="launcher-item-icon">
+                {hasIcon(iconName as IconName) ? (
+                  <Icon
+                    name={iconName as IconName}
+                    size={56}
+                    fallback={
+                      typeof iconName === 'string' && !hasIcon(iconName as IconName)
+                        ? iconName
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <span>{iconName}</span>
+                )}
+              </div>
+              <div className="launcher-item-name">{program.name}</div>
+            </button>
           );
         })}
 

@@ -83,7 +83,10 @@ export function registerFolderWindowMenu(manager: ContextMenuManager): void {
         const { getClipboard, hasClipboardData } = await import('@core/clipboard');
         if (hasClipboardData()) {
           const clipboard = getClipboard();
-          if (clipboard && (clipboard.type === 'desktop-items' || clipboard.type === 'folder-items')) {
+          if (
+            clipboard &&
+            (clipboard.type === 'desktop-items' || clipboard.type === 'folder-items')
+          ) {
             items.push({
               id: 'folder-window-separator-paste',
               type: 'separator',
@@ -91,7 +94,8 @@ export function registerFolderWindowMenu(manager: ContextMenuManager): void {
             });
             items.push({
               id: 'folder-window-paste',
-              label: clipboard.items.length > 1 ? `Paste (${clipboard.items.length} items)` : 'Paste',
+              label:
+                clipboard.items.length > 1 ? `Paste (${clipboard.items.length} items)` : 'Paste',
               icon: 'paste',
               shortcut: 'Cmd+V',
               action: async () => {

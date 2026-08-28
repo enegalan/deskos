@@ -7,20 +7,26 @@ interface WebViewWindowProps {
 }
 
 /** WebView window template with toolbar navigation and sandboxed iframe. */
-export function WebViewWindow({ ctx: _ctx, defaultUrl = 'https://example.com' }: WebViewWindowProps) {
+export function WebViewWindow({
+  ctx: _ctx,
+  defaultUrl = 'https://example.com',
+}: WebViewWindowProps) {
   const [url, setUrl] = useState(defaultUrl);
   const [inputUrl, setInputUrl] = useState(defaultUrl);
   const [canGoBack, _setCanGoBack] = useState(false);
   const [canGoForward, _setCanGoForward] = useState(false);
 
-  const handleNavigate = useCallback((e: FormEvent) => {
-    e.preventDefault();
-    let newUrl = inputUrl.trim();
-    if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
-      newUrl = 'https://' + newUrl;
-    }
-    setUrl(newUrl);
-  }, [inputUrl]);
+  const handleNavigate = useCallback(
+    (e: FormEvent) => {
+      e.preventDefault();
+      let newUrl = inputUrl.trim();
+      if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+        newUrl = 'https://' + newUrl;
+      }
+      setUrl(newUrl);
+    },
+    [inputUrl]
+  );
 
   const handleRefresh = useCallback(() => {
     setUrl((current) => current + '');

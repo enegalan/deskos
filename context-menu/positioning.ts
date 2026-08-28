@@ -40,11 +40,11 @@ export function calculateMenuPosition(
   const { offsetX = 0, offsetY = 0, preferRight = true } = options;
 
   let x = triggerX + offsetX;
-  let y = triggerY + offsetY;
+  let y: number;
   let flippedX = false;
   let flippedY = false;
   let shiftX = 0;
-  let shiftY = 0;
+  let shiftY: number;
 
   // Horizontal collision detection
   if (x + menuDimensions.width > viewport.width + viewport.scrollX) {
@@ -75,22 +75,22 @@ export function calculateMenuPosition(
   // Get actual viewport height - this is the absolute truth
   const actualViewportHeight = typeof window !== 'undefined' ? window.innerHeight : viewport.height;
   const margin = 20; // Generous margin
-  
+
   // Calculate where menu bottom would be if placed below trigger
   const menuBottomIfBelow = triggerY + offsetY + menuDimensions.height;
-  
+
   // Calculate maximum allowed Y position (viewport height minus margin)
   const maxAllowedY = actualViewportHeight - margin;
-  
+
   // DECISION: If menu would go below maxAllowedY, ALWAYS flip above
   // Also flip if trigger is in the bottom 200px (very conservative zone)
-  const triggerInBottomZone = triggerY > (actualViewportHeight - 200);
+  const triggerInBottomZone = triggerY > actualViewportHeight - 200;
   const wouldExceedMax = menuBottomIfBelow > maxAllowedY;
-  
+
   if (triggerInBottomZone || wouldExceedMax) {
     // FORCE flip above - no exceptions
     let flippedYPos = triggerY - menuDimensions.height - offsetY;
-    
+
     // Clamp to viewport top if needed
     if (flippedYPos < 0) {
       flippedYPos = 0;
@@ -98,13 +98,13 @@ export function calculateMenuPosition(
     } else {
       shiftY = 0;
     }
-    
+
     y = flippedYPos;
     flippedY = true;
   } else {
     // Try to place below trigger
     y = triggerY + offsetY;
-    
+
     // Clamp to viewport top
     if (y < 0) {
       y = 0;
@@ -113,34 +113,34 @@ export function calculateMenuPosition(
       shiftY = 0;
     }
   }
-  
+
   // ABSOLUTE FINAL ENFORCEMENT: y + height MUST be <= window.innerHeight
   // This is the last line of defense - no exceptions
   if (typeof window !== 'undefined') {
     const finalMenuBottom = y + menuDimensions.height;
     const viewportHeight = window.innerHeight;
-    
+
     if (finalMenuBottom > viewportHeight) {
       // CRITICAL: Menu would be cut off, force flip above
       let forcedY = triggerY - menuDimensions.height - offsetY;
-      
+
       // If menu is taller than viewport, position at top
       if (menuDimensions.height > viewportHeight) {
         forcedY = 0;
       } else if (forcedY < 0) {
         forcedY = 0;
       }
-      
+
       // Final verification: ensure forced position is valid
       if (forcedY + menuDimensions.height > viewportHeight) {
         forcedY = Math.max(0, viewportHeight - menuDimensions.height);
       }
-      
+
       y = forcedY;
       flippedY = true;
       shiftY = y - (triggerY - menuDimensions.height - offsetY);
     }
-    
+
     // One more check: ensure y is never negative
     if (y < 0) {
       y = 0;
@@ -183,13 +183,13 @@ export function calculateSubmenuPosition(
   let x = parentItemRect.right + offsetX;
   let y = parentItemRect.top + offsetY;
   let flippedX = false;
-  let flippedY = false;
+  const flippedY = false;
   let shiftX = 0;
   let shiftY = 0;
 
   // Check if submenu would overflow right edge
   const wouldOverflowRight = x + submenuDimensions.width > viewport.width + viewport.scrollX;
-  
+
   if (wouldOverflowRight) {
     if (preferRight) {
       // Try opening to the left of parent menu (flip to left side)
@@ -213,7 +213,11 @@ export function calculateSubmenuPosition(
   // Check if submenu would overflow left edge (after potential flip)
   if (x < viewport.scrollX) {
     x = viewport.scrollX;
-    shiftX = x - (flippedX ? (parentMenuRect.left - submenuDimensions.width - offsetX) : (parentItemRect.right + offsetX));
+    shiftX =
+      x -
+      (flippedX
+        ? parentMenuRect.left - submenuDimensions.width - offsetX
+        : parentItemRect.right + offsetX);
   }
 
   // Check if submenu would overflow bottom edge (accounting for dock)
@@ -232,7 +236,7 @@ export function calculateSubmenuPosition(
       shiftY = y - (parentItemRect.top + offsetY);
     }
   }
-  
+
   // Final check: ensure submenu doesn't go below viewport
   if (y + submenuDimensions.height > viewport.height + viewport.scrollY) {
     y = viewport.height + viewport.scrollY - submenuDimensions.height;
@@ -324,9 +328,10 @@ export function measureMenuDimensions(menuElement: HTMLElement): MenuDimensions 
 /**
  * Get trigger coordinates from event
  */
-export function getTriggerCoordinates(
-  event: MouseEvent | KeyboardEvent | TouchEvent
-): { x: number; y: number } {
+export function getTriggerCoordinates(event: MouseEvent | KeyboardEvent | TouchEvent): {
+  x: number;
+  y: number;
+} {
   if ('clientX' in event && 'clientY' in event) {
     return { x: event.clientX, y: event.clientY };
   }

@@ -70,7 +70,11 @@ export function MediaWindow({ ctx: _ctx }: MediaWindowProps) {
           ref={mediaRef as React.RefObject<HTMLVideoElement>}
           src={mediaUrl}
           controls
-          style={{ maxWidth: '100%', maxHeight: 'calc(100% - 60px)', borderRadius: 'var(--radius-md)' }}
+          style={{
+            maxWidth: '100%',
+            maxHeight: 'calc(100% - 60px)',
+            borderRadius: 'var(--radius-md)',
+          }}
         />
       )}
 

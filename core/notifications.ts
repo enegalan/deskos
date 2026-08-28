@@ -24,7 +24,7 @@ class NotificationManager {
   subscribe(listener: (notifications: Notification[]) => void): () => void {
     this.listeners.add(listener);
     listener([...this.notifications]);
-    
+
     return () => {
       this.listeners.delete(listener);
     };
@@ -36,12 +36,7 @@ class NotificationManager {
     });
   }
 
-  show(
-    type: NotificationType,
-    title: string,
-    message?: string,
-    duration?: number
-  ): string {
+  show(type: NotificationType, title: string, message?: string, duration?: number): string {
     const id = `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const notificationDuration = duration ?? this.defaultDuration;
     const notification: Notification = {

@@ -43,11 +43,7 @@ export default defineProgram({
       width: 800,
       height: 600,
       component: (
-        <FolderWindow
-          ctx={ctx}
-          folderId={request.folderId}
-          initialPath={request.initialPath}
-        />
+        <FolderWindow ctx={ctx} folderId={request.folderId} initialPath={request.initialPath} />
       ),
     });
   },

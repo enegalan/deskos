@@ -14,11 +14,7 @@ import {
   type TrashEntry,
 } from '@core/trash';
 import { resolveProgramIcon } from '@core/program-icons';
-import {
-  getGridSize,
-  isDesktopFolder,
-  isDesktopShortcut,
-} from '@core/desktop-shortcuts';
+import { getGridSize, isDesktopFolder, isDesktopShortcut } from '@core/desktop-shortcuts';
 import { Icon } from '../../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
@@ -35,10 +31,7 @@ function entryIconName(entry: TrashEntry): string {
   }
   if (isDesktopShortcut(entry.item)) {
     const meta = programs[entry.item.programId]?.metadata;
-    return resolveProgramIcon(
-      entry.item.programId,
-      meta?.icon || entry.item.programId
-    );
+    return resolveProgramIcon(entry.item.programId, meta?.icon || entry.item.programId);
   }
   return getTrashEntryIcon(entry);
 }
@@ -114,9 +107,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
         const itemId = itemEl?.dataset.itemId;
         if (!itemId) return [];
 
-        const selection = context.selection as
-          | { type: string; ids: string[] }
-          | undefined;
+        const selection = context.selection as { type: string; ids: string[] } | undefined;
         const selectedIdsForMenu =
           selection?.type === 'trash-items' &&
           selection.ids.length > 0 &&
@@ -128,9 +119,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
         return [
           {
             id: 'trash-item-restore',
-            label: isMultiple
-              ? `Restore (${selectedIdsForMenu.length} items)`
-              : 'Restore',
+            label: isMultiple ? `Restore (${selectedIdsForMenu.length} items)` : 'Restore',
             icon: 'restore',
             action: () => {
               restoreFromTrash(selectedIdsForMenu);
@@ -219,11 +208,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
             enabled: !empty,
             action: () => {
               if (isTrashEmpty()) return;
-              if (
-                !confirm(
-                  'Are you sure you want to permanently erase the items in the Trash?'
-                )
-              ) {
+              if (!confirm('Are you sure you want to permanently erase the items in the Trash?')) {
                 return;
               }
               emptyTrash();
@@ -311,9 +296,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
           name={icon as IconName}
           size={size * ICON_GLYPH_SCALE}
           color={color}
-          fallback={
-            typeof icon === 'string' && !hasIcon(icon as IconName) ? icon : undefined
-          }
+          fallback={typeof icon === 'string' && !hasIcon(icon as IconName) ? icon : undefined}
         />
       ) : (
         <span style={{ fontSize: `${size * ICON_EMOJI_SCALE}px` }}>{icon}</span>
@@ -378,11 +361,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
       </div>
 
       <div className="folder-window-body">
-        <div
-          ref={contentRef}
-          className="folder-window-main"
-          onClick={clearSelection}
-        >
+        <div ref={contentRef} className="folder-window-main" onClick={clearSelection}>
           <div className="folder-window-title">Trash</div>
           <div className={`folder-window-grid view-${viewMode}`} ref={gridRef}>
             {empty ? (
@@ -431,11 +410,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
                       ctx.events.emit('trash:restored', { ids: [entry.id] });
                     }}
                   >
-                    {renderItemIcon(
-                      icon,
-                      iconSize,
-                      isFolder ? 'var(--color-accent)' : undefined
-                    )}
+                    {renderItemIcon(icon, iconSize, isFolder ? 'var(--color-accent)' : undefined)}
                     {(isList || settings.showIconLabels) && (
                       <div className="folder-window-item-label">{entryLabel(entry)}</div>
                     )}

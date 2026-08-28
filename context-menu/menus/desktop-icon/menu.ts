@@ -9,25 +9,26 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
     priority: 0,
     generator: async (context: MenuContext) => {
       const items: MenuItem[] = [];
-      
+
       // Check for multiple selection
-      const selection = context.selection as { type: string; ids: string[]; count: number } | undefined;
+      const selection = context.selection as
+        { type: string; ids: string[]; count: number } | undefined;
       const isMultipleSelection = selection?.type === 'desktop-icons' && selection.count > 1;
-      
+
       // Get selected items info
       let selectedShortcuts: string[] = [];
       let selectedFolders: string[] = [];
-      
+
       if (isMultipleSelection && selection) {
         // Multiple selection - get all selected items
         const { getDesktopShortcuts, getDesktopFolders } = await import('@core/desktop-shortcuts');
         const shortcuts = getDesktopShortcuts();
         const folders = getDesktopFolders();
-        
-        selection.ids.forEach(id => {
-          if (shortcuts.some(s => s.id === id)) {
+
+        selection.ids.forEach((id) => {
+          if (shortcuts.some((s) => s.id === id)) {
             selectedShortcuts.push(id);
-          } else if (folders.some(f => f.id === id)) {
+          } else if (folders.some((f) => f.id === id)) {
             selectedFolders.push(id);
           }
         });
@@ -41,14 +42,14 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
           selectedFolders = [folderId];
         }
       }
-      
+
       // Open action - only show if single selection and it's a shortcut
       if (!isMultipleSelection && selectedShortcuts.length === 1) {
         const programId = context.target.getAttribute('data-program-id');
         let programName = '';
         let allowMultiple = false;
         let iconContextMenuItems: MenuItem[] = [];
-        
+
         if (programId) {
           try {
             const { programs } = await import('virtual:programs');
@@ -59,21 +60,13 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
               allowMultiple = module.default.allowMultipleWindows ?? false;
               if (module.default.iconContextMenu) {
                 try {
-                  const customPromise = Promise.resolve(
-                    module.default.iconContextMenu(context)
-                  );
+                  const customPromise = Promise.resolve(module.default.iconContextMenu(context));
                   const timeoutPromise = new Promise<MenuItem[]>((resolve) => {
                     setTimeout(() => resolve([]), 200);
                   });
-                  iconContextMenuItems = await Promise.race([
-                    customPromise,
-                    timeoutPromise,
-                  ]);
+                  iconContextMenuItems = await Promise.race([customPromise, timeoutPromise]);
                 } catch (error) {
-                  console.error(
-                    '[DesktopIcon] Error generating iconContextMenu:',
-                    error
-                  );
+                  console.error('[DesktopIcon] Error generating iconContextMenu:', error);
                 }
               }
             }
@@ -81,12 +74,12 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
             console.error('[DesktopIcon] Error loading program metadata:', error);
           }
         }
-        
+
         if (programId) {
           // Capture programId and programName in closure
           const capturedProgramId = programId;
           const capturedProgramName = programName;
-          
+
           items.push({
             id: 'desktop-icon-open',
             label: 'Open',
@@ -100,7 +93,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
               }
             },
           });
-          
+
           // Add "New {appName} window" option if the app supports multiple windows
           if (allowMultiple && capturedProgramName) {
             items.push({
@@ -123,7 +116,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
           }
         }
       }
-      
+
       if (items.length > 0) {
         items.push({
           id: 'desktop-icon-separator-1',
@@ -144,10 +137,10 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
             try {
               const { copy } = await import('@core/clipboard');
               const clipboardItems: Array<{ id: string; type: 'shortcut' | 'folder' }> = [];
-              selectedShortcuts.forEach(id => {
+              selectedShortcuts.forEach((id) => {
                 clipboardItems.push({ id, type: 'shortcut' });
               });
-              selectedFolders.forEach(id => {
+              selectedFolders.forEach((id) => {
                 clipboardItems.push({ id, type: 'folder' });
               });
               if (clipboardItems.length > 0) {
@@ -172,10 +165,10 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
             try {
               const { cut } = await import('@core/clipboard');
               const clipboardItems: Array<{ id: string; type: 'shortcut' | 'folder' }> = [];
-              selectedShortcuts.forEach(id => {
+              selectedShortcuts.forEach((id) => {
                 clipboardItems.push({ id, type: 'shortcut' });
               });
-              selectedFolders.forEach(id => {
+              selectedFolders.forEach((id) => {
                 clipboardItems.push({ id, type: 'folder' });
               });
               if (clipboardItems.length > 0) {
@@ -197,9 +190,12 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
           label: '',
         });
       }
-      
+
       // Info action - only show if single selection
-      if (!isMultipleSelection && (selectedShortcuts.length === 1 || selectedFolders.length === 1)) {
+      if (
+        !isMultipleSelection &&
+        (selectedShortcuts.length === 1 || selectedFolders.length === 1)
+      ) {
         items.push({
           id: 'desktop-icon-info',
           label: 'Get Info',
@@ -209,14 +205,14 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
             console.log('[DesktopIcon] Get Info', context);
           },
         });
-        
+
         items.push({
           id: 'desktop-icon-separator-info',
           type: 'separator',
           label: '',
         });
       }
-      
+
       // Duplicate action - only show if single selection
       if (!isMultipleSelection && selectedShortcuts.length === 1) {
         items.push({
@@ -227,9 +223,10 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
             const shortcutId = context.target.getAttribute('data-shortcut-id');
             if (shortcutId) {
               try {
-                const { getDesktopShortcuts, addDesktopShortcut, getGridMetrics } = await import('@core/desktop-shortcuts');
+                const { getDesktopShortcuts, addDesktopShortcut, getGridMetrics } =
+                  await import('@core/desktop-shortcuts');
                 const shortcuts = getDesktopShortcuts();
-                const shortcut = shortcuts.find(s => s.id === shortcutId);
+                const shortcut = shortcuts.find((s) => s.id === shortcutId);
                 if (shortcut) {
                   // Add duplicate at offset position
                   const { cellWidth } = getGridMetrics();
@@ -243,9 +240,12 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
           },
         });
       }
-      
+
       // Rename action - only show if single selection
-      if (!isMultipleSelection && (selectedShortcuts.length === 1 || selectedFolders.length === 1)) {
+      if (
+        !isMultipleSelection &&
+        (selectedShortcuts.length === 1 || selectedFolders.length === 1)
+      ) {
         items.push({
           id: 'desktop-icon-rename',
           label: 'Rename',
@@ -255,9 +255,10 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
             const folderId = context.target.getAttribute('data-folder-id');
             if (shortcutId) {
               try {
-                const { getDesktopShortcuts, renameDesktopShortcut } = await import('@core/desktop-shortcuts');
+                const { getDesktopShortcuts, renameDesktopShortcut } =
+                  await import('@core/desktop-shortcuts');
                 const shortcuts = getDesktopShortcuts();
-                const shortcut = shortcuts.find(s => s.id === shortcutId);
+                const shortcut = shortcuts.find((s) => s.id === shortcutId);
                 if (shortcut) {
                   const currentName = shortcut.customName || '';
                   const newName = prompt('Enter new shortcut name:', currentName);
@@ -282,15 +283,18 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
           },
         });
       }
-      
-      if (items.length > 0 && (!isMultipleSelection || selectedShortcuts.length > 0 || selectedFolders.length > 0)) {
+
+      if (
+        items.length > 0 &&
+        (!isMultipleSelection || selectedShortcuts.length > 0 || selectedFolders.length > 0)
+      ) {
         items.push({
           id: 'desktop-icon-separator-2',
           type: 'separator',
           label: '',
         });
       }
-      
+
       const totalSelectedForDelete = selectedShortcuts.length + selectedFolders.length;
       const { getDeleteItemsLabel, deleteDesktopItems } = await import('@core/delete-items');
 
@@ -307,7 +311,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
           }
         },
       });
-      
+
       return items;
     },
   });

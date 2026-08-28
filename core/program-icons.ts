@@ -12,10 +12,7 @@ const iconResolvers = new Map<string, () => string>();
  * @param resolver - Return the icon name to display
  * @returns Unregister function
  */
-export function registerProgramIconResolver(
-  programId: string,
-  resolver: () => string
-): () => void {
+export function registerProgramIconResolver(programId: string, resolver: () => string): () => void {
   iconResolvers.set(programId, resolver);
   return () => {
     if (iconResolvers.get(programId) === resolver) {
@@ -42,7 +39,5 @@ export function resolveProgramIcon(programId: string, fallbackIcon: string): str
  * Notify shell UI that a program's icon may have changed.
  */
 export function notifyProgramIconChanged(programId: string): void {
-  window.dispatchEvent(
-    new CustomEvent('program-icon-updated', { detail: { programId } })
-  );
+  window.dispatchEvent(new CustomEvent('program-icon-updated', { detail: { programId } }));
 }

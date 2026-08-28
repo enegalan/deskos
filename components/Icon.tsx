@@ -54,9 +54,10 @@ export function Icon({
 
   // Render SVG icon
   // Replace currentColor in SVG content with actual color if provided
-  const processedSvgContent = color && color !== 'currentColor' 
-    ? svgContent.replace(/fill="currentColor"/g, `fill="${color}"`)
-    : svgContent;
+  const processedSvgContent =
+    color && color !== 'currentColor'
+      ? svgContent.replace(/fill="currentColor"/g, `fill="${color}"`)
+      : svgContent;
 
   return (
     <svg

@@ -1,4 +1,12 @@
-import { useState, useCallback, useRef, useEffect, type DragEvent, type FormEvent, type MouseEvent } from 'react';
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  type DragEvent,
+  type FormEvent,
+  type MouseEvent,
+} from 'react';
 import type { ProgramContext } from '@core/context';
 import { useWindowSessionState } from '@core/window-session';
 import { TITLE_PATH } from '../../vite-plugin-page-title';
@@ -47,7 +55,10 @@ interface BrowserTab {
   reloadKey: number;
 }
 
-type PersistedBrowserTab = Pick<BrowserTab, 'id' | 'history' | 'historyIndex' | 'inputUrl' | 'title'>;
+type PersistedBrowserTab = Pick<
+  BrowserTab,
+  'id' | 'history' | 'historyIndex' | 'inputUrl' | 'title'
+>;
 
 /** Ephemeral per-tab UI state (not persisted in session). */
 interface TabRuntime {
@@ -269,7 +280,9 @@ function BookmarkIcon({
 
   if (!iconUrl || failed) {
     return (
-      <span className={`ie-bookmark-fallback ${className}`.trim()}>{label.charAt(0).toUpperCase()}</span>
+      <span className={`ie-bookmark-fallback ${className}`.trim()}>
+        {label.charAt(0).toUpperCase()}
+      </span>
     );
   }
 
@@ -409,7 +422,6 @@ function HomePage({
 
   return (
     <div className="ie-home">
-
       <form className="ie-home-search" onSubmit={handleSearch}>
         <Icon name="search" size={20} className="ie-home-search-icon" />
         <input
@@ -435,7 +447,12 @@ function HomePage({
             title={shortcut.url}
           >
             <span className="ie-home-shortcut-icon">
-              <BookmarkIcon url={shortcut.url} label={shortcut.label} size={32} className="ie-home-favicon" />
+              <BookmarkIcon
+                url={shortcut.url}
+                label={shortcut.label}
+                size={32}
+                className="ie-home-favicon"
+              />
             </span>
             <span className="ie-home-shortcut-label">{shortcut.label}</span>
           </button>
@@ -482,14 +499,13 @@ function HomePage({
                 placeholder="URL"
               />
               <div className="ie-shortcut-modal-actions">
-                <button type="submit" className="ie-shortcut-modal-btn ie-shortcut-modal-btn-primary">
+                <button
+                  type="submit"
+                  className="ie-shortcut-modal-btn ie-shortcut-modal-btn-primary"
+                >
                   Add
                 </button>
-                <button
-                  type="button"
-                  className="ie-shortcut-modal-btn"
-                  onClick={closeAddModal}
-                >
+                <button type="button" className="ie-shortcut-modal-btn" onClick={closeAddModal}>
                   Cancel
                 </button>
               </div>
@@ -532,17 +548,13 @@ function BrowserContent({
   onAddShortcut: (label: string, url: string) => void;
 }) {
   if (url === HOME_URL) {
-    return (
-      <HomePage shortcuts={shortcuts} onNavigate={onNavigate} onAddShortcut={onAddShortcut} />
-    );
+    return <HomePage shortcuts={shortcuts} onNavigate={onNavigate} onAddShortcut={onAddShortcut} />;
   }
   if (url === HELP_URL) return <HelpPage />;
 
   const src = getIframeSrc(url);
   if (!src) {
-    return (
-      <HomePage shortcuts={shortcuts} onNavigate={onNavigate} onAddShortcut={onAddShortcut} />
-    );
+    return <HomePage shortcuts={shortcuts} onNavigate={onNavigate} onAddShortcut={onAddShortcut} />;
   }
 
   return (
@@ -669,9 +681,12 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
     if (windowId) ctx.window.close(windowId);
   }, [ctx.window, getWindowId]);
 
-  const updateTab = useCallback((tabId: string, updater: (tab: BrowserTab) => BrowserTab) => {
-    setTabs((prev) => prev.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
-  }, [setTabs]);
+  const updateTab = useCallback(
+    (tabId: string, updater: (tab: BrowserTab) => BrowserTab) => {
+      setTabs((prev) => prev.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
+    },
+    [setTabs]
+  );
 
   const applyTabTitle = useCallback(
     (tabId: string, url: string, title: string) => {
@@ -715,19 +730,22 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
     setActiveTabId(tab.id);
   }, []);
 
-  const openNewTabWithUrl = useCallback((rawUrl: string) => {
-    const target = normalizeUrl(rawUrl);
-    const tab: BrowserTab = {
-      ...createTab(),
-      history: [target],
-      historyIndex: 0,
-      inputUrl: target,
-      title: tabTitleForUrl(target),
-    };
-    setTabs((prev) => [...prev, tab]);
-    setActiveTabId(tab.id);
-    patchTabRuntime(tab.id, { loading: !isInternalPage(target) });
-  }, [patchTabRuntime, setActiveTabId, setTabs]);
+  const openNewTabWithUrl = useCallback(
+    (rawUrl: string) => {
+      const target = normalizeUrl(rawUrl);
+      const tab: BrowserTab = {
+        ...createTab(),
+        history: [target],
+        historyIndex: 0,
+        inputUrl: target,
+        title: tabTitleForUrl(target),
+      };
+      setTabs((prev) => [...prev, tab]);
+      setActiveTabId(tab.id);
+      patchTabRuntime(tab.id, { loading: !isInternalPage(target) });
+    },
+    [patchTabRuntime, setActiveTabId, setTabs]
+  );
 
   const closeTab = useCallback(
     (tabId: string, e?: MouseEvent) => {
@@ -784,19 +802,22 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
     [setActiveTabId, setTabs]
   );
 
-  const moveTabToIndex = useCallback((fromId: string, toIndex: number) => {
-    setTabs((prev) => {
-      const fromIdx = prev.findIndex((tab) => tab.id === fromId);
-      if (fromIdx === -1) return prev;
-      const bounded = Math.max(0, Math.min(toIndex, prev.length));
-      if (bounded === fromIdx || bounded === fromIdx + 1) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(fromIdx, 1);
-      const target = bounded > fromIdx ? bounded - 1 : bounded;
-      next.splice(target, 0, moved);
-      return next;
-    });
-  }, [setTabs]);
+  const moveTabToIndex = useCallback(
+    (fromId: string, toIndex: number) => {
+      setTabs((prev) => {
+        const fromIdx = prev.findIndex((tab) => tab.id === fromId);
+        if (fromIdx === -1) return prev;
+        const bounded = Math.max(0, Math.min(toIndex, prev.length));
+        if (bounded === fromIdx || bounded === fromIdx + 1) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(fromIdx, 1);
+        const target = bounded > fromIdx ? bounded - 1 : bounded;
+        next.splice(target, 0, moved);
+        return next;
+      });
+    },
+    [setTabs]
+  );
 
   const handleTabDragStart = useCallback((e: DragEvent<HTMLDivElement>, tabId: string) => {
     if ((e.target as HTMLElement).closest('.ie-tab-close')) {
@@ -1597,7 +1618,9 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
               type="text"
               className="ie-address-input"
               value={activeTab.inputUrl}
-              onChange={(e) => updateTab(activeTabId, (tab) => ({ ...tab, inputUrl: e.target.value }))}
+              onChange={(e) =>
+                updateTab(activeTabId, (tab) => ({ ...tab, inputUrl: e.target.value }))
+              }
               onDragOver={handleAddressDragOver}
               onDragLeave={handleAddressDragLeave}
               onDrop={handleAddressDrop}

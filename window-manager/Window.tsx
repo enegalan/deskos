@@ -1,4 +1,11 @@
-import { useState, useCallback, useEffect, useRef, memo, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  memo,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { useKernel } from '@core/kernel';
 import type { WindowState } from '@core/kernel';
 import { WindowSessionProvider } from '@core/window-session';
@@ -143,11 +150,7 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
   useEffect(() => {
     const handleMouseMove = (e: globalThis.MouseEvent) => {
       if (dragState.isDragging) {
-        moveWindow(
-          win.id,
-          e.clientX - dragState.offsetX,
-          e.clientY - dragState.offsetY
-        );
+        moveWindow(win.id, e.clientX - dragState.offsetX, e.clientY - dragState.offsetY);
       }
 
       if (resizeState.isResizing && resizeState.direction) {
@@ -313,11 +316,7 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
             title={win.isMaximized ? 'Restore' : 'Maximize'}
             aria-label={win.isMaximized ? 'Restore window' : 'Maximize window'}
           >
-            {win.isMaximized ? (
-              <Icon name="restore" size={8} />
-            ) : (
-              <Icon name="maximize" size={8} />
-            )}
+            {win.isMaximized ? <Icon name="restore" size={8} /> : <Icon name="maximize" size={8} />}
           </button>
         </div>
       </div>
@@ -334,10 +333,22 @@ export const Window = memo(function Window({ window: win, windowOrder }: WindowP
           <div className="resize-handle resize-handle-s" onMouseDown={handleResizeMouseDown('s')} />
           <div className="resize-handle resize-handle-e" onMouseDown={handleResizeMouseDown('e')} />
           <div className="resize-handle resize-handle-w" onMouseDown={handleResizeMouseDown('w')} />
-          <div className="resize-handle resize-handle-ne" onMouseDown={handleResizeMouseDown('ne')} />
-          <div className="resize-handle resize-handle-nw" onMouseDown={handleResizeMouseDown('nw')} />
-          <div className="resize-handle resize-handle-se" onMouseDown={handleResizeMouseDown('se')} />
-          <div className="resize-handle resize-handle-sw" onMouseDown={handleResizeMouseDown('sw')} />
+          <div
+            className="resize-handle resize-handle-ne"
+            onMouseDown={handleResizeMouseDown('ne')}
+          />
+          <div
+            className="resize-handle resize-handle-nw"
+            onMouseDown={handleResizeMouseDown('nw')}
+          />
+          <div
+            className="resize-handle resize-handle-se"
+            onMouseDown={handleResizeMouseDown('se')}
+          />
+          <div
+            className="resize-handle resize-handle-sw"
+            onMouseDown={handleResizeMouseDown('sw')}
+          />
         </>
       )}
     </div>

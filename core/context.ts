@@ -2,11 +2,13 @@ import type { WindowCreateOptions, WindowRestoreOptions, WindowState } from './k
 import { prepareWindowIdsForSession, useKernel } from './kernel';
 import { createSecureScopedStorage, type StorageAPI } from './storage';
 import { createScopedEventBus, type EventBusAPI } from './event-bus';
-import { ContextMenuManager, type ContextMenuProvider, type MenuContext, type MenuItem } from '../context-menu/ContextMenuManager';
 import {
-  registerSelectionSource,
-  SELECTION_PRIORITY,
-} from './selection';
+  ContextMenuManager,
+  type ContextMenuProvider,
+  type MenuContext,
+  type MenuItem,
+} from '../context-menu/ContextMenuManager';
+import { registerSelectionSource, SELECTION_PRIORITY } from './selection';
 import { registerProgramIconResolver } from './program-icons';
 import {
   beginSessionRestore,
@@ -55,12 +57,15 @@ export interface SystemAPI {
  * }, [ctx]);
  */
 export interface ContextMenuAPI {
-  register(target: string, provider: {
-    id: string;
-    items?: MenuItem[];
-    generator?: (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
-    priority?: number;
-  }): () => void;
+  register(
+    target: string,
+    provider: {
+      id: string;
+      items?: MenuItem[];
+      generator?: (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
+      priority?: number;
+    }
+  ): () => void;
 }
 
 /**
@@ -139,32 +144,32 @@ export async function launchOrFocusProgram(
   forceNewWindow: boolean = false
 ): Promise<void> {
   const kernel = useKernel.getState();
-  
+
   // Check if there's an existing window for this program
   const existingWindows = kernel.windows.filter((w) => w.programId === programId);
-  
+
   // Get program metadata to check if it allows multiple windows
   const { programs } = await import('virtual:programs');
   const program = programs[programId];
-  
+
   if (!program) {
     console.error(`[launchOrFocusProgram] Program not found: ${programId}`);
     return;
   }
-  
+
   const module = await program.load();
-  
+
   // If forcing new window (e.g., "New window" menu option), always launch
   if (forceNewWindow) {
     module.default.launch(createProgramContext(programId, program.metadata.icon));
     return;
   }
-  
+
   // If there's an existing window and the program is single-window, focus it
   const allowMultiple = module.default.allowMultipleWindows === true;
   if (existingWindows.length > 0 && !forceNewWindow && !allowMultiple) {
     const windowToFocus = existingWindows[0];
-    
+
     // Restore if minimized
     if (windowToFocus.isMinimized) {
       kernel.restoreWindow(windowToFocus.id);
@@ -173,7 +178,7 @@ export async function launchOrFocusProgram(
     }
     return;
   }
-  
+
   // No existing window, launch normally
   module.default.launch(createProgramContext(programId, program.metadata.icon));
 }
@@ -182,16 +187,18 @@ export async function launchOrFocusProgram(
  * Creates a WindowAPI for a specific program.
  * All window operations are scoped to windows owned by this program.
  */
-function createWindowAPI(programId: string, icon: string, restoreEntry?: SessionWindowEntry): WindowAPI {
+function createWindowAPI(
+  programId: string,
+  icon: string,
+  restoreEntry?: SessionWindowEntry
+): WindowAPI {
   let restoreConsumed = false;
 
   return {
     create(options: WindowCreateOptions): string {
       const state = useKernel.getState();
       const restore =
-        !restoreConsumed && restoreEntry
-          ? (restoreEntry as WindowRestoreOptions)
-          : undefined;
+        !restoreConsumed && restoreEntry ? (restoreEntry as WindowRestoreOptions) : undefined;
       restoreConsumed = true;
       return state.createWindow(programId, icon, options, restore);
     },
@@ -289,12 +296,15 @@ function createContextMenuAPI(programId: string): ContextMenuAPI {
   const manager = ContextMenuManager.getInstance();
 
   return {
-    register(target: string, provider: {
-      id: string;
-      items?: MenuItem[];
-      generator?: (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
-      priority?: number;
-    }): () => void {
+    register(
+      target: string,
+      provider: {
+        id: string;
+        items?: MenuItem[];
+        generator?: (context: MenuContext) => MenuItem[] | Promise<MenuItem[]>;
+        priority?: number;
+      }
+    ): () => void {
       const fullProvider: ContextMenuProvider = {
         ...provider,
         id: `${programId}:${provider.id}`,
@@ -456,7 +466,7 @@ export function restoreDesktopSession(): Promise<void> {
         const activeId =
           snapshot.activeWindowId && restoredIds.includes(snapshot.activeWindowId)
             ? snapshot.activeWindowId
-            : restoredOrder.at(-1) ?? null;
+            : (restoredOrder.at(-1) ?? null);
         kernel.applySessionOrder(restoredOrder, activeId);
       }
     } finally {

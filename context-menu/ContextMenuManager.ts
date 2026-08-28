@@ -138,7 +138,11 @@ export class ContextMenuManager {
 
       // Also check if clicking inside an interactive element
       const closestInteractive = target.closest('input, textarea, button, select, a[href]');
-      if (closestInteractive && closestInteractive !== target && !this.hasSpecificProvider(target)) {
+      if (
+        closestInteractive &&
+        closestInteractive !== target &&
+        !this.hasSpecificProvider(target)
+      ) {
         // Prevent any context menu
         e.preventDefault();
         e.stopPropagation();
@@ -227,11 +231,13 @@ export class ContextMenuManager {
    */
   private isNativeInteractiveElement(element: HTMLElement): boolean {
     const tagName = element.tagName.toLowerCase();
-    return tagName === 'input' || 
-           tagName === 'textarea' || 
-           tagName === 'button' || 
-           tagName === 'select' ||
-           (tagName === 'a' && element.hasAttribute('href'));
+    return (
+      tagName === 'input' ||
+      tagName === 'textarea' ||
+      tagName === 'button' ||
+      tagName === 'select' ||
+      (tagName === 'a' && element.hasAttribute('href'))
+    );
   }
 
   /**
@@ -241,10 +247,14 @@ export class ContextMenuManager {
     // Check if there's a provider that specifically targets this element or its classes/ID
     for (const [targetSelector] of this.providers.entries()) {
       // Skip semantic targets (desktop, window, file) - these are too broad
-      if (targetSelector === 'desktop' || targetSelector === 'window' || targetSelector === 'file') {
+      if (
+        targetSelector === 'desktop' ||
+        targetSelector === 'window' ||
+        targetSelector === 'file'
+      ) {
         continue;
       }
-      
+
       if (this.matchesCssSelector(element, targetSelector)) {
         return true;
       }
@@ -310,12 +320,7 @@ export class ContextMenuManager {
   /**
    * Handle long-press trigger for touch devices
    */
-  private startLongPressTimer(
-    _event: TouchEvent,
-    target: HTMLElement,
-    x: number,
-    y: number
-  ): void {
+  private startLongPressTimer(_event: TouchEvent, target: HTMLElement, x: number, y: number): void {
     this.cancelLongPressTimer();
 
     this.longPressTimer = window.setTimeout(() => {
@@ -356,7 +361,7 @@ export class ContextMenuManager {
     } else if (folderWindowItem) {
       actualTarget = folderWindowItem;
     }
-    
+
     // Nearest ancestor wins (desktop also has data-program-id="system")
     let programId: string | undefined;
     let windowId: string | undefined;
@@ -526,8 +531,7 @@ export class ContextMenuManager {
     // Element-specific CSS providers win over the generic window chrome menu
     const hasElementProvider = matches.some(
       (provider) =>
-        !ContextMenuManager.SEMANTIC_TARGETS.has(provider.target) &&
-        provider.target !== '*'
+        !ContextMenuManager.SEMANTIC_TARGETS.has(provider.target) && provider.target !== '*'
     );
     const filtered = hasElementProvider
       ? matches.filter((provider) => provider.target !== 'window')
@@ -554,7 +558,8 @@ export class ContextMenuManager {
     // Semantic targets
     if (selector === 'desktop') {
       // Check if element is inside desktop or is desktop itself
-      const isInsideDesktop = element.classList.contains('desktop') || element.closest('.desktop') !== null;
+      const isInsideDesktop =
+        element.classList.contains('desktop') || element.closest('.desktop') !== null;
       if (!isInsideDesktop) {
         return false;
       }
@@ -563,20 +568,24 @@ export class ContextMenuManager {
         return false;
       }
       // Exclude desktop menu when clicking on icons or folders (including their children)
-      const isIcon = element.classList.contains('desktop-icon') || 
-                     element.classList.contains('folder-icon') ||
-                     element.closest('.desktop-icon') !== null ||
-                     element.closest('.folder-icon') !== null;
+      const isIcon =
+        element.classList.contains('desktop-icon') ||
+        element.classList.contains('folder-icon') ||
+        element.closest('.desktop-icon') !== null ||
+        element.closest('.folder-icon') !== null;
       if (isIcon) {
         return false;
       }
-      
+
       // Also check if there's an icon at the click coordinates
       if (context?.event && 'clientX' in context.event && 'clientY' in context.event) {
         const desktopElement = document.querySelector('.desktop');
         if (desktopElement) {
           // Use elementFromPoint to check if there's an icon at these coordinates
-          const elementAtPoint = document.elementFromPoint(context.event.clientX, context.event.clientY);
+          const elementAtPoint = document.elementFromPoint(
+            context.event.clientX,
+            context.event.clientY
+          );
           if (elementAtPoint) {
             const iconAtPoint = elementAtPoint.closest('.desktop-icon, .folder-icon');
             if (iconAtPoint) {
@@ -585,13 +594,12 @@ export class ContextMenuManager {
           }
         }
       }
-      
+
       return true;
     }
     if (selector === 'folder-window') {
       // Require data-folder-path so apps that reuse folder layout do not match
-      const inFolderWindow =
-        element.closest('.folder-window-main[data-folder-path]') !== null;
+      const inFolderWindow = element.closest('.folder-window-main[data-folder-path]') !== null;
       if (!inFolderWindow) {
         return false;
       }
@@ -602,7 +610,8 @@ export class ContextMenuManager {
       return true;
     }
     if (selector === 'window') {
-      const isInsideWindow = element.classList.contains('window') || element.closest('.window') !== null;
+      const isInsideWindow =
+        element.classList.contains('window') || element.closest('.window') !== null;
       if (!isInsideWindow) {
         return false;
       }
@@ -654,8 +663,7 @@ export class ContextMenuManager {
     // nodes and accept if the click target is one of them or inside one.
     try {
       const root = element.getRootNode();
-      const scope =
-        root instanceof Document || root instanceof ShadowRoot ? root : document;
+      const scope = root instanceof Document || root instanceof ShadowRoot ? root : document;
       for (const node of scope.querySelectorAll(selector)) {
         if (node === element || node.contains(element)) {
           return true;
@@ -681,9 +689,9 @@ export class ContextMenuManager {
     for (const provider of providers) {
       if (provider.items) {
         // Static items - deep clone to preserve functions
-        const clonedItems = provider.items.map(item => ({
+        const clonedItems = provider.items.map((item) => ({
           ...item,
-          submenu: item.submenu ? item.submenu.map(subItem => ({ ...subItem })) : undefined,
+          submenu: item.submenu ? item.submenu.map((subItem) => ({ ...subItem })) : undefined,
         }));
         items.push(...clonedItems);
       } else if (provider.generator) {
@@ -716,7 +724,7 @@ export class ContextMenuManager {
     }
 
     const providers = this.providers.get(target)!;
-    
+
     // Check if provider with same ID already exists
     const existingIndex = providers.findIndex((p) => p.id === provider.id);
     if (existingIndex >= 0) {

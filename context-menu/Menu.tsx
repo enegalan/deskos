@@ -14,7 +14,11 @@ export function Menu({ items, position, onClose }: MenuProps) {
   const menuRef = useRef<HTMLUListElement>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [openSubmenuId, setOpenSubmenuId] = useState<string | null>(null);
-  const [keyboardState, setKeyboardState] = useState({ lastKey: null as string | null, lastKeyTime: 0, searchString: '' });
+  const [keyboardState, setKeyboardState] = useState({
+    lastKey: null as string | null,
+    lastKeyTime: 0,
+    searchString: '',
+  });
 
   // Get enabled items for navigation
   const enabledItems = items.filter((item) => item.enabled !== false && item.visible !== false);
@@ -32,22 +36,23 @@ export function Menu({ items, position, onClose }: MenuProps) {
       if (!menuRef.current) return;
 
       const currentIndex = enabledItems.findIndex((item) => item.id === activeItemId);
-      let newIndex = currentIndex;
 
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
           e.stopPropagation();
-          newIndex = currentIndex < enabledItems.length - 1 ? currentIndex + 1 : 0;
-          setActiveItemId(enabledItems[newIndex].id);
+          setActiveItemId(
+            enabledItems[currentIndex < enabledItems.length - 1 ? currentIndex + 1 : 0].id
+          );
           setOpenSubmenuId(null);
           break;
 
         case 'ArrowUp':
           e.preventDefault();
           e.stopPropagation();
-          newIndex = currentIndex > 0 ? currentIndex - 1 : enabledItems.length - 1;
-          setActiveItemId(enabledItems[newIndex].id);
+          setActiveItemId(
+            enabledItems[currentIndex > 0 ? currentIndex - 1 : enabledItems.length - 1].id
+          );
           setOpenSubmenuId(null);
           break;
 
@@ -160,13 +165,10 @@ export function Menu({ items, position, onClose }: MenuProps) {
     };
   }, [handleKeyDown]);
 
-  const handleItemSelect = useCallback(
-    (item: MenuItemType) => {
-      const manager = ContextMenuManager.getInstance();
-      manager.handleMenuItemSelect(item);
-    },
-    []
-  );
+  const handleItemSelect = useCallback((item: MenuItemType) => {
+    const manager = ContextMenuManager.getInstance();
+    manager.handleMenuItemSelect(item);
+  }, []);
 
   const handleItemMouseEnter = useCallback((item: MenuItemType) => {
     setActiveItemId(item.id);
@@ -227,12 +229,12 @@ export function Menu({ items, position, onClose }: MenuProps) {
   // Final safety check after DOM update: ensure menu never exceeds viewport
   useLayoutEffect(() => {
     if (!menuRef.current || typeof window === 'undefined') return;
-    
+
     const menu = menuRef.current;
     const rect = menu.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const margin = 20;
-    
+
     // If menu bottom exceeds viewport, adjust position
     if (rect.bottom > viewportHeight - margin) {
       const overflow = rect.bottom - (viewportHeight - margin);
@@ -240,7 +242,7 @@ export function Menu({ items, position, onClose }: MenuProps) {
       const newTop = Math.max(0, currentTop - overflow);
       menu.style.top = `${newTop}px`;
     }
-    
+
     // Also ensure menu doesn't go above viewport
     if (rect.top < 0) {
       menu.style.top = '0px';

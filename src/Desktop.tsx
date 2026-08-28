@@ -7,7 +7,13 @@ import { eventBus, SystemEvents } from '@core/event-bus';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { registerDefaultMenus } from '../context-menu/menus';
 import { DesktopIcons } from './DesktopIcons';
-import { addDesktopShortcut, pixelToClampedGrid, getGridMetrics, DESKOS_ITEM_IDS_MIME, readDraggedItemIds } from '@core/desktop-shortcuts';
+import {
+  addDesktopShortcut,
+  pixelToClampedGrid,
+  getGridMetrics,
+  DESKOS_ITEM_IDS_MIME,
+  readDraggedItemIds,
+} from '@core/desktop-shortcuts';
 import { getWallpaper, isWallpaperReference } from '@core/wallpaper-storage';
 import { getWallpaperTone, type WallpaperTone } from '../wallpapers/wallpapers';
 import { ToastContainer } from '@components/Toast';
@@ -28,7 +34,7 @@ export function Desktop() {
   // Load wallpaper from IndexedDB if it's a reference
   useEffect(() => {
     let cancelled = false;
-    
+
     const loadWallpaper = async () => {
       if (!settings.wallpaper) {
         console.log('[Desktop] No wallpaper set');
@@ -70,8 +76,7 @@ export function Desktop() {
   }, [settings.wallpaper]);
 
   const isGradient =
-    wallpaperUrl?.startsWith('linear-gradient') ||
-    wallpaperUrl?.startsWith('radial-gradient');
+    wallpaperUrl?.startsWith('linear-gradient') || wallpaperUrl?.startsWith('radial-gradient');
   const isSolidColor = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(
     wallpaperUrl?.trim() || ''
   );
@@ -100,7 +105,6 @@ export function Desktop() {
           }
     : {};
 
-
   // Debug logging
   useEffect(() => {
     if (wallpaperUrl) {
@@ -108,7 +112,7 @@ export function Desktop() {
         isGradient,
         isDataUrl: wallpaperUrl.startsWith('data:'),
         style: backgroundStyle,
-        wallpaperUrlLength: wallpaperUrl.length
+        wallpaperUrlLength: wallpaperUrl.length,
       });
     }
   }, [wallpaperUrl, backgroundStyle, isGradient]);
@@ -189,26 +193,27 @@ export function Desktop() {
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Check if dragging an item from a folder window or taskbar
     // Note: getData only works in drop event, so we check types instead
     const types = Array.from(e.dataTransfer.types);
-    const hasDeskosData = types.some(type => 
-      type === 'application/x-deskos-shortcut-id' || 
-      type === 'application/x-deskos-folder-id' || 
-      type === 'application/x-deskos-program-id' ||
-      type === DESKOS_ITEM_IDS_MIME
+    const hasDeskosData = types.some(
+      (type) =>
+        type === 'application/x-deskos-shortcut-id' ||
+        type === 'application/x-deskos-folder-id' ||
+        type === 'application/x-deskos-program-id' ||
+        type === DESKOS_ITEM_IDS_MIME
     );
-    
+
     if (hasDeskosData && desktopRef.current) {
       const rect = desktopRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      
+
       // Check if mouse is over a window (not just desktop)
       const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
       const isOverWindow = elementUnderMouse?.closest('.window-container, .folder-window-main');
-      
+
       if (!isOverWindow) {
         desktopRef.current.classList.add('drag-over');
         const gridPos = pixelToClampedGrid(x, y, { width: rect.width, height: rect.height });
@@ -217,7 +222,7 @@ export function Desktop() {
         desktopRef.current.classList.remove('drag-over');
         setDragGridPosition(null);
       }
-      
+
       // Use 'copy' for program-id (from taskbar), 'move' for others
       const hasProgramId = types.includes('application/x-deskos-program-id');
       e.dataTransfer.dropEffect = hasProgramId ? 'copy' : 'move';
@@ -231,27 +236,31 @@ export function Desktop() {
   useEffect(() => {
     const handleDragOver = (e: DragEvent) => {
       if (!desktopRef.current) return;
-      
+
       const types = Array.from(e.dataTransfer?.types || []);
-      const hasDeskosData = types.some(type => 
-        type === 'application/x-deskos-shortcut-id' || 
-        type === 'application/x-deskos-folder-id' || 
-        type === 'application/x-deskos-program-id' ||
-        type === DESKOS_ITEM_IDS_MIME
+      const hasDeskosData = types.some(
+        (type) =>
+          type === 'application/x-deskos-shortcut-id' ||
+          type === 'application/x-deskos-folder-id' ||
+          type === 'application/x-deskos-program-id' ||
+          type === DESKOS_ITEM_IDS_MIME
       );
-      
+
       if (hasDeskosData) {
         const rect = desktopRef.current.getBoundingClientRect();
-        const isOverDesktop = e.clientX >= rect.left && e.clientX <= rect.right &&
-                             e.clientY >= rect.top && e.clientY <= rect.bottom;
-        
+        const isOverDesktop =
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom;
+
         // Check if mouse is over a window (not just desktop)
         const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
         const isOverWindow = elementUnderMouse?.closest('.window-container, .folder-window-main');
-        
+
         if (isOverDesktop && !isOverWindow) {
           desktopRef.current.classList.add('drag-over');
-          
+
           // Calculate grid position for visual indicator
           const x = e.clientX - rect.left;
           const y = e.clientY - rect.top;
@@ -268,12 +277,15 @@ export function Desktop() {
 
     const handleDragLeave = (e: DragEvent) => {
       if (!desktopRef.current) return;
-      
+
       // Only remove drag-over if we're actually leaving the desktop
       const rect = desktopRef.current.getBoundingClientRect();
-      const isOverDesktop = e.clientX >= rect.left && e.clientX <= rect.right &&
-                           e.clientY >= rect.top && e.clientY <= rect.bottom;
-      
+      const isOverDesktop =
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom;
+
       if (!isOverDesktop) {
         desktopRef.current.classList.remove('drag-over');
         setDragGridPosition(null);
@@ -292,7 +304,7 @@ export function Desktop() {
     document.addEventListener('dragover', handleDragOver, true);
     document.addEventListener('dragleave', handleDragLeave, true);
     document.addEventListener('dragend', handleDragEnd, true);
-    
+
     return () => {
       document.removeEventListener('dragover', handleDragOver, true);
       document.removeEventListener('dragleave', handleDragLeave, true);
@@ -312,7 +324,7 @@ export function Desktop() {
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (desktopRef.current) {
       desktopRef.current.classList.remove('drag-over');
       setDragGridPosition(null);
@@ -330,10 +342,10 @@ export function Desktop() {
 
     // Check for items from folder windows
     const itemIds = readDraggedItemIds(e.dataTransfer);
-    
+
     if (itemIds.length > 0) {
       console.log('[Desktop] Drop: Moving items from folder to desktop', { itemIds, gridPos });
-      
+
       const {
         getDesktopFolders,
         getDesktopShortcuts,
@@ -342,7 +354,7 @@ export function Desktop() {
         removeItemFromFolder,
         clampGridPosition,
       } = await import('@core/desktop-shortcuts');
-      
+
       const folders = getDesktopFolders();
       const shortcuts = getDesktopShortcuts();
 
@@ -368,11 +380,10 @@ export function Desktop() {
             : primaryOrigin;
         const offsetX = origin.x - primaryOrigin.x;
         const offsetY = origin.y - primaryOrigin.y;
-        const pos = clampGridPosition(
-          gridPos.x + offsetX,
-          gridPos.y + offsetY,
-          { width: desktopRect.width, height: desktopRect.height }
-        );
+        const pos = clampGridPosition(gridPos.x + offsetX, gridPos.y + offsetY, {
+          width: desktopRect.width,
+          height: desktopRect.height,
+        });
 
         if (shortcut) {
           updateDesktopShortcutPosition(itemId, pos.x, pos.y);

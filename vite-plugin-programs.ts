@@ -88,10 +88,7 @@ function generateVirtualModule(programs: ProgramMetadata[], rootDir: string): st
 
   for (const program of programs) {
     // Get relative path from root
-    const relativePath = program.path
-      .replace(rootDir, '')
-      .replace(/\\/g, '/')
-      .replace(/^\//, '');
+    const relativePath = program.path.replace(rootDir, '').replace(/\\/g, '/').replace(/^\//, '');
 
     // Eager-load so defineProgram side effects (dock, shortcuts, delete, icons) register at startup
     eagerImports.push(`import '/${relativePath}';`);

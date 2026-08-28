@@ -9,7 +9,7 @@ export function registerTextMenu(manager: ContextMenuManager): void {
     priority: 10,
     generator: async (context: MenuContext) => {
       const items: MenuItem[] = [];
-      
+
       // Check if there's text selection
       const selection = context.selection as { type: string; text: string } | undefined;
       if (selection?.type === 'text' && selection.text && selection.text.trim()) {
@@ -25,7 +25,7 @@ export function registerTextMenu(manager: ContextMenuManager): void {
             }
           },
         });
-        
+
         items.push({
           id: 'text-cut',
           label: 'Cut',
@@ -39,13 +39,13 @@ export function registerTextMenu(manager: ContextMenuManager): void {
             }
           },
         });
-        
+
         items.push({
           id: 'text-separator-1',
           type: 'separator',
           label: '',
         });
-        
+
         items.push({
           id: 'text-search',
           label: 'Search',
@@ -56,7 +56,7 @@ export function registerTextMenu(manager: ContextMenuManager): void {
           },
         });
       }
-      
+
       return items;
     },
   });

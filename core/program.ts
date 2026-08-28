@@ -2,7 +2,11 @@ import type { ProgramContext } from './context';
 import type { IconName } from './icons';
 import type { MenuContext, MenuItem } from '../context-menu/ContextMenuManager';
 import { registerProgramIconResolver } from './program-icons';
-import { registerDeleteItemsHandler, type DeleteLabelFn, type DeleteItemsHandler } from './delete-items';
+import {
+  registerDeleteItemsHandler,
+  type DeleteLabelFn,
+  type DeleteItemsHandler,
+} from './delete-items';
 import {
   registerProgramFlags,
   type ProgramDockConfig,

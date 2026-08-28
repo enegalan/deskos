@@ -25,5 +25,19 @@
       "virtual:programs": ["./virtual-programs.d.ts"]
     }
   },
-  "include": ["src", "core", "window-manager", "programs", "context-menu", "file-system", "wallpapers", "components", "cli", "vite-plugin-programs.ts", "vite.config.ts", "virtual-programs.d.ts", "vite-env.d.ts"]
+  "include": [
+    "src",
+    "core",
+    "window-manager",
+    "programs",
+    "context-menu",
+    "file-system",
+    "wallpapers",
+    "components",
+    "cli",
+    "vite-plugin-programs.ts",
+    "vite.config.ts",
+    "virtual-programs.d.ts",
+    "vite-env.d.ts"
+  ]
 }

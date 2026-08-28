@@ -20,9 +20,10 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
         return items;
       }
 
-      const containerPath =
-        (itemEl.closest('[data-folder-path]') as HTMLElement | null)?.dataset.folderPath;
-      const selection = context.selection as { type: string; ids: string[]; path?: string } | undefined;
+      const containerPath = (itemEl.closest('[data-folder-path]') as HTMLElement | null)?.dataset
+        .folderPath;
+      const selection = context.selection as
+        { type: string; ids: string[]; path?: string } | undefined;
       const selectedIds =
         selection?.type === 'folder-items' &&
         selection.ids.length > 0 &&
@@ -38,8 +39,8 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
           icon: 'open',
           action: async () => {
             if (itemType === 'folder') {
-              const parentPath =
-                (itemEl.closest('[data-folder-path]') as HTMLElement | null)?.dataset.folderPath;
+              const parentPath = (itemEl.closest('[data-folder-path]') as HTMLElement | null)
+                ?.dataset.folderPath;
               const { getDesktopFolders } = await import('@core/desktop-shortcuts');
               const folder = getDesktopFolders().find((f) => f.id === itemId);
               if (parentPath && folder) {
@@ -52,7 +53,9 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
                   })
                 );
               } else {
-                window.dispatchEvent(new CustomEvent('open-folder', { detail: { folderId: itemId } }));
+                window.dispatchEvent(
+                  new CustomEvent('open-folder', { detail: { folderId: itemId } })
+                );
               }
             } else {
               const programId = itemEl.dataset.programId;
@@ -85,7 +88,11 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             type: 'folder-items',
             items: selectedIds.map((id) => ({
               id,
-              type: id === itemId ? itemType : ((document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)?.dataset.itemType as 'folder' | 'shortcut') || 'shortcut',
+              type:
+                id === itemId
+                  ? itemType
+                  : ((document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
+                      ?.dataset.itemType as 'folder' | 'shortcut') || 'shortcut',
             })),
             operation: 'copy',
             sourcePath: path,
@@ -107,7 +114,11 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             type: 'folder-items',
             items: selectedIds.map((id) => ({
               id,
-              type: id === itemId ? itemType : ((document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)?.dataset.itemType as 'folder' | 'shortcut') || 'shortcut',
+              type:
+                id === itemId
+                  ? itemType
+                  : ((document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
+                      ?.dataset.itemType as 'folder' | 'shortcut') || 'shortcut',
             })),
             operation: 'cut',
             sourcePath: path,

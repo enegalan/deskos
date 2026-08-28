@@ -51,8 +51,7 @@ export function Taskbar() {
     windowsByProgram.get(win.programId)!.push(win);
   });
 
-  const resolveProgram = (programId: string) =>
-    programList.find((p) => p.id === programId);
+  const resolveProgram = (programId: string) => programList.find((p) => p.id === programId);
 
   const pinnedProgramIds = getDockPinnedProgramIds();
   const runningProgramIds = Array.from(windowsByProgram.keys()).filter(
@@ -88,11 +87,7 @@ export function Taskbar() {
           }
           handleLaunchProgram(programId);
         }}
-        title={
-          isRunningSlot
-            ? programWindows.map((w) => w.title).join(', ')
-            : program.name
-        }
+        title={isRunningSlot ? programWindows.map((w) => w.title).join(', ') : program.name}
         draggable={!isLauncher}
         onDragStart={
           isLauncher
@@ -144,9 +139,7 @@ export function Taskbar() {
           if (item.type === 'running') {
             return (
               <Fragment key={`running-${index}`}>
-                {runningProgramIds.map((programId) =>
-                  renderProgramButton(programId, 'window')
-                )}
+                {runningProgramIds.map((programId) => renderProgramButton(programId, 'window'))}
               </Fragment>
             );
           }

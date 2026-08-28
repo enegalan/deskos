@@ -67,7 +67,7 @@ Pass `ctx` to your window component. Everything your app can do goes through tha
 Fields you set in `program.tsx`. Required ones must be present; the rest are optional.
 
 | Field                  | Required | Default       | What it does                                                                              | Example                                               |
-|------------------------|----------|---------------|-------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| ---------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `id`                   | yes      | —             | Unique id (match your folder name).                                                       | `'my-app'`                                            |
 | `name`                 | yes      | —             | Shown in the Launcher and as the default window title.                                    | `'My App'`                                            |
 | `icon`                 | yes      | —             | Launcher, desktop shortcut, and taskbar icon (built-in name or emoji).                    | `'package'` or `'🚀'`                                 |
@@ -118,7 +118,7 @@ shortcuts: [
 ```
 
 | Field         | Required | Default    | Notes                                                             |
-|---------------|----------|------------|-------------------------------------------------------------------|
+| ------------- | -------- | ---------- | ----------------------------------------------------------------- |
 | `key`         | yes      | —          | `'N'`, `'COMMA'`, `'DELETE'`, etc.                                |
 | `metaKey`     | no       | `true`     | Cmd on macOS. Use `ctrlKey` / `shiftKey` / `altKey` as needed.    |
 | `action`      | no       | `'launch'` | `'launch'` — focus or open; `'launch-new'` — always a new window. |
@@ -202,8 +202,12 @@ ctx.storage.keys();
 
 ```tsx
 ctx.events.emit('note:saved', { id: '42' });
-const off = ctx.events.on('note:saved', (payload) => { /* … */ });
-ctx.events.once('ready', () => { /* … */ });
+const off = ctx.events.on('note:saved', (payload) => {
+  /* … */
+});
+ctx.events.once('ready', () => {
+  /* … */
+});
 off();
 ```
 
@@ -212,9 +216,9 @@ Prefix with `system:` to listen to desk-wide events (e.g. `system:open-folder`).
 ### System info
 
 ```tsx
-ctx.system.version;    // DeskOS version
-ctx.system.theme;      // 'light' | 'dark'
-ctx.system.programId;  // your app id
+ctx.system.version; // DeskOS version
+ctx.system.theme; // 'light' | 'dark'
+ctx.system.programId; // your app id
 ```
 
 ### Right-click menus inside your window
@@ -242,9 +246,7 @@ Tell DeskOS what the user has selected inside your app so context menus and Dele
 useEffect(() => {
   return ctx.selection.register(
     () =>
-      selectedIds.size
-        ? { type: 'notes', ids: [...selectedIds], count: selectedIds.size }
-        : null,
+      selectedIds.size ? { type: 'notes', ids: [...selectedIds], count: selectedIds.size } : null,
     { id: 'main', isActive: () => isWindowFocused }
   );
 }, [ctx]);
@@ -280,7 +282,7 @@ Built-in icon names are in `@core/icons`. Render them with the shared component:
 ```tsx
 import { Icon } from '@components/Icon';
 
-<Icon name="notes" size={32} />
+<Icon name="notes" size={32} />;
 ```
 
 You can also use an emoji string as `icon` in `defineProgram`.

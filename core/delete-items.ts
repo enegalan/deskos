@@ -19,8 +19,7 @@ interface DeleteItemsProvider {
 let deleteItemsProviders: DeleteItemsProvider[] = [];
 
 /** Fallback delete label when no provider registers a custom one. */
-const DEFAULT_LABEL: DeleteLabelFn = (count) =>
-  count > 1 ? `Delete (${count} items)` : 'Delete';
+const DEFAULT_LABEL: DeleteLabelFn = (count) => (count > 1 ? `Delete (${count} items)` : 'Delete');
 
 /**
  * Register a handler that performs delete/move-to-trash on item ids.

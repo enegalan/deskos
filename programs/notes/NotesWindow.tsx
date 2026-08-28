@@ -61,11 +61,7 @@ export function NotesWindow({ ctx }: NotesWindowProps) {
   const updateNote = useCallback(
     (id: string, updates: Partial<Note>) => {
       setNotes((prev) =>
-        prev.map((note) =>
-          note.id === id
-            ? { ...note, ...updates, updatedAt: Date.now() }
-            : note
-        )
+        prev.map((note) => (note.id === id ? { ...note, ...updates, updatedAt: Date.now() } : note))
       );
 
       // Emit event for sync
@@ -105,9 +101,7 @@ export function NotesWindow({ ctx }: NotesWindowProps) {
       (data) => {
         if (data) {
           setNotes((prev) =>
-            prev.map((note) =>
-              note.id === data.id ? { ...note, ...data.updates } : note
-            )
+            prev.map((note) => (note.id === data.id ? { ...note, ...data.updates } : note))
           );
         }
       }
@@ -138,9 +132,7 @@ export function NotesWindow({ ctx }: NotesWindowProps) {
               onClick={() => setSelectedNoteId(note.id)}
             >
               <div className="notes-item-title">{note.title || 'Untitled'}</div>
-              <div className="notes-item-preview">
-                {note.content.slice(0, 50) || 'No content'}
-              </div>
+              <div className="notes-item-preview">{note.content.slice(0, 50) || 'No content'}</div>
             </button>
           ))}
 
@@ -191,9 +183,7 @@ export function NotesWindow({ ctx }: NotesWindowProps) {
                 color: 'var(--color-text-muted)',
               }}
             >
-              <span>
-                Last updated: {new Date(selectedNote.updatedAt).toLocaleString()}
-              </span>
+              <span>Last updated: {new Date(selectedNote.updatedAt).toLocaleString()}</span>
               <button
                 onClick={() => deleteNote(selectedNote.id)}
                 style={{
@@ -211,9 +201,7 @@ export function NotesWindow({ ctx }: NotesWindowProps) {
             </div>
           </>
         ) : (
-          <div className="notes-empty">
-            Select a note or create a new one
-          </div>
+          <div className="notes-empty">Select a note or create a new one</div>
         )}
       </div>
     </div>

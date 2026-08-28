@@ -344,9 +344,7 @@ function restoreFolderEntry(
 
   if (targetParent === '/Desktop') {
     const occupied = desktopRootOccupied(shortcuts, folders);
-    const conflict = occupied.some(
-      (pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1
-    );
+    const conflict = occupied.some((pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1);
     if (conflict) {
       const next = findNextAvailablePosition(occupied);
       x = next.x;
@@ -364,8 +362,7 @@ function restoreFolderEntry(
   };
 
   folders.push(folder);
-  const path =
-    targetParent !== '/Desktop' ? `${targetParent}/${name}` : `/Desktop/${name}`;
+  const path = targetParent !== '/Desktop' ? `${targetParent}/${name}` : `/Desktop/${name}`;
   paths[folder.id] = path;
 
   if (targetParent !== '/Desktop') {
@@ -405,9 +402,7 @@ function restoreShortcutEntry(
 
   if (!targetParent) {
     const occupied = desktopRootOccupied(shortcuts, folders);
-    const conflict = occupied.some(
-      (pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1
-    );
+    const conflict = occupied.some((pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1);
     if (conflict) {
       const next = findNextAvailablePosition(occupied);
       x = next.x;

@@ -7,7 +7,12 @@ import {
   MIN_GRID_SIZE,
   MIN_ICON_SIZE,
 } from '@core/constants';
-import { saveCustomWallpaper, getCustomWallpapers, removeCustomWallpaper, type WallpaperMetadata } from '@core/wallpaper-storage';
+import {
+  saveCustomWallpaper,
+  getCustomWallpapers,
+  removeCustomWallpaper,
+  type WallpaperMetadata,
+} from '@core/wallpaper-storage';
 import { BUILTIN_WALLPAPERS } from '../../wallpapers/wallpapers';
 import { useState, useEffect } from 'react';
 
@@ -158,23 +163,25 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
     reader.onload = async (event) => {
       const dataUrl = event.target?.result as string;
       console.log('[Settings] File read, data URL length:', dataUrl?.length);
-      
+
       if (dataUrl) {
         try {
           console.log('[Settings] Saving custom wallpaper...');
           // Save wallpaper with metadata
           const metadata = await saveCustomWallpaper(dataUrl, file.name, file.size);
           console.log('[Settings] Wallpaper saved with metadata:', metadata);
-          
+
           // Update the list
           setCustomWallpapers(getCustomWallpapers());
-          
+
           // Set as current wallpaper
           updateSettings({ wallpaper: metadata.id });
           console.log('[Settings] Settings updated');
         } catch (error) {
           console.error('[Settings] Failed to save wallpaper:', error);
-          alert('Failed to save wallpaper: ' + (error instanceof Error ? error.message : String(error)));
+          alert(
+            'Failed to save wallpaper: ' + (error instanceof Error ? error.message : String(error))
+          );
         }
       } else {
         console.error('[Settings] No data URL generated');
@@ -228,7 +235,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
   const handleAutoArrangeToggle = () => {
     const newAutoArrange = !settings.autoArrange;
     updateSettings({ autoArrange: newAutoArrange });
-    
+
     // If enabling, arrange icons immediately
     if (newAutoArrange) {
       import('@core/desktop-shortcuts').then(({ autoArrangeIcons }) => {
@@ -290,7 +297,10 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
                     width: '24px',
                     height: '24px',
                     backgroundColor: color,
-                    border: settings.accentColor === color ? '2px solid var(--color-text-primary)' : '1px solid var(--color-border)',
+                    border:
+                      settings.accentColor === color
+                        ? '2px solid var(--color-text-primary)'
+                        : '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-sm)',
                     cursor: 'pointer',
                   }}
@@ -313,7 +323,10 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
               style={{
                 width: 60,
                 height: 40,
-                border: settings.wallpaper === wp.value ? '2px solid var(--color-accent)' : '1px solid var(--color-border)',
+                border:
+                  settings.wallpaper === wp.value
+                    ? '2px solid var(--color-accent)'
+                    : '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-sm)',
                 background: wp.value || 'var(--color-bg-tertiary)',
                 cursor: 'pointer',
@@ -326,7 +339,13 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
 
         {customWallpapers.length > 0 && (
           <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--color-text-secondary)',
+                marginBottom: '8px',
+              }}
+            >
               Custom Wallpapers
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -344,7 +363,10 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
                     style={{
                       width: '100%',
                       height: '100%',
-                      border: settings.wallpaper === wp.id ? '2px solid var(--color-accent)' : '1px solid var(--color-border)',
+                      border:
+                        settings.wallpaper === wp.id
+                          ? '2px solid var(--color-accent)'
+                          : '1px solid var(--color-border)',
                       borderRadius: 'var(--radius-sm)',
                       backgroundImage: `url(${wp.thumbnail})`,
                       backgroundSize: 'cover',

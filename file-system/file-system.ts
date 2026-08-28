@@ -83,7 +83,7 @@ const RECENT_ITEMS_STORAGE_KEY = 'recent-items';
  */
 export function parsePath(path: string): string[] {
   if (!path || path === '/') return [];
-  return path.split('/').filter(part => part.length > 0);
+  return path.split('/').filter((part) => part.length > 0);
 }
 
 /**

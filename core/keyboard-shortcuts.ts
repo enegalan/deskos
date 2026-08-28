@@ -6,7 +6,8 @@ import { useKernel } from './kernel';
 import { getAllSelectAllHandlers } from './selection';
 
 /** Key or key name accepted by the keyboard shortcuts manager. */
-export type ShortcutKey = 'Q' | 'W' | 'M' | 'H' | 'N' | 'T' | 'COMMA' | 'DELETE' | 'BACKSPACE' | string;
+export type ShortcutKey =
+  'Q' | 'W' | 'M' | 'H' | 'N' | 'T' | 'COMMA' | 'DELETE' | 'BACKSPACE' | string;
 
 /** Registered global keyboard shortcut. */
 export interface KeyboardShortcut {
@@ -195,7 +196,7 @@ class KeyboardShortcutsManager {
 
   private getShortcutKey(e: KeyboardEvent): string {
     const parts: string[] = [];
-    
+
     // Accept Cmd (Mac) or Ctrl (Windows/Linux, and Ctrl on Mac) as the primary modifier
     if (e.metaKey || e.ctrlKey) {
       parts.push('meta');
@@ -206,15 +207,12 @@ class KeyboardShortcutsManager {
     if (e.altKey) {
       parts.push('alt');
     }
-    
+
     const key = e.key.toUpperCase();
     const keyName =
-      key === ',' ? 'COMMA' :
-      key === 'BACKSPACE' ? 'BACKSPACE' :
-      key === 'DELETE' ? 'DELETE' :
-      key;
+      key === ',' ? 'COMMA' : key === 'BACKSPACE' ? 'BACKSPACE' : key === 'DELETE' ? 'DELETE' : key;
     parts.push(keyName);
-    
+
     return parts.join('+');
   }
 
@@ -228,11 +226,7 @@ class KeyboardShortcutsManager {
   private handleKeyDown(e: KeyboardEvent): void {
     // Never steal text editing shortcuts from inputs / contenteditable
     const target = e.target as HTMLElement;
-    if (
-      target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.isContentEditable
-    ) {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
       return;
     }
 
@@ -252,7 +246,7 @@ class KeyboardShortcutsManager {
   register(shortcut: KeyboardShortcut): () => void {
     const key = this.buildShortcutKey(shortcut);
     this.shortcuts.set(key, shortcut);
-    
+
     return () => {
       this.shortcuts.delete(key);
     };
@@ -274,9 +268,9 @@ class KeyboardShortcutsManager {
     if (shortcut.altKey) {
       parts.push('alt');
     }
-    
+
     parts.push(shortcut.key);
-    
+
     return parts.join('+');
   }
 

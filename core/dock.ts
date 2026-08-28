@@ -11,10 +11,7 @@ export type DockProgramItem = {
 };
 
 /** Built-in dock chrome (not a program) */
-export type DockSpecialItem =
-  | { type: 'separator' }
-  | { type: 'clock' }
-  | { type: 'running' };
+export type DockSpecialItem = { type: 'separator' } | { type: 'clock' } | { type: 'running' };
 
 /** Union of all dock slot types (program pin or built-in chrome). */
 export type DockItem = DockProgramItem | DockSpecialItem;

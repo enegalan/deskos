@@ -74,26 +74,31 @@ export function getDesktopShortcuts(): DesktopShortcut[] {
 /**
  * Add a new desktop shortcut
  */
-export function addDesktopShortcut(programId: string, x?: number, y?: number, customName?: string): DesktopShortcut {
+export function addDesktopShortcut(
+  programId: string,
+  x?: number,
+  y?: number,
+  customName?: string
+): DesktopShortcut {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
-  
+
   // Check if shortcut already exists for this program
   const existing = shortcuts.find((s) => s.programId === programId);
   if (existing) {
     // Check if the shortcut is inside a folder
-    const isInFolder = folders.some(f => f.contents.includes(existing.id));
-    
+    const isInFolder = folders.some((f) => f.contents.includes(existing.id));
+
     // If it's in a folder and we're providing a position, remove it from the folder
     if (isInFolder && x !== undefined && y !== undefined) {
-      folders.forEach(folder => {
+      folders.forEach((folder) => {
         if (folder.contents.includes(existing.id)) {
-          folder.contents = folder.contents.filter(id => id !== existing.id);
+          folder.contents = folder.contents.filter((id) => id !== existing.id);
         }
       });
       systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
     }
-    
+
     // Update existing shortcut position if provided
     if (x !== undefined && y !== undefined) {
       const clamped = clampGridPosition(x, y);
@@ -104,7 +109,7 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
       existing.customName = customName;
     }
     systemStorage.setItem(STORAGE_KEY, shortcuts);
-    
+
     // Always dispatch event when updating existing shortcut
     window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
     return existing;
@@ -138,7 +143,7 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
   shortcuts.push(newShortcut);
   systemStorage.setItem(STORAGE_KEY, shortcuts);
   rememberGridMetrics();
-  
+
   // If auto arrange is enabled and position was not manually specified, arrange all icons
   if (positionNotSpecified && useKernel.getState().settings.autoArrange) {
     autoArrangeIcons();
@@ -146,7 +151,7 @@ export function addDesktopShortcut(programId: string, x?: number, y?: number, cu
     // Dispatch event to notify DesktopIcons to refresh
     window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
   }
-  
+
   return newShortcut;
 }
 
@@ -213,7 +218,9 @@ export function findItemAtPosition(
   const shortcut = shortcuts.find((s) => {
     if (exclude.has(s.id)) return false;
     if (inFolders.has(s.id)) return false;
-    return Math.round(s.x / metrics.cellWidth) === col && Math.round(s.y / metrics.cellHeight) === row;
+    return (
+      Math.round(s.x / metrics.cellWidth) === col && Math.round(s.y / metrics.cellHeight) === row
+    );
   });
 
   if (shortcut) return shortcut;
@@ -221,7 +228,9 @@ export function findItemAtPosition(
   const folder = folders.find((f) => {
     if (exclude.has(f.id)) return false;
     if (!isRootDesktopFolder(f)) return false;
-    return Math.round(f.x / metrics.cellWidth) === col && Math.round(f.y / metrics.cellHeight) === row;
+    return (
+      Math.round(f.x / metrics.cellWidth) === col && Math.round(f.y / metrics.cellHeight) === row
+    );
   });
 
   return folder || null;
@@ -256,11 +265,11 @@ export function readDraggedItemIds(dataTransfer: DataTransfer): string[] {
 export function swapItemPositions(itemId1: string, itemId2: string): void {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
-  
+
   // Find both items
   const item1 = shortcuts.find((s) => s.id === itemId1) || folders.find((f) => f.id === itemId1);
   const item2 = shortcuts.find((s) => s.id === itemId2) || folders.find((f) => f.id === itemId2);
-  
+
   if (item1 && item2) {
     const tempX = item1.x;
     const tempY = item1.y;
@@ -268,12 +277,12 @@ export function swapItemPositions(itemId1: string, itemId2: string): void {
     item1.y = item2.y;
     item2.x = tempX;
     item2.y = tempY;
-    
+
     // Save changes
     systemStorage.setItem(STORAGE_KEY, shortcuts);
     systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
     rememberGridMetrics();
-    
+
     // Dispatch event to notify DesktopIcons to refresh
     window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
   }
@@ -451,7 +460,10 @@ export function pixelToClampedGrid(
 /**
  * Find next available grid position
  */
-export function findNextAvailablePosition(items: Array<{ x: number; y: number }>): { x: number; y: number } {
+export function findNextAvailablePosition(items: Array<{ x: number; y: number }>): {
+  x: number;
+  y: number;
+} {
   const bounds = getDesktopBounds();
   const metrics = getGridMetrics(bounds);
   const thresholdX = metrics.cellWidth * GRID_OCCUPANCY_RATIO;
@@ -474,9 +486,7 @@ export function findNextAvailablePosition(items: Array<{ x: number; y: number }>
   // If all visible cells are occupied, place past the grid (avoids overlapping origin)
   let y = metrics.rows * metrics.cellHeight;
   while (
-    items.some(
-      (item) => Math.abs(item.x - 0) < thresholdX && Math.abs(item.y - y) < thresholdY
-    )
+    items.some((item) => Math.abs(item.x - 0) < thresholdX && Math.abs(item.y - y) < thresholdY)
   ) {
     y += metrics.cellHeight;
   }
@@ -530,7 +540,9 @@ export function findNearestAvailablePosition(
 }
 
 /** Positions of root-desktop items, optionally excluding ids (e.g. the drag group) */
-export function getDesktopSurfacePositions(excludeIds: Iterable<string> = []): Array<{ x: number; y: number }> {
+export function getDesktopSurfacePositions(
+  excludeIds: Iterable<string> = []
+): Array<{ x: number; y: number }> {
   const exclude = new Set(excludeIds);
   const inFolders = getIdsInsideFolders();
   const positions: Array<{ x: number; y: number }> = [];
@@ -673,7 +685,7 @@ export function realignIconsToGrid(): void {
   const allItems: Array<{ id: string; x: number; y: number; type: 'shortcut' | 'folder' }> = [];
   const metrics = getGridMetrics();
   let hasChanges = false;
-  
+
   // Collect all items with their current positions
   shortcuts.forEach((shortcut) => {
     allItems.push({ id: shortcut.id, x: shortcut.x, y: shortcut.y, type: 'shortcut' });
@@ -681,37 +693,37 @@ export function realignIconsToGrid(): void {
   folders.forEach((folder) => {
     allItems.push({ id: folder.id, x: folder.x, y: folder.y, type: 'folder' });
   });
-  
+
   // Track occupied grid positions
   const occupiedPositions = new Map<string, string>(); // key: "col,row", value: itemId
-  
+
   // First pass: align all items to grid and detect collisions
-  const collisions: Array<{ item: typeof allItems[0]; gridPos: { x: number; y: number } }> = [];
-  
+  const collisions: Array<{ item: (typeof allItems)[0]; gridPos: { x: number; y: number } }> = [];
+
   allItems.forEach((item) => {
     const gridPos = pixelToGrid(item.x, item.y);
     const col = Math.round(gridPos.x / metrics.cellWidth);
     const row = Math.round(gridPos.y / metrics.cellHeight);
     const posKey = `${col},${row}`;
-    
+
     if (occupiedPositions.has(posKey)) {
       // Collision detected - this item needs a new position
       collisions.push({ item, gridPos });
     } else {
       // No collision - assign this position
       occupiedPositions.set(posKey, item.id);
-      
+
       // Update the item's position if it changed
       if (item.x !== gridPos.x || item.y !== gridPos.y) {
         if (item.type === 'shortcut') {
-          const shortcut = shortcuts.find(s => s.id === item.id);
+          const shortcut = shortcuts.find((s) => s.id === item.id);
           if (shortcut) {
             shortcut.x = gridPos.x;
             shortcut.y = gridPos.y;
             hasChanges = true;
           }
         } else {
-          const folder = folders.find(f => f.id === item.id);
+          const folder = folders.find((f) => f.id === item.id);
           if (folder) {
             folder.x = gridPos.x;
             folder.y = gridPos.y;
@@ -721,7 +733,7 @@ export function realignIconsToGrid(): void {
       }
     }
   });
-  
+
   // Second pass: resolve collisions by finding available positions
   if (collisions.length > 0) {
     collisions.forEach(({ item, gridPos }) => {
@@ -729,14 +741,14 @@ export function realignIconsToGrid(): void {
       let found = false;
       const startCol = Math.round(gridPos.x / metrics.cellWidth);
       const startRow = Math.round(gridPos.y / metrics.cellHeight);
-      
+
       // Search in a spiral pattern starting from the original grid position
       for (let radius = 1; radius <= Math.max(metrics.cols, metrics.rows) && !found; radius++) {
         for (let dx = -radius; dx <= radius && !found; dx++) {
           for (let dy = -radius; dy <= radius && !found; dy++) {
             // Only check positions at the current radius
             if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
-            
+
             const col = startCol + dx;
             const row = startRow + dy;
             if (col < 0 || row < 0 || col >= metrics.cols || row >= metrics.rows) {
@@ -747,32 +759,32 @@ export function realignIconsToGrid(): void {
             const posKey = `${col},${row}`;
             if (!occupiedPositions.has(posKey)) {
               occupiedPositions.set(posKey, item.id);
-              
+
               if (item.type === 'shortcut') {
-                const shortcut = shortcuts.find(s => s.id === item.id);
+                const shortcut = shortcuts.find((s) => s.id === item.id);
                 if (shortcut) {
                   shortcut.x = pos.x;
                   shortcut.y = pos.y;
                   hasChanges = true;
                 }
               } else {
-                const folder = folders.find(f => f.id === item.id);
+                const folder = folders.find((f) => f.id === item.id);
                 if (folder) {
                   folder.x = pos.x;
                   folder.y = pos.y;
                   hasChanges = true;
                 }
               }
-              
+
               found = true;
             }
           }
         }
       }
-      
+
       // If no position found in spiral search, use findNextAvailablePosition as fallback
       if (!found) {
-        const allCurrentPositions = Array.from(occupiedPositions.keys()).map(key => {
+        const allCurrentPositions = Array.from(occupiedPositions.keys()).map((key) => {
           const [col, row] = key.split(',').map(Number);
           return cellTopLeft(col, row, metrics);
         });
@@ -780,16 +792,16 @@ export function realignIconsToGrid(): void {
         const col = Math.round(availablePos.x / metrics.cellWidth);
         const row = Math.round(availablePos.y / metrics.cellHeight);
         occupiedPositions.set(`${col},${row}`, item.id);
-        
+
         if (item.type === 'shortcut') {
-          const shortcut = shortcuts.find(s => s.id === item.id);
+          const shortcut = shortcuts.find((s) => s.id === item.id);
           if (shortcut) {
             shortcut.x = availablePos.x;
             shortcut.y = availablePos.y;
             hasChanges = true;
           }
         } else {
-          const folder = folders.find(f => f.id === item.id);
+          const folder = folders.find((f) => f.id === item.id);
           if (folder) {
             folder.x = availablePos.x;
             folder.y = availablePos.y;
@@ -799,13 +811,13 @@ export function realignIconsToGrid(): void {
       }
     });
   }
-  
+
   if (hasChanges) {
     // Save updated positions
     systemStorage.setItem(STORAGE_KEY, shortcuts);
     systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
     rememberGridMetrics();
-    
+
     // Dispatch event to notify DesktopIcons to refresh
     window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
   } else {
@@ -821,7 +833,7 @@ export function autoArrangeIcons(): void {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const allItems = [...shortcuts, ...folders];
-  
+
   if (allItems.length === 0) return;
 
   const metrics = getGridMetrics();
@@ -843,7 +855,7 @@ export function autoArrangeIcons(): void {
     const pos = cellTopLeft(currentCol, currentRow, metrics);
     item.x = pos.x;
     item.y = pos.y;
-    
+
     currentCol++;
     if (currentCol >= metrics.cols) {
       currentCol = 0;
@@ -855,7 +867,7 @@ export function autoArrangeIcons(): void {
   systemStorage.setItem(STORAGE_KEY, shortcuts);
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   rememberGridMetrics();
-  
+
   // Dispatch event to notify DesktopIcons to refresh
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
@@ -866,17 +878,17 @@ export function autoArrangeIcons(): void {
 export async function organizeIconsByName(): Promise<void> {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
-  
+
   // Filter to only root level items (not inside folders)
-  const rootFolders = folders.filter(f => !f.parentPath || f.parentPath === '/Desktop');
+  const rootFolders = folders.filter((f) => !f.parentPath || f.parentPath === '/Desktop');
   const itemsInFolders = new Set<string>();
-  folders.forEach(folder => {
-    folder.contents.forEach(itemId => {
+  folders.forEach((folder) => {
+    folder.contents.forEach((itemId) => {
       itemsInFolders.add(itemId);
     });
   });
-  const rootShortcuts = shortcuts.filter(s => !itemsInFolders.has(s.id));
-  
+  const rootShortcuts = shortcuts.filter((s) => !itemsInFolders.has(s.id));
+
   if (rootShortcuts.length === 0 && rootFolders.length === 0) return;
 
   const metrics = getGridMetrics();
@@ -885,17 +897,17 @@ export async function organizeIconsByName(): Promise<void> {
 
   // Get program names for shortcuts - import dynamically to avoid circular dependency
   const { programs } = await import('virtual:programs');
-  
+
   // Create array of items with their names for sorting
   const itemsWithNames: Array<{ item: DesktopItem; name: string }> = [];
-  
-  rootShortcuts.forEach(shortcut => {
+
+  rootShortcuts.forEach((shortcut) => {
     const program = programs[shortcut.programId];
-    const name = shortcut.customName || (program?.metadata?.name || shortcut.programId);
+    const name = shortcut.customName || program?.metadata?.name || shortcut.programId;
     itemsWithNames.push({ item: shortcut, name: name.toLowerCase() });
   });
-  
-  rootFolders.forEach(folder => {
+
+  rootFolders.forEach((folder) => {
     itemsWithNames.push({ item: folder, name: folder.name.toLowerCase() });
   });
 
@@ -911,7 +923,7 @@ export async function organizeIconsByName(): Promise<void> {
     const pos = cellTopLeft(currentCol, currentRow, metrics);
     item.x = pos.x;
     item.y = pos.y;
-    
+
     currentCol++;
     if (currentCol >= metrics.cols) {
       currentCol = 0;
@@ -923,7 +935,7 @@ export async function organizeIconsByName(): Promise<void> {
   systemStorage.setItem(STORAGE_KEY, shortcuts);
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   rememberGridMetrics();
-  
+
   // Dispatch event to notify DesktopIcons to refresh
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
@@ -934,17 +946,17 @@ export async function organizeIconsByName(): Promise<void> {
 export function organizeIconsByDate(): void {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
-  
+
   // Filter to only root level items (not inside folders)
-  const rootFolders = folders.filter(f => !f.parentPath || f.parentPath === '/Desktop');
+  const rootFolders = folders.filter((f) => !f.parentPath || f.parentPath === '/Desktop');
   const itemsInFolders = new Set<string>();
-  folders.forEach(folder => {
-    folder.contents.forEach(itemId => {
+  folders.forEach((folder) => {
+    folder.contents.forEach((itemId) => {
       itemsInFolders.add(itemId);
     });
   });
-  const rootShortcuts = shortcuts.filter(s => !itemsInFolders.has(s.id));
-  
+  const rootShortcuts = shortcuts.filter((s) => !itemsInFolders.has(s.id));
+
   if (rootShortcuts.length === 0 && rootFolders.length === 0) return;
 
   const metrics = getGridMetrics();
@@ -953,15 +965,17 @@ export function organizeIconsByDate(): void {
 
   // Create array of items with their creation dates for sorting
   const itemsWithDates: Array<{ item: DesktopItem; date: number }> = [];
-  
-  rootShortcuts.forEach(shortcut => {
+
+  rootShortcuts.forEach((shortcut) => {
     // Shortcuts don't have createdAt, use a default or extract from ID timestamp if available
     // For now, use 0 to put them at the end, or we could extract timestamp from ID
-    const timestamp = shortcut.id.includes('-') ? parseInt(shortcut.id.split('-').pop() || '0', 10) : 0;
+    const timestamp = shortcut.id.includes('-')
+      ? parseInt(shortcut.id.split('-').pop() || '0', 10)
+      : 0;
     itemsWithDates.push({ item: shortcut, date: timestamp || 0 });
   });
-  
-  rootFolders.forEach(folder => {
+
+  rootFolders.forEach((folder) => {
     itemsWithDates.push({ item: folder, date: folder.createdAt || 0 });
   });
 
@@ -973,7 +987,7 @@ export function organizeIconsByDate(): void {
     const pos = cellTopLeft(currentCol, currentRow, metrics);
     item.x = pos.x;
     item.y = pos.y;
-    
+
     currentCol++;
     if (currentCol >= metrics.cols) {
       currentCol = 0;
@@ -985,7 +999,7 @@ export function organizeIconsByDate(): void {
   systemStorage.setItem(STORAGE_KEY, shortcuts);
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   rememberGridMetrics();
-  
+
   // Dispatch event to notify DesktopIcons to refresh
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
@@ -1018,35 +1032,40 @@ function setFolderPaths(paths: Record<string, string>): void {
 function generateUniqueFolderName(baseName: string, parentPath: string): string {
   const folders = getDesktopFolders();
   const targetParentPath = parentPath || '/Desktop';
-  
+
   // Get all folders in the same parent directory
-  const siblingFolders = folders.filter(f => (f.parentPath || '/Desktop') === targetParentPath);
-  
+  const siblingFolders = folders.filter((f) => (f.parentPath || '/Desktop') === targetParentPath);
+
   // Check if base name is available
-  const nameExists = siblingFolders.some(f => f.name === baseName);
+  const nameExists = siblingFolders.some((f) => f.name === baseName);
   if (!nameExists) {
     return baseName;
   }
-  
+
   // Find the next available number
   let number = 1;
   let uniqueName = `${baseName} (${number})`;
-  
-  while (siblingFolders.some(f => f.name === uniqueName)) {
+
+  while (siblingFolders.some((f) => f.name === uniqueName)) {
     number++;
     uniqueName = `${baseName} (${number})`;
   }
-  
+
   return uniqueName;
 }
 
 /**
  * Create a new desktop folder
  */
-export function createDesktopFolder(name: string, x?: number, y?: number, parentPath?: string): DesktopFolder {
+export function createDesktopFolder(
+  name: string,
+  x?: number,
+  y?: number,
+  parentPath?: string
+): DesktopFolder {
   const folders = getDesktopFolders();
   const paths = getFolderPaths();
-  
+
   // Find next available position if not provided (desktop surface only)
   if (x === undefined || y === undefined) {
     const shortcuts = getDesktopShortcuts();
@@ -1067,10 +1086,13 @@ export function createDesktopFolder(name: string, x?: number, y?: number, parent
   // Generate unique folder name
   const targetParentPath = parentPath || '/Desktop';
   const uniqueName = generateUniqueFolderName(name, targetParentPath);
-  
+
   const folderId = `folder-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const path = targetParentPath !== '/Desktop' ? `${targetParentPath}/${uniqueName}` : `/Desktop/${uniqueName}`;
-  
+  const path =
+    targetParentPath !== '/Desktop'
+      ? `${targetParentPath}/${uniqueName}`
+      : `/Desktop/${uniqueName}`;
+
   const newFolder: DesktopFolder = {
     id: folderId,
     name: uniqueName,
@@ -1099,13 +1121,13 @@ export function createDesktopFolder(name: string, x?: number, y?: number, parent
       parentFolder.contents.push(folderId);
     }
   }
-  
+
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);
   rememberGridMetrics();
-  
+
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-  
+
   return newFolder;
 }
 
@@ -1115,14 +1137,14 @@ export function createDesktopFolder(name: string, x?: number, y?: number, parent
 export function getDesktopItems(path?: string): DesktopItem[] {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
-  
+
   if (!path || path === '/Desktop') {
     const inFolders = getIdsInsideFolders();
     const rootShortcuts = shortcuts.filter((s) => !inFolders.has(s.id));
     const rootFolders = folders.filter((f) => !f.parentPath || f.parentPath === '/Desktop');
     return [...rootShortcuts, ...rootFolders];
   }
-  
+
   // For specific paths, we'll need the file-system module
   // This is a placeholder - will be enhanced when file-system is implemented
   return [...shortcuts, ...folders];
@@ -1133,7 +1155,7 @@ export function getDesktopItems(path?: string): DesktopItem[] {
  */
 export function getFolderById(folderId: string): DesktopFolder | null {
   const folders = getDesktopFolders();
-  return folders.find(f => f.id === folderId) || null;
+  return folders.find((f) => f.id === folderId) || null;
 }
 
 /**
@@ -1143,34 +1165,34 @@ export function getFolderByPath(path: string): DesktopFolder | null {
   if (!path || path === '/Desktop' || path === '/') {
     return null; // Root is not a folder
   }
-  
+
   // Parse path: /Desktop/Folder1/Folder2 -> ['Desktop', 'Folder1', 'Folder2']
-  const parts = path.split('/').filter(p => p.length > 0);
+  const parts = path.split('/').filter((p) => p.length > 0);
   if (parts.length === 0 || parts[0] !== 'Desktop') {
     return null;
   }
-  
+
   const folders = getDesktopFolders();
-  let currentFolders = folders.filter(f => !f.parentPath || f.parentPath === '/Desktop');
-  
+  let currentFolders = folders.filter((f) => !f.parentPath || f.parentPath === '/Desktop');
+
   // Traverse path
   for (let i = 1; i < parts.length; i++) {
     const folderName = parts[i];
-    const folder = currentFolders.find(f => f.name === folderName);
+    const folder = currentFolders.find((f) => f.name === folderName);
     if (!folder) return null;
-    
+
     // If this is the last part, return this folder
     if (i === parts.length - 1) {
       return folder;
     }
-    
+
     // Otherwise, get subfolders
     const allFolders = getDesktopFolders();
     currentFolders = folder.contents
       .map((itemId) => allFolders.find((f) => f.id === itemId))
       .filter((f): f is DesktopFolder => f !== undefined);
   }
-  
+
   return null;
 }
 
@@ -1181,18 +1203,18 @@ export function getItemsByPath(path: string): DesktopItem[] {
   if (path === '/Desktop' || path === '/') {
     return getDesktopItems('/Desktop');
   }
-  
+
   const folder = getFolderByPath(path);
   if (!folder) return [];
-  
+
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
-  
+
   return folder.contents
-    .map(itemId => {
-      const shortcut = shortcuts.find(s => s.id === itemId);
+    .map((itemId) => {
+      const shortcut = shortcuts.find((s) => s.id === itemId);
       if (shortcut) return shortcut;
-      const subFolder = folders.find(f => f.id === itemId);
+      const subFolder = folders.find((f) => f.id === itemId);
       return subFolder || null;
     })
     .filter((item): item is DesktopItem => item !== null);
@@ -1204,39 +1226,41 @@ export function getItemsByPath(path: string): DesktopItem[] {
 export function addItemToFolder(folderId: string, itemId: string): void {
   const folders = getDesktopFolders();
   const paths = getFolderPaths();
-  const folder = folders.find(f => f.id === folderId);
+  const folder = folders.find((f) => f.id === folderId);
   if (!folder) return;
-  
+
   // Prevent adding item to itself
   if (folder.id === itemId) return;
-  
+
   // Prevent adding item if it's already in the folder
   if (folder.contents.includes(itemId)) return;
-  
+
   // Remove item from its current parent if it's a folder
-  folders.forEach(f => {
+  folders.forEach((f) => {
     if (f.id !== folderId && f.contents.includes(itemId)) {
-      f.contents = f.contents.filter(id => id !== itemId);
+      f.contents = f.contents.filter((id) => id !== itemId);
     }
   });
-  
+
   folder.contents.push(itemId);
-  
+
   // If the item being added is a folder, update its parentPath
-  const itemFolder = folders.find(f => f.id === itemId);
+  const itemFolder = folders.find((f) => f.id === itemId);
   if (itemFolder) {
     // Calculate the new parent path
-    const folderPath = paths[folderId] || (folder.parentPath ? `${folder.parentPath}/${folder.name}` : `/Desktop/${folder.name}`);
+    const folderPath =
+      paths[folderId] ||
+      (folder.parentPath ? `${folder.parentPath}/${folder.name}` : `/Desktop/${folder.name}`);
     itemFolder.parentPath = folderPath;
-    
+
     // Update the path mapping for the moved folder
     const newPath = `${folderPath}/${itemFolder.name}`;
     paths[itemId] = newPath;
   }
-  
+
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);
-  
+
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
 
@@ -1246,23 +1270,23 @@ export function addItemToFolder(folderId: string, itemId: string): void {
 export function removeItemFromFolder(folderId: string, itemId: string): void {
   const folders = getDesktopFolders();
   const paths = getFolderPaths();
-  const folder = folders.find(f => f.id === folderId);
+  const folder = folders.find((f) => f.id === folderId);
   if (!folder) return;
-  
-  folder.contents = folder.contents.filter(id => id !== itemId);
-  
+
+  folder.contents = folder.contents.filter((id) => id !== itemId);
+
   // If the item being removed is a folder, update its parentPath to root
-  const itemFolder = folders.find(f => f.id === itemId);
+  const itemFolder = folders.find((f) => f.id === itemId);
   if (itemFolder) {
     itemFolder.parentPath = '/Desktop';
     // Update path mapping
     const newPath = `/Desktop/${itemFolder.name}`;
     paths[itemId] = newPath;
   }
-  
+
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);
-  
+
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
 
@@ -1272,37 +1296,37 @@ export function removeItemFromFolder(folderId: string, itemId: string): void {
 export function deleteDesktopFolder(folderId: string): void {
   const folders = getDesktopFolders();
   const paths = getFolderPaths();
-  
+
   // Remove folder and all its contents recursively
   const removeFolderRecursive = (id: string) => {
-    const folder = folders.find(f => f.id === id);
+    const folder = folders.find((f) => f.id === id);
     if (!folder) return;
-    
+
     // Remove all items in the folder
-    folder.contents.forEach(itemId => {
+    folder.contents.forEach((itemId) => {
       // Check if it's a subfolder
-      const subFolder = folders.find(f => f.id === itemId);
+      const subFolder = folders.find((f) => f.id === itemId);
       if (subFolder) {
         removeFolderRecursive(itemId);
       }
       // Shortcuts are not deleted, just removed from folder
     });
-    
+
     // Remove folder from array
-    const index = folders.findIndex(f => f.id === id);
+    const index = folders.findIndex((f) => f.id === id);
     if (index !== -1) {
       folders.splice(index, 1);
     }
-    
+
     // Remove path mapping
     delete paths[id];
   };
-  
+
   removeFolderRecursive(folderId);
-  
+
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);
-  
+
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
 
@@ -1312,11 +1336,11 @@ export function deleteDesktopFolder(folderId: string): void {
 export function renameDesktopFolder(folderId: string, newName: string): void {
   const folders = getDesktopFolders();
   const paths = getFolderPaths();
-  const folder = folders.find(f => f.id === folderId);
+  const folder = folders.find((f) => f.id === folderId);
   if (!folder) return;
-  
+
   folder.name = newName;
-  
+
   // Update path if it exists
   if (paths[folderId]) {
     const oldPath = paths[folderId];
@@ -1324,10 +1348,10 @@ export function renameDesktopFolder(folderId: string, newName: string): void {
     pathParts[pathParts.length - 1] = newName;
     paths[folderId] = pathParts.join('/');
   }
-  
+
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);
-  
+
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
 
@@ -1336,13 +1360,13 @@ export function renameDesktopFolder(folderId: string, newName: string): void {
  */
 export function renameDesktopShortcut(shortcutId: string, newName: string): void {
   const shortcuts = getDesktopShortcuts();
-  const shortcut = shortcuts.find(s => s.id === shortcutId);
+  const shortcut = shortcuts.find((s) => s.id === shortcutId);
   if (!shortcut) return;
-  
+
   shortcut.customName = newName.trim() || undefined;
-  
+
   systemStorage.setItem(STORAGE_KEY, shortcuts);
-  
+
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
 
@@ -1351,7 +1375,7 @@ export function renameDesktopShortcut(shortcutId: string, newName: string): void
  */
 export function updateFolderPosition(folderId: string, x: number, y: number): void {
   const folders = getDesktopFolders();
-  const folder = folders.find(f => f.id === folderId);
+  const folder = folders.find((f) => f.id === folderId);
   if (folder) {
     const clamped = clampGridPosition(x, y);
     folder.x = clamped.x;

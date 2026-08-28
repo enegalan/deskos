@@ -56,7 +56,10 @@ class ErrorLogger {
     }
 
     // Log to console in development
-    if (typeof window !== 'undefined' && (window as any).__DEV__ !== false) {
+    if (
+      typeof window !== 'undefined' &&
+      (window as Window & { __DEV__?: boolean }).__DEV__ !== false
+    ) {
       console.error(`[DeskOS Error] ${error.name}:`, error.message, error.context);
     }
   }

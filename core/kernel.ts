@@ -212,7 +212,7 @@ const defaultSettings: SystemSettings = {
  */
 function loadSettings(): SystemSettings {
   const [stored, error] = safeSync(() => localStorage.getItem(SETTINGS_STORAGE_KEY));
-  
+
   if (error) {
     handleError(error, { operation: 'loadSettings' });
     return defaultSettings;
@@ -223,9 +223,11 @@ function loadSettings(): SystemSettings {
   }
 
   const [parsed, parseError] = safeSync(() => JSON.parse(stored) as Partial<SystemSettings>);
-  
+
   if (parseError || !parsed) {
-    handleError(parseError ?? new StorageError('Failed to parse settings'), { operation: 'parseSettings' });
+    handleError(parseError ?? new StorageError('Failed to parse settings'), {
+      operation: 'parseSettings',
+    });
     return defaultSettings;
   }
 
@@ -264,7 +266,7 @@ function saveSettings(settings: SystemSettings): void {
   const [, error] = safeSync(() => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   });
-  
+
   if (error) {
     handleError(new StorageError('Failed to save settings', { settings }), {
       operation: 'saveSettings',
@@ -444,7 +446,8 @@ export const useKernel = create<KernelState>((set, get) => ({
       const visibleWindows = newWindows.filter((w) => !w.isMinimized);
       const newActiveId =
         visibleWindows.length > 0
-          ? state.windowOrder.filter((id) => visibleWindows.some((w) => w.id === id)).pop() ?? null
+          ? (state.windowOrder.filter((id) => visibleWindows.some((w) => w.id === id)).pop() ??
+            null)
           : null;
 
       scheduleSessionPersist();
@@ -516,9 +519,7 @@ export const useKernel = create<KernelState>((set, get) => ({
 
   moveWindow: (windowId: string, x: number, y: number): void => {
     set((state) => ({
-      windows: state.windows.map((w) =>
-        w.id === windowId ? { ...w, x, y } : w
-      ),
+      windows: state.windows.map((w) => (w.id === windowId ? { ...w, x, y } : w)),
     }));
   },
 
@@ -532,7 +533,10 @@ export const useKernel = create<KernelState>((set, get) => ({
 
       // Validate dimensions
       const validWidth = Math.max(win.minWidth, Math.min(width, window.innerWidth));
-      const validHeight = Math.max(win.minHeight, Math.min(height, window.innerHeight - TASKBAR_HEIGHT));
+      const validHeight = Math.max(
+        win.minHeight,
+        Math.min(height, window.innerHeight - TASKBAR_HEIGHT)
+      );
 
       return {
         windows: state.windows.map((w) =>
@@ -566,12 +570,12 @@ export const useKernel = create<KernelState>((set, get) => ({
     set((state) => {
       const knownIds = new Set(state.windows.map((w) => w.id));
       const orderedIds = windowOrder.filter((id) => knownIds.has(id));
-      const missingIds = state.windows
-        .map((w) => w.id)
-        .filter((id) => !orderedIds.includes(id));
+      const missingIds = state.windows.map((w) => w.id).filter((id) => !orderedIds.includes(id));
       const nextOrder = [...orderedIds, ...missingIds];
       const resolvedActiveId =
-        activeWindowId && knownIds.has(activeWindowId) ? activeWindowId : nextOrder.at(-1) ?? null;
+        activeWindowId && knownIds.has(activeWindowId)
+          ? activeWindowId
+          : (nextOrder.at(-1) ?? null);
 
       return {
         windowOrder: nextOrder,
@@ -587,9 +591,7 @@ export const useKernel = create<KernelState>((set, get) => ({
 
   setWindowTitle: (windowId: string, title: string): void => {
     set((state) => ({
-      windows: state.windows.map((w) =>
-        w.id === windowId ? { ...w, title } : w
-      ),
+      windows: state.windows.map((w) => (w.id === windowId ? { ...w, title } : w)),
     }));
     scheduleSessionPersist();
   },

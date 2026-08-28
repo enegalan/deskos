@@ -160,12 +160,7 @@ export interface MarqueeRect {
 }
 
 /** Normalize two points into a positive-size rectangle */
-export function normalizeMarqueeRect(
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number
-): MarqueeRect {
+export function normalizeMarqueeRect(x0: number, y0: number, x1: number, y1: number): MarqueeRect {
   const left = Math.min(x0, x1);
   const top = Math.min(y0, y1);
   return {
@@ -292,12 +287,7 @@ export function startMarqueeSelection(options: MarqueeSessionOptions): void {
     const localRect = normalizeMarqueeRect(startLocalX, startLocalY, localX, localY);
     onRect(localRect);
 
-    const clientRect = normalizeMarqueeRect(
-      startClientX,
-      startClientY,
-      e.clientX,
-      e.clientY
-    );
+    const clientRect = normalizeMarqueeRect(startClientX, startClientY, e.clientX, e.clientY);
     applyHits(clientRect);
   };
 

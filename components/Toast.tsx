@@ -76,9 +76,7 @@ function Toast({ notification }: ToastProps) {
       </div>
       <div className="toast-content">
         <div className="toast-title">{notification.title}</div>
-        {notification.message && (
-          <div className="toast-message">{notification.message}</div>
-        )}
+        {notification.message && <div className="toast-message">{notification.message}</div>}
       </div>
       <button className="toast-close" onClick={handleDismiss} aria-label="Close">
         <Icon name="close" size={16} />

@@ -67,15 +67,15 @@ export async function storeWallpaper(dataUrl: string): Promise<string> {
     console.log('[WallpaperStorage] Opening database...');
     const db = await openDatabase();
     console.log('[WallpaperStorage] Database opened');
-    
+
     const id = `wallpaper-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     console.log('[WallpaperStorage] Generated ID:', id);
-    
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
       console.log('[WallpaperStorage] Storing data, size:', dataUrl.length);
-      
+
       const request = store.put(dataUrl, id);
 
       request.onsuccess = () => {
@@ -102,7 +102,7 @@ export async function storeWallpaper(dataUrl: string): Promise<string> {
 export async function getWallpaper(id: string): Promise<string | null> {
   try {
     const db = await openDatabase();
-    
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readonly');
       const store = transaction.objectStore(STORE_NAME);
@@ -129,7 +129,7 @@ export async function getWallpaper(id: string): Promise<string | null> {
 export async function deleteWallpaper(id: string): Promise<void> {
   try {
     const db = await openDatabase();
-    
+
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
@@ -174,7 +174,11 @@ const WALLPAPERS_LIST_KEY = 'deskos:custom-wallpapers';
 /**
  * Generate a thumbnail from a data URL
  */
-function generateThumbnail(dataUrl: string, maxWidth: number = 200, maxHeight: number = 120): Promise<string> {
+function generateThumbnail(
+  dataUrl: string,
+  maxWidth: number = 200,
+  maxHeight: number = 120
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {

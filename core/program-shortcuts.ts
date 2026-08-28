@@ -27,8 +27,7 @@ export function registerProgramKeyboardShortcuts(
       altKey: shortcut.altKey,
       description: shortcut.description,
       preventDefault: true,
-      action: () =>
-        launchOrFocusProgram(programId, action === 'launch-new'),
+      action: () => launchOrFocusProgram(programId, action === 'launch-new'),
     });
   }
 }

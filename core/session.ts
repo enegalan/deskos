@@ -82,8 +82,15 @@ export function loadSession(): SessionSnapshot | null {
   if (!stored) return null;
 
   const [parsed, parseError] = safeSync(() => JSON.parse(stored) as SessionSnapshot);
-  if (parseError || !parsed || parsed.version !== SESSION_VERSION || !Array.isArray(parsed.windows)) {
-    handleError(parseError ?? new StorageError('Failed to parse session'), { operation: 'parseSession' });
+  if (
+    parseError ||
+    !parsed ||
+    parsed.version !== SESSION_VERSION ||
+    !Array.isArray(parsed.windows)
+  ) {
+    handleError(parseError ?? new StorageError('Failed to parse session'), {
+      operation: 'parseSession',
+    });
     return null;
   }
 

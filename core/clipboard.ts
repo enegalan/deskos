@@ -48,46 +48,58 @@ function notifyClipboardUpdated(): void {
 /**
  * Register a handler for "Copy" keyboard shortcut
  */
-export function registerCopyHandler(handler: () => void, priority: number = PRIORITY_DESKTOP): () => void {
+export function registerCopyHandler(
+  handler: () => void,
+  priority: number = PRIORITY_DESKTOP
+): () => void {
   copyHandlers.push({ handler, priority });
   // Sort by priority (higher priority first)
   copyHandlers.sort((a, b) => b.priority - a.priority);
-  
+
   return () => {
-    copyHandlers = copyHandlers.filter(h => h.handler !== handler);
+    copyHandlers = copyHandlers.filter((h) => h.handler !== handler);
   };
 }
 
 /**
  * Register a handler for "Cut" keyboard shortcut
  */
-export function registerCutHandler(handler: () => void, priority: number = PRIORITY_DESKTOP): () => void {
+export function registerCutHandler(
+  handler: () => void,
+  priority: number = PRIORITY_DESKTOP
+): () => void {
   cutHandlers.push({ handler, priority });
   // Sort by priority (higher priority first)
   cutHandlers.sort((a, b) => b.priority - a.priority);
-  
+
   return () => {
-    cutHandlers = cutHandlers.filter(h => h.handler !== handler);
+    cutHandlers = cutHandlers.filter((h) => h.handler !== handler);
   };
 }
 
 /**
  * Register a handler for "Paste" keyboard shortcut
  */
-export function registerPasteHandler(handler: () => void, priority: number = PRIORITY_DESKTOP): () => void {
+export function registerPasteHandler(
+  handler: () => void,
+  priority: number = PRIORITY_DESKTOP
+): () => void {
   pasteHandlers.push({ handler, priority });
   // Sort by priority (higher priority first)
   pasteHandlers.sort((a, b) => b.priority - a.priority);
-  
+
   return () => {
-    pasteHandlers = pasteHandlers.filter(h => h.handler !== handler);
+    pasteHandlers = pasteHandlers.filter((h) => h.handler !== handler);
   };
 }
 
 /**
  * Register a handler for Delete / Backspace
  */
-export function registerDeleteHandler(handler: () => void, priority: number = PRIORITY_DESKTOP): () => void {
+export function registerDeleteHandler(
+  handler: () => void,
+  priority: number = PRIORITY_DESKTOP
+): () => void {
   deleteHandlers.push({ handler, priority });
   deleteHandlers.sort((a, b) => b.priority - a.priority);
 

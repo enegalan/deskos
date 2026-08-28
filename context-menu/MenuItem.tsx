@@ -114,9 +114,7 @@ export function MenuItem({
           </span>
         )}
         <span className="context-menu-item-label">{item.label}</span>
-        {item.shortcut && (
-          <span className="context-menu-item-shortcut">{item.shortcut}</span>
-        )}
+        {item.shortcut && <span className="context-menu-item-shortcut">{item.shortcut}</span>}
         {isChecked && !hasSubmenu && (
           <span className="context-menu-item-check" aria-hidden="true">
             <Icon name="checkmark" size={14} />
@@ -155,7 +153,15 @@ interface SubmenuProps {
 }
 
 /** Nested submenu portal positioned relative to its parent item */
-function Submenu({ items, parentItem, parentItemId, onSelect, onMouseEnter, onMouseLeave, onClose }: SubmenuProps) {
+function Submenu({
+  items,
+  parentItem,
+  parentItemId,
+  onSelect,
+  onMouseEnter,
+  onMouseLeave,
+  onClose,
+}: SubmenuProps) {
   const submenuRef = useRef<HTMLUListElement>(null);
   const [position, setPosition] = useState<MenuPosition | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
@@ -172,18 +178,18 @@ function Submenu({ items, parentItem, parentItemId, onSelect, onMouseEnter, onMo
       // Get parent item position relative to viewport
       const parentRect = parentItem.getBoundingClientRect();
       const parentMenu = parentItem.closest('.context-menu') as HTMLElement;
-      
+
       // Measure submenu while hidden
       submenuRef.current.style.visibility = 'hidden';
       submenuRef.current.style.position = 'fixed';
       submenuRef.current.style.left = '0';
       submenuRef.current.style.top = '0';
       submenuRef.current.style.width = 'auto';
-      
+
       // Force layout calculation
       const submenuWidth = submenuRef.current.offsetWidth || 200;
       const submenuHeight = submenuRef.current.offsetHeight || 100;
-      
+
       const viewport = {
         width: window.innerWidth,
         height: window.innerHeight,
@@ -259,7 +265,7 @@ function Submenu({ items, parentItem, parentItemId, onSelect, onMouseEnter, onMo
     if (submenuRef.current) {
       submenuRef.current.dataset.mouseOver = 'true';
     }
-    
+
     // Cancel any pending close
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
@@ -272,16 +278,18 @@ function Submenu({ items, parentItem, parentItemId, onSelect, onMouseEnter, onMo
     if (submenuRef.current) {
       submenuRef.current.dataset.mouseOver = 'false';
     }
-    
+
     // Check if mouse is moving back to parent item
     const relatedTarget = e.relatedTarget as HTMLElement;
     if (relatedTarget && parentItem) {
-      const isMovingToParent = parentItem.contains(relatedTarget) || relatedTarget.closest(`#context-menu-item-${parentItemId}`);
+      const isMovingToParent =
+        parentItem.contains(relatedTarget) ||
+        relatedTarget.closest(`#context-menu-item-${parentItemId}`);
       if (isMovingToParent) {
         return; // Don't close if moving back to parent
       }
     }
-    
+
     // Close submenu after a short delay
     closeTimeoutRef.current = window.setTimeout(() => {
       onClose();

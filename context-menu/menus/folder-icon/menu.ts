@@ -9,25 +9,26 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
     priority: 0,
     generator: async (context: MenuContext) => {
       const items: MenuItem[] = [];
-      
+
       // Check for multiple selection
-      const selection = context.selection as { type: string; ids: string[]; count: number } | undefined;
+      const selection = context.selection as
+        { type: string; ids: string[]; count: number } | undefined;
       const isMultipleSelection = selection?.type === 'desktop-icons' && selection.count > 1;
-      
+
       // Get selected items info
       let selectedShortcuts: string[] = [];
       let selectedFolders: string[] = [];
-      
+
       if (isMultipleSelection && selection) {
         // Multiple selection - get all selected items
         const { getDesktopShortcuts, getDesktopFolders } = await import('@core/desktop-shortcuts');
         const shortcuts = getDesktopShortcuts();
         const folders = getDesktopFolders();
-        
-        selection.ids.forEach(id => {
-          if (shortcuts.some(s => s.id === id)) {
+
+        selection.ids.forEach((id) => {
+          if (shortcuts.some((s) => s.id === id)) {
             selectedShortcuts.push(id);
-          } else if (folders.some(f => f.id === id)) {
+          } else if (folders.some((f) => f.id === id)) {
             selectedFolders.push(id);
           }
         });
@@ -41,7 +42,7 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
           selectedFolders = [folderId];
         }
       }
-      
+
       // Open action - only show if single selection and it's a folder
       if (!isMultipleSelection && selectedFolders.length === 1) {
         items.push({
@@ -56,7 +57,7 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
           },
         });
       }
-      
+
       if (items.length > 0) {
         items.push({
           id: 'folder-icon-separator-1',
@@ -77,10 +78,10 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
             try {
               const { copy } = await import('@core/clipboard');
               const clipboardItems: Array<{ id: string; type: 'shortcut' | 'folder' }> = [];
-              selectedShortcuts.forEach(id => {
+              selectedShortcuts.forEach((id) => {
                 clipboardItems.push({ id, type: 'shortcut' });
               });
-              selectedFolders.forEach(id => {
+              selectedFolders.forEach((id) => {
                 clipboardItems.push({ id, type: 'folder' });
               });
               if (clipboardItems.length > 0) {
@@ -105,10 +106,10 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
             try {
               const { cut } = await import('@core/clipboard');
               const clipboardItems: Array<{ id: string; type: 'shortcut' | 'folder' }> = [];
-              selectedShortcuts.forEach(id => {
+              selectedShortcuts.forEach((id) => {
                 clipboardItems.push({ id, type: 'shortcut' });
               });
-              selectedFolders.forEach(id => {
+              selectedFolders.forEach((id) => {
                 clipboardItems.push({ id, type: 'folder' });
               });
               if (clipboardItems.length > 0) {
@@ -130,7 +131,7 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
           label: '',
         });
       }
-      
+
       // Rename action - only show if single folder selection
       if (!isMultipleSelection && selectedFolders.length === 1) {
         items.push({
@@ -152,14 +153,14 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
             }
           },
         });
-        
+
         items.push({
           id: 'folder-icon-separator-2',
           type: 'separator',
           label: '',
         });
       }
-      
+
       const totalSelectedForDelete = selectedShortcuts.length + selectedFolders.length;
       const { getDeleteItemsLabel, deleteDesktopItems } = await import('@core/delete-items');
       const deleteLabel = getDeleteItemsLabel(totalSelectedForDelete);
@@ -177,7 +178,7 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
           }
         },
       });
-      
+
       return items;
     },
   });
