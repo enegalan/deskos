@@ -66,7 +66,7 @@ export function Taskbar() {
     const programWindows = windowsByProgram.get(programId) || [];
     const hasWindows = programWindows.length > 0;
     const isActive = programWindows.some((w) => w.id === activeWindowId);
-    const isRunning = hasWindows || variant === 'window';
+    const isRunning = hasWindows;
     const isLauncher = variant === 'launcher';
     const isRunningSlot = variant === 'window';
     const iconName = resolveProgramIcon(programId, program.icon);

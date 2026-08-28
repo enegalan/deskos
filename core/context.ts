@@ -12,8 +12,10 @@ import {
   beginSessionRestore,
   endSessionRestore,
   loadSession,
+  clampSessionWindowBounds,
   type SessionWindowEntry,
 } from './session';
+import { handleError } from './errors';
 import packageJson from '../package.json';
 
 /** Window lifecycle API exposed to programs via {@link ProgramContext}. */
@@ -418,22 +420,50 @@ export function restoreDesktopSession(): Promise<void> {
     beginSessionRestore();
     prepareWindowIdsForSession(windows.map((entry) => entry.id));
 
+    let restoreComplete = true;
+
     try {
+      const restoredIds: string[] = [];
+
       for (const entry of windows) {
         const programMeta = programs[entry.programId];
-        if (!programMeta) continue;
+        if (!programMeta) {
+          restoreComplete = false;
+          continue;
+        }
 
-        const module = await programMeta.load();
-        const ctx = createProgramContext(entry.programId, programMeta.metadata.icon, {
-          restore: entry,
-        });
-        module.default.launch(ctx);
+        try {
+          const module = await programMeta.load();
+          const clampedEntry = clampSessionWindowBounds(entry);
+          const ctx = createProgramContext(entry.programId, programMeta.metadata.icon, {
+            restore: clampedEntry,
+          });
+          module.default.launch(ctx);
+          restoredIds.push(entry.id);
+        } catch (error) {
+          restoreComplete = false;
+          handleError(error, { operation: 'restoreDesktopSession', windowId: entry.id });
+        }
       }
 
-      kernel.applySessionOrder(windowOrder, snapshot.activeWindowId);
+      if (restoredIds.length > 0) {
+        const restoredOrder = windowOrder.filter((id) => restoredIds.includes(id));
+        for (const id of restoredIds) {
+          if (!restoredOrder.includes(id)) {
+            restoredOrder.push(id);
+          }
+        }
+        const activeId =
+          snapshot.activeWindowId && restoredIds.includes(snapshot.activeWindowId)
+            ? snapshot.activeWindowId
+            : restoredOrder.at(-1) ?? null;
+        kernel.applySessionOrder(restoredOrder, activeId);
+      }
     } finally {
       endSessionRestore();
-      kernel.persistSession();
+      if (restoreComplete) {
+        kernel.persistSession();
+      }
     }
   })();
 

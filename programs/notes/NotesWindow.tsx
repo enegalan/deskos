@@ -29,11 +29,11 @@ export function NotesWindow({ ctx }: NotesWindowProps) {
     const savedNotes = ctx.storage.getItem<Note[]>('notes');
     if (savedNotes && savedNotes.length > 0) {
       setNotes(savedNotes);
-      if (!selectedNoteId || !savedNotes.some((note) => note.id === selectedNoteId)) {
-        setSelectedNoteId(savedNotes[0].id);
-      }
+      setSelectedNoteId((current) =>
+        current && savedNotes.some((note) => note.id === current) ? current : savedNotes[0].id
+      );
     }
-  }, [ctx.storage, selectedNoteId, setSelectedNoteId]);
+  }, [ctx.storage, setSelectedNoteId]);
 
   // Save notes to storage whenever they change
   useEffect(() => {
@@ -56,7 +56,7 @@ export function NotesWindow({ ctx }: NotesWindowProps) {
 
     // Emit event for other windows to sync
     ctx.events.emit('note:created', newNote);
-  }, [ctx.events]);
+  }, [ctx.events, setSelectedNoteId]);
 
   const updateNote = useCallback(
     (id: string, updates: Partial<Note>) => {

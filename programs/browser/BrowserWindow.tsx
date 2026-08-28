@@ -153,7 +153,15 @@ function normalizeUrl(input: string): string {
     return trimmed;
   }
   if (trimmed.includes('://')) {
-    return withGoogleIframeParam(trimmed);
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return HOME_URL;
+      }
+      return withGoogleIframeParam(parsed.href);
+    } catch {
+      return HOME_URL;
+    }
   }
   if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/i.test(trimmed)) {
     return withGoogleIframeParam('https://' + trimmed);
@@ -170,7 +178,15 @@ function isInternalPage(url: string): boolean {
 function getIframeSrc(url: string): string | undefined {
   if (isInternalPage(url)) return undefined;
   if (url.startsWith('chrome://')) return url;
-  return withGoogleIframeParam(url);
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return undefined;
+    }
+    return withGoogleIframeParam(parsed.href);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Tab title for built-in pages rendered without an iframe. */
@@ -535,6 +551,7 @@ function BrowserContent({
       src={src}
       className="ie-frame"
       title="Browser"
+      sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
       onLoad={(e) => onLoad(url, readIframePageTitle(e.currentTarget))}
     />
   );
@@ -654,7 +671,7 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
 
   const updateTab = useCallback((tabId: string, updater: (tab: BrowserTab) => BrowserTab) => {
     setTabs((prev) => prev.map((tab) => (tab.id === tabId ? updater(tab) : tab)));
-  }, []);
+  }, [setTabs]);
 
   const applyTabTitle = useCallback(
     (tabId: string, url: string, title: string) => {
@@ -680,12 +697,15 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
     [applyTabTitle]
   );
 
+  const titleRequestRef = useRef<Map<string, string>>(new Map());
+
   useEffect(() => {
     for (const tab of tabs) {
       const url = getTabUrl(tab);
-      if (!isInternalPage(url) && !isResolvedTabTitle(tab)) {
-        requestTabTitle(tab.id, url);
-      }
+      if (isInternalPage(url) || isResolvedTabTitle(tab)) continue;
+      if (titleRequestRef.current.get(tab.id) === url) continue;
+      titleRequestRef.current.set(tab.id, url);
+      requestTabTitle(tab.id, url);
     }
   }, [requestTabTitle, tabs]);
 
@@ -1622,7 +1642,7 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
               <BrowserContent
                 url={url}
                 reloadKey={tab.reloadKey}
-                onLoad={(pageTitle) => handleIframeLoad(tab.id, url, pageTitle)}
+                onLoad={(loadedUrl, pageTitle) => handleIframeLoad(tab.id, loadedUrl, pageTitle)}
                 onNavigate={navigateTo}
                 shortcuts={shortcuts}
                 onAddShortcut={addShortcut}

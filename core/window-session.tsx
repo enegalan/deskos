@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
   type Dispatch,
   type SetStateAction,
   type ReactNode,
@@ -51,6 +52,9 @@ export function useWindowSessionState<T, S = T>(
 ): [T, Dispatch<SetStateAction<T>>] {
   const windowId = useWindowId();
 
+  const serializeRef = useRef(options?.serialize);
+  serializeRef.current = options?.serialize;
+
   const [state, setState] = useState<T>(() => {
     const saved = getWindowSessionState(windowId, key);
     if (saved !== undefined) {
@@ -63,9 +67,10 @@ export function useWindowSessionState<T, S = T>(
   });
 
   useEffect(() => {
-    const value = options?.serialize ? options.serialize(state) : state;
+    const serialize = serializeRef.current;
+    const value = serialize ? serialize(state) : state;
     setWindowSessionState(windowId, key, value);
-  }, [windowId, key, state, options]);
+  }, [windowId, key, state]);
 
   return [state, setState];
 }

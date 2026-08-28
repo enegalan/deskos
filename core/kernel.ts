@@ -371,6 +371,7 @@ export const useKernel = create<KernelState>((set, get) => ({
     }
 
     if (restore?.isMaximized) {
+      newWindow.isMaximized = true;
       newWindow.x = 0;
       newWindow.y = 0;
       newWindow.width = viewportWidth;
@@ -489,21 +490,18 @@ export const useKernel = create<KernelState>((set, get) => ({
     set((state) => ({
       windows: state.windows.map((w) => {
         if (w.id === windowId) {
-          // Restore from previous state if available
-          const restoreState = w.previousState || {
-            x: Math.max(50, (window.innerWidth - 600) / 2),
-            y: Math.max(50, (window.innerHeight - 448) / 2),
-            width: 600,
-            height: 400,
-          };
+          const bounds =
+            w.isMaximized && w.previousState
+              ? w.previousState
+              : { x: w.x, y: w.y, width: w.width, height: w.height };
           return {
             ...w,
             isMinimized: false,
             isMaximized: false,
-            x: restoreState.x,
-            y: restoreState.y,
-            width: restoreState.width,
-            height: restoreState.height,
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
             previousState: undefined,
           };
         }
