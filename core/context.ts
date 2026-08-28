@@ -1,5 +1,5 @@
-import type { WindowCreateOptions, WindowState } from './kernel';
-import { useKernel } from './kernel';
+import type { WindowCreateOptions, WindowRestoreOptions, WindowState } from './kernel';
+import { prepareWindowIdsForSession, useKernel } from './kernel';
 import { createSecureScopedStorage, type StorageAPI } from './storage';
 import { createScopedEventBus, type EventBusAPI } from './event-bus';
 import { ContextMenuManager, type ContextMenuProvider, type MenuContext, type MenuItem } from '../context-menu/ContextMenuManager';
@@ -8,6 +8,12 @@ import {
   SELECTION_PRIORITY,
 } from './selection';
 import { registerProgramIconResolver } from './program-icons';
+import {
+  beginSessionRestore,
+  endSessionRestore,
+  loadSession,
+  type SessionWindowEntry,
+} from './session';
 import packageJson from '../package.json';
 
 /** Window lifecycle API exposed to programs via {@link ProgramContext}. */
@@ -174,11 +180,18 @@ export async function launchOrFocusProgram(
  * Creates a WindowAPI for a specific program.
  * All window operations are scoped to windows owned by this program.
  */
-function createWindowAPI(programId: string, icon: string): WindowAPI {
+function createWindowAPI(programId: string, icon: string, restoreEntry?: SessionWindowEntry): WindowAPI {
+  let restoreConsumed = false;
+
   return {
     create(options: WindowCreateOptions): string {
       const state = useKernel.getState();
-      return state.createWindow(programId, icon, options);
+      const restore =
+        !restoreConsumed && restoreEntry
+          ? (restoreEntry as WindowRestoreOptions)
+          : undefined;
+      restoreConsumed = true;
+      return state.createWindow(programId, icon, options, restore);
     },
 
     close(windowId: string): void {
@@ -325,10 +338,14 @@ function createIconAPI(programId: string): IconAPI {
  * Creates a complete ProgramContext for a specific program.
  * This is the only interface through which programs interact with the system.
  */
-function createProgramContext(programId: string, icon: string = 'package'): ProgramContext {
+function createProgramContext(
+  programId: string,
+  icon: string = 'package',
+  options?: { restore?: SessionWindowEntry }
+): ProgramContext {
   // Wrap the entire context in a Proxy for additional security
   const context: ProgramContext = {
-    window: createWindowAPI(programId, icon),
+    window: createWindowAPI(programId, icon, options?.restore),
     storage: createSecureScopedStorage(programId),
     events: createScopedEventBus(programId),
     system: createSystemAPI(programId),
@@ -352,4 +369,73 @@ function createProgramContext(programId: string, icon: string = 'package'): Prog
       return false;
     },
   });
+}
+
+/** In-flight desktop session restore promise (idempotent boot guard). */
+let desktopSessionRestorePromise: Promise<void> | null = null;
+
+/**
+ * Restore open windows from the last saved desktop session snapshot.
+ * Idempotent: React StrictMode may invoke the boot effect twice in development.
+ */
+export function restoreDesktopSession(): Promise<void> {
+  if (desktopSessionRestorePromise) {
+    return desktopSessionRestorePromise;
+  }
+
+  desktopSessionRestorePromise = (async () => {
+    const snapshot = loadSession();
+    if (!snapshot || snapshot.windows.length === 0) {
+      return;
+    }
+
+    const kernel = useKernel.getState();
+    if (kernel.windows.length > 0) {
+      return;
+    }
+
+    const seenWindowIds = new Set<string>();
+    const windows = snapshot.windows.filter((entry) => {
+      if (seenWindowIds.has(entry.id)) {
+        return false;
+      }
+      seenWindowIds.add(entry.id);
+      return true;
+    });
+    if (windows.length === 0) {
+      return;
+    }
+
+    const windowOrder = snapshot.windowOrder.filter((id) => seenWindowIds.has(id));
+    for (const entry of windows) {
+      if (!windowOrder.includes(entry.id)) {
+        windowOrder.push(entry.id);
+      }
+    }
+
+    const { programs } = await import('virtual:programs');
+
+    beginSessionRestore();
+    prepareWindowIdsForSession(windows.map((entry) => entry.id));
+
+    try {
+      for (const entry of windows) {
+        const programMeta = programs[entry.programId];
+        if (!programMeta) continue;
+
+        const module = await programMeta.load();
+        const ctx = createProgramContext(entry.programId, programMeta.metadata.icon, {
+          restore: entry,
+        });
+        module.default.launch(ctx);
+      }
+
+      kernel.applySessionOrder(windowOrder, snapshot.activeWindowId);
+    } finally {
+      endSessionRestore();
+      kernel.persistSession();
+    }
+  })();
+
+  return desktopSessionRestorePromise;
 }

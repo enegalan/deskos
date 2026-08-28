@@ -8,6 +8,7 @@ import { registerLauncherItemMenu } from './launcher-item/menu';
 import { registerWindowMenu } from './window/menu';
 import { registerTextMenu } from './text/menu';
 
+/** Whether default system context menus have been registered. */
 let defaultMenusRegistered = false;
 
 /**

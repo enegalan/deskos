@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.6.0] - 2026-08-28
+
+### Added
+
+- Browser program (`programs/browser`) — tabs, address bar, bookmarks, home shortcuts, and iframe navigation (Google URLs use `igu=1` for embed compatibility)
+- Desktop session persistence (`core/session.ts`) — open windows, geometry, z-order, focus, and opaque per-window state survive reload
+- `restoreDesktopSession()` on boot (`core/context.ts`, `src/Desktop.tsx`)
+- `useWindowSessionState` / `WindowSessionProvider` (`core/window-session.tsx`) — drop-in `useState` for per-window UI state stored in the session snapshot
+- `core/window-layout.ts` — last window bounds per program in localStorage (used when opening a new window)
+- Vite plugin `vite-plugin-page-title.ts` — `GET /__deskos/page-title` fetches document titles for cross-origin iframe tabs (dev and `vite preview` only)
+- Icons: `arrow-left`, `home`, `star`, `star-filled`, `internet-explorer`
+
+### Changed
+
+- Kernel persists window geometry on move, resize, maximize, minimize, and close; session debounced on focus and title changes
+- Notes keeps the selected note across reload via `useWindowSessionState`
+- Window shell wraps program content in `WindowSessionProvider` for session-aware hooks
+
+### Fixed
+
+- Browser refresh button remounts the active iframe (runtime `reloadKey` / `loading` kept outside persisted session state)
+
 ## [1.5.0] - 2026-08-28
 
 ### Added
@@ -142,6 +164,7 @@
 - Core services (storage, event bus, ProgramContext)
 - First desktop shell and context menu foundation
 
+[1.6.0]: https://github.com/enegalan/deskos/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/enegalan/deskos/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/enegalan/deskos/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/enegalan/deskos/compare/v1.2.0...v1.3.0

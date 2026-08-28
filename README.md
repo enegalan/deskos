@@ -174,6 +174,18 @@ ctx.window.getWindows(); // your app's open windows
 
 Omit `x` / `y` to center the window with a small random offset.
 
+### Persist UI across reload
+
+DeskOS restores open windows (size, position, focus, and order) when you reload the page. Inside a window component, use `useWindowSessionState` like `useState` for UI that should survive reloads (active tab, selection, scroll position, etc.):
+
+```tsx
+import { useWindowSessionState } from '@core/window-session';
+
+const [view, setView] = useWindowSessionState<'list' | 'grid'>('view', 'list');
+```
+
+The shell wraps program content in `WindowSessionProvider`; use the hook only inside your window tree.
+
 ### Save data (per app)
 
 Data is stored under your app's id — it never clashes with other apps:

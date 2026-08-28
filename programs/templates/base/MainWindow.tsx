@@ -4,6 +4,7 @@ interface MainWindowProps {
   ctx: ProgramContext;
 }
 
+/** Starter main window for new programs (replace with your UI). */
 export function MainWindow({ ctx: _ctx }: MainWindowProps) {
   return (
     <div style={{ padding: 'var(--space-lg)' }}>

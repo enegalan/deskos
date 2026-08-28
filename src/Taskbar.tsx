@@ -66,6 +66,7 @@ export function Taskbar() {
     const programWindows = windowsByProgram.get(programId) || [];
     const hasWindows = programWindows.length > 0;
     const isActive = programWindows.some((w) => w.id === activeWindowId);
+    const isRunning = hasWindows || variant === 'window';
     const isLauncher = variant === 'launcher';
     const isRunningSlot = variant === 'window';
     const iconName = resolveProgramIcon(programId, program.icon);
@@ -74,7 +75,7 @@ export function Taskbar() {
     return (
       <button
         key={programId}
-        className={`dock-item ${isLauncher ? 'dock-launcher' : isRunningSlot ? 'dock-window' : 'dock-program'} ${isActive ? 'active' : ''}`}
+        className={`dock-item ${isLauncher ? 'dock-launcher' : isRunningSlot ? 'dock-window' : 'dock-program'} ${isRunning ? 'running' : ''} ${isActive ? 'active' : ''}`}
         onClick={() => {
           if (isRunningSlot) {
             const activeWin = programWindows.find((w) => w.id === activeWindowId);

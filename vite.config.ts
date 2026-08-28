@@ -2,9 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { programsPlugin } from './vite-plugin-programs';
+import { pageTitlePlugin } from './vite-plugin-page-title';
 
 export default defineConfig({
-  plugins: [react(), programsPlugin()],
+  plugins: [react(), programsPlugin(), pageTitlePlugin()],
   resolve: {
     alias: {
       '@core': resolve(__dirname, 'core'),

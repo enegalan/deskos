@@ -23,14 +23,16 @@ export interface ClipboardData {
   sourcePath?: string; // For folder items, the path where they came from
 }
 
-// Global clipboard state
+/** Current clipboard payload, or null when empty. */
 let clipboardData: ClipboardData | null = null;
 
-// Global handler registration
-// Support multiple handlers with priority (folder windows have higher priority)
+/** Registered copy handlers sorted by priority (folder windows override desktop). */
 let copyHandlers: Array<{ handler: () => void; priority: number }> = [];
+/** Registered cut handlers sorted by priority. */
 let cutHandlers: Array<{ handler: () => void; priority: number }> = [];
+/** Registered paste handlers sorted by priority. */
 let pasteHandlers: Array<{ handler: () => void; priority: number }> = [];
+/** Registered delete handlers sorted by priority. */
 let deleteHandlers: Array<{ handler: () => void; priority: number }> = [];
 
 /** Handler priority: desktop icon surface. */

@@ -6,6 +6,7 @@ interface WebViewWindowProps {
   defaultUrl?: string;
 }
 
+/** WebView window template with toolbar navigation and sandboxed iframe. */
 export function WebViewWindow({ ctx: _ctx, defaultUrl = 'https://example.com' }: WebViewWindowProps) {
   const [url, setUrl] = useState(defaultUrl);
   const [inputUrl, setInputUrl] = useState(defaultUrl);

@@ -9,6 +9,7 @@ const DB_VERSION = 1;
 /** IndexedDB object store name for wallpaper blobs. */
 const STORE_NAME = 'wallpapers';
 
+/** Cached open-database promise (singleton per page load). */
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 /**

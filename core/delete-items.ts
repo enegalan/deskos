@@ -15,6 +15,7 @@ interface DeleteItemsProvider {
   priority: number;
 }
 
+/** Registered delete handlers sorted by priority (highest first). */
 let deleteItemsProviders: DeleteItemsProvider[] = [];
 
 /** Fallback delete label when no provider registers a custom one. */
