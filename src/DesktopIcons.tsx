@@ -66,6 +66,13 @@ function setDragOverTarget(itemId: string | null) {
   }
 }
 
+/** True when a folder browser window is focused (desktop defers clipboard shortcuts to it). */
+function isFolderWindowActive(): boolean {
+  const { activeWindowId, windows } = useKernel.getState();
+  if (!activeWindowId) return false;
+  return windows.some((w) => w.id === activeWindowId && w.programId === 'folder');
+}
+
 /** Active multi-icon drag on the desktop surface */
 interface DesktopDragGroup {
   ids: string[];
@@ -1319,8 +1326,7 @@ export function DesktopIcons() {
 
   // Select All handler
   const handleSelectAll = useCallback(() => {
-    const kernel = useKernel.getState();
-    if (kernel.activeWindowId) {
+    if (isFolderWindowActive()) {
       throw new HandlerSkippedError();
     }
     const allItemIds = [
@@ -1403,11 +1409,9 @@ export function DesktopIcons() {
 
   // Paste handler
   const handlePaste = useCallback(async () => {
-    const kernel = useKernel.getState();
-    if (kernel.activeWindowId) {
+    if (isFolderWindowActive()) {
       throw new HandlerSkippedError();
     }
-    
     const clipboard = getClipboard();
     if (!clipboard || clipboard.items.length === 0) {
       return;
