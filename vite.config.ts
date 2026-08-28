@@ -3,9 +3,10 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { programsPlugin } from './vite-plugin-programs';
 import { pageTitlePlugin } from './vite-plugin-page-title';
+import { imagesPlugin } from './vite-plugin-images';
 
 export default defineConfig({
-  plugins: [react(), programsPlugin(), pageTitlePlugin()],
+  plugins: [react(), programsPlugin(), imagesPlugin(), pageTitlePlugin()],
   resolve: {
     alias: {
       '@core': resolve(__dirname, 'core'),

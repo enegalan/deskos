@@ -23,13 +23,28 @@ export interface DesktopFolder {
   parentPath?: string; // Path of parent folder, undefined for root
 }
 
-/** Desktop shortcut or folder item. */
-export type DesktopItem = DesktopShortcut | DesktopFolder;
+/**
+ * Read-only image entry shown inside a special location (e.g. `/Images`).
+ * Not user-created and not persisted — it points at a bundled asset URL.
+ */
+export interface DesktopImageItem {
+  id: string;
+  name: string;
+  kind: 'image';
+  /** Asset URL served from `public/` (e.g. `/img/acer.png`). */
+  imageUrl: string;
+  icon: string;
+  x: number;
+  y: number;
+}
+
+/** Desktop shortcut, folder, or read-only image item. */
+export type DesktopItem = DesktopShortcut | DesktopFolder | DesktopImageItem;
 
 /**
  * Type guard: whether a desktop item is a folder.
  *
- * @param item - Shortcut or folder
+ * @param item - Shortcut, folder, or image
  * @returns `true` if `item` is a `DesktopFolder`
  */
 export function isDesktopFolder(item: DesktopItem): item is DesktopFolder {
@@ -39,11 +54,21 @@ export function isDesktopFolder(item: DesktopItem): item is DesktopFolder {
 /**
  * Type guard: whether a desktop item is a program shortcut.
  *
- * @param item - Shortcut or folder
+ * @param item - Shortcut, folder, or image
  * @returns `true` if `item` is a `DesktopShortcut`
  */
 export function isDesktopShortcut(item: DesktopItem): item is DesktopShortcut {
   return 'programId' in item;
+}
+
+/**
+ * Type guard: whether a desktop item is a read-only image entry.
+ *
+ * @param item - Shortcut, folder, or image
+ * @returns `true` if `item` is a `DesktopImageItem`
+ */
+export function isImageItem(item: DesktopItem): item is DesktopImageItem {
+  return 'kind' in item && item.kind === 'image';
 }
 
 /** System storage key for live desktop shortcuts. */
@@ -1217,7 +1242,7 @@ export function getItemsByPath(path: string): DesktopItem[] {
       const subFolder = folders.find((f) => f.id === itemId);
       return subFolder || null;
     })
-    .filter((item): item is DesktopItem => item !== null);
+    .filter((item): item is DesktopShortcut | DesktopFolder => item !== null);
 }
 
 /**
