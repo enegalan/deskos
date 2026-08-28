@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { ProgramContext } from '@core/context';
 import { useKernel } from '@core/kernel';
-import { useWindowId } from '@core/window-session';
+import { useWindowId, useWindowSessionState } from '@core/window-session';
 import { Icon } from '../../components/Icon';
 
 /** One image shown by the previewer. */
@@ -12,14 +12,35 @@ interface PreviewImage {
   name: string;
 }
 
+/** Persisted previewer state (survives page reload). */
+type PhotosPreviewState = {
+  images: PreviewImage[];
+  index: number;
+  zoom: number;
+  rotation: number;
+};
+
 /** Props for the Photos previewer window. */
 interface PhotosWindowProps {
   /** Program context (used to close the window and update its title). */
   ctx: ProgramContext;
-  /** The images to browse — only what the user selected before previewing. */
-  images: PreviewImage[];
-  /** Index of the image to show first. */
-  startIndex: number;
+  /** Images for a fresh open; omitted on session restore. */
+  initialImages?: PreviewImage[];
+  /** Starting index for a fresh open. */
+  initialStartIndex?: number;
+}
+
+/** Build initial preview state from open props when no session snapshot exists. */
+function createInitialPreviewState(
+  initialImages?: PreviewImage[],
+  initialStartIndex = 0
+): PhotosPreviewState {
+  const images = initialImages ?? [];
+  const index = Math.min(
+    Math.max(initialStartIndex, 0),
+    Math.max(images.length - 1, 0)
+  );
+  return { images, index, zoom: 1, rotation: 0 };
 }
 
 /** Zoom limits and step for the zoom in / zoom out buttons. */
@@ -44,16 +65,15 @@ const normalizeAngle = (deg: number) => ((deg % 360) + 360) % 360;
  * events are handled by the focused window only, so several previewers open at
  * once don't move, zoom, rotate or close together.
  */
-export function PhotosWindow({ ctx, images, startIndex }: PhotosWindowProps) {
+export function PhotosWindow({ ctx, initialImages, initialStartIndex }: PhotosWindowProps) {
   const windowId = useWindowId();
   const isActive = useKernel((state) => state.activeWindowId === windowId);
 
-  const [index, setIndex] = useState(() =>
-    Math.min(Math.max(startIndex, 0), Math.max(images.length - 1, 0))
+  const [preview, setPreview] = useWindowSessionState(
+    'preview',
+    () => createInitialPreviewState(initialImages, initialStartIndex)
   );
-  const [zoom, setZoom] = useState(1);
-  // Running total in degrees; can go negative or past 360 as the user rotates.
-  const [rotation, setRotation] = useState(0);
+  const { images, index, zoom, rotation } = preview;
 
   const current = images[index] ?? images[0];
   const canNavigate = images.length > 1;
@@ -63,32 +83,56 @@ export function PhotosWindow({ ctx, images, startIndex }: PhotosWindowProps) {
   const isPristine = zoom === 1 && angle === 0;
 
   const goPrev = useCallback(
-    () => setIndex((i) => (i - 1 + images.length) % images.length),
-    [images.length]
+    () =>
+      setPreview((p) => ({
+        ...p,
+        index: (p.index - 1 + p.images.length) % p.images.length,
+        zoom: 1,
+        rotation: 0,
+      })),
+    [setPreview]
   );
-  const goNext = useCallback(() => setIndex((i) => (i + 1) % images.length), [images.length]);
+  const goNext = useCallback(
+    () =>
+      setPreview((p) => ({
+        ...p,
+        index: (p.index + 1) % p.images.length,
+        zoom: 1,
+        rotation: 0,
+      })),
+    [setPreview]
+  );
 
   const zoomIn = useCallback(
-    () => setZoom((z) => roundZoom(Math.min(z + ZOOM_STEP, ZOOM_MAX))),
-    []
+    () =>
+      setPreview((p) => ({
+        ...p,
+        zoom: roundZoom(Math.min(p.zoom + ZOOM_STEP, ZOOM_MAX)),
+      })),
+    [setPreview]
   );
   const zoomOut = useCallback(
-    () => setZoom((z) => roundZoom(Math.max(z - ZOOM_STEP, ZOOM_MIN))),
-    []
+    () =>
+      setPreview((p) => ({
+        ...p,
+        zoom: roundZoom(Math.max(p.zoom - ZOOM_STEP, ZOOM_MIN)),
+      })),
+    [setPreview]
   );
-  const rotateLeft = useCallback(() => setRotation((r) => r - ROTATE_STEP), []);
-  const rotateRight = useCallback(() => setRotation((r) => r + ROTATE_STEP), []);
+  const rotateLeft = useCallback(
+    () => setPreview((p) => ({ ...p, rotation: p.rotation - ROTATE_STEP })),
+    [setPreview]
+  );
+  const rotateRight = useCallback(
+    () => setPreview((p) => ({ ...p, rotation: p.rotation + ROTATE_STEP })),
+    [setPreview]
+  );
 
   // Back to fitted size and upright.
-  const resetView = useCallback(() => {
-    setZoom(1);
-    setRotation(0);
-  }, []);
-
-  // A new image always starts fitted and upright.
-  useEffect(() => {
-    resetView();
-  }, [index, resetView]);
+  const resetView = useCallback(
+    () => setPreview((p) => ({ ...p, zoom: 1, rotation: 0 })),
+    [setPreview]
+  );
 
   // Keep the window title in sync with the visible image.
   useEffect(() => {

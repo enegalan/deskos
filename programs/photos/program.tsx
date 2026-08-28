@@ -43,18 +43,21 @@ export default defineProgram({
   allowMultipleWindows: true,
   launch: (ctx) => {
     const request = pendingOpens.shift();
-    // No request queued (e.g. session restore) — nothing to preview, no fallback.
-    if (!request) return;
-
-    const first = request.images[request.startIndex] ?? request.images[0];
+    const first = request?.images[request.startIndex] ?? request?.images[0];
 
     ctx.window.create({
-      title: first.name,
+      title: first?.name ?? 'Photos',
       width: 900,
       height: 620,
       minWidth: 360,
       minHeight: 260,
-      component: <PhotosWindow ctx={ctx} images={request.images} startIndex={request.startIndex} />,
+      component: (
+        <PhotosWindow
+          ctx={ctx}
+          initialImages={request?.images}
+          initialStartIndex={request?.startIndex}
+        />
+      ),
     });
   },
 });
