@@ -1,3 +1,4 @@
+/** Built-in wallpaper preset: blue gradient. */
 export const wallpaper = {
   id: 'gradient-blue',
   name: 'Gradient Blue',

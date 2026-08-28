@@ -4,7 +4,7 @@ import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMen
 export function registerFolderWindowItemMenu(manager: ContextMenuManager): void {
   manager.registerProvider({
     id: 'system-folder-window-item-menu',
-    target: '.folder-window-item',
+    target: '[data-folder-path] .folder-window-item',
     programId: 'system',
     priority: 0,
     generator: async (context: MenuContext) => {
@@ -20,9 +20,13 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
         return items;
       }
 
+      const containerPath =
+        (itemEl.closest('[data-folder-path]') as HTMLElement | null)?.dataset.folderPath;
       const selection = context.selection as { type: string; ids: string[]; path?: string } | undefined;
       const selectedIds =
-        selection?.type === 'folder-items' && selection.ids.length > 0
+        selection?.type === 'folder-items' &&
+        selection.ids.length > 0 &&
+        selection.path === containerPath
           ? selection.ids
           : [itemId];
       const isMultiple = selectedIds.length > 1;
@@ -137,33 +141,16 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
         label: '',
       });
 
+      const { getDeleteItemsLabel, deleteDesktopItems } = await import('@core/delete-items');
+
       items.push({
         id: 'folder-window-item-delete',
-        label: isMultiple ? `Delete (${selectedIds.length} items)` : 'Delete',
+        label: getDeleteItemsLabel(selectedIds.length),
         icon: 'delete',
         shortcut: 'Delete',
         action: async () => {
           try {
-            const { removeDesktopShortcut, deleteDesktopFolder, getDesktopFolders } = await import('@core/desktop-shortcuts');
-            const folders = getDesktopFolders();
-            const hasFolders = selectedIds.some((id) => folders.some((f) => f.id === id));
-            if (hasFolders) {
-              const ok = confirm(
-                selectedIds.length === 1
-                  ? 'Are you sure you want to delete this folder and all its contents?'
-                  : `Are you sure you want to delete ${selectedIds.length} items?`
-              );
-              if (!ok) return;
-            }
-
-            for (const id of selectedIds) {
-              if (folders.some((f) => f.id === id)) {
-                deleteDesktopFolder(id);
-              } else {
-                removeDesktopShortcut(id);
-              }
-            }
-            window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+            await deleteDesktopItems(selectedIds);
           } catch (error) {
             console.error('[FolderWindowItem] Error deleting:', error);
           }

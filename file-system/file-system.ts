@@ -6,7 +6,6 @@
 import { createScopedStorage } from '../core/storage';
 import {
   getFolderByPath as getFolderByPathImpl,
-  getItemsByPath as getItemsByPathImpl,
   type DesktopItem,
   type DesktopFolder,
 } from '../core/desktop-shortcuts';
@@ -14,6 +13,7 @@ import {
 /** Registry key = locations/<id>.ts filename */
 export type SpecialLocation = string;
 
+/** Definition of a virtual special location (Desktop, Documents, etc.). */
 export interface SpecialLocationInfo {
   path: string;
   name: string;
@@ -68,18 +68,11 @@ export function getFolderByPath(path: string): DesktopFolder | null {
   return getFolderByPathImpl(path);
 }
 
-/**
- * List items contained in a folder path.
- *
- * @param path - Absolute folder path
- * @returns Shortcuts and folders inside that path
- */
-export function getItemsByPath(path: string): DesktopItem[] {
-  return getItemsByPathImpl(path);
-}
-
+/** Scoped system storage for favorites and recent paths. */
 const systemStorage = createScopedStorage('system');
+/** System storage key for sidebar favorite paths. */
 const FAVORITES_STORAGE_KEY = 'favorites';
+/** System storage key for recently opened paths. */
 const RECENT_ITEMS_STORAGE_KEY = 'recent-items';
 
 /**

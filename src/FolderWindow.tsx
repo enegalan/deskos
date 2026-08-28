@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useKernel, type FolderViewMode } from '@core/kernel';
 import { ICON_EMOJI_SCALE, ICON_GLYPH_SCALE } from '@core/constants';
 import {
-  getItemsByPath,
   getSpecialLocationItems,
   resolvePath,
   parsePath,
@@ -11,6 +10,7 @@ import {
 } from '../file-system/file-system';
 import {
   getDesktopFolders,
+  getItemsByPath,
   type DesktopItem,
   isDesktopFolder,
   isDesktopShortcut,
@@ -19,23 +19,30 @@ import {
   getFolderByPath,
   DESKOS_ITEM_IDS_MIME,
   readDraggedItemIds,
-  removeDesktopShortcut,
-  deleteDesktopFolder,
 } from '@core/desktop-shortcuts';
 import { programs } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
 import { FolderSidebar } from './FolderSidebar';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
+import { resolveProgramIcon } from '@core/program-icons';
 import {
   registerSelectAllHandler,
+  registerSelectionSource,
+  getSelectionById,
   startMarqueeSelection,
   SELECTION_PRIORITY,
+  SELECTION_SOURCE_IDS,
   type MarqueeRect,
 } from '@core/selection';
+import type { ProgramContext } from '@core/context';
 import { registerCopyHandler, registerCutHandler, registerPasteHandler, registerDeleteHandler, copy as clipboardCopy, cut as clipboardCut, getClipboard, clearClipboard, getCutItemIds, CLIPBOARD_PRIORITY, HandlerSkippedError, type ClipboardItem } from '@core/clipboard';
+import { deleteDesktopItems } from '@core/delete-items';
 
+/** Props for the folder browser window. */
 interface FolderWindowProps {
+  /** Program context when opened via the folder program */
+  ctx?: ProgramContext;
   /** Absolute path to open (default `/Desktop`) */
   initialPath?: string;
   /** Open by folder id when path is unknown */
@@ -43,7 +50,7 @@ interface FolderWindowProps {
 }
 
 /** File-browser window: sidebar, breadcrumbs, grid/list, and clipboard/DnD. */
-export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
+export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowProps) {
   const settings = useKernel((state) => state.settings);
   const updateSettings = useKernel((state) => state.updateSettings);
   const viewMode: FolderViewMode = settings.folderViewMode === 'list' ? 'list' : 'grid';
@@ -62,9 +69,11 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
   const isInitialMount = useRef(true);
   const selectedIdsRef = useRef(selectedIds);
   const itemsRef = useRef(items);
+  const currentPathRef = useRef(currentPath);
   const suppressClickClearRef = useRef(false);
   selectedIdsRef.current = selectedIds;
   itemsRef.current = items;
+  currentPathRef.current = currentPath;
 
   useEffect(() => {
     const sync = () => setCutIds(getCutItemIds());
@@ -274,8 +283,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     assertThisFolderWindowActive();
     // If no selection in this folder window, check if there's desktop selection
     if (selectedIds.size === 0) {
-      const desktopSelection = (window as any).__desktopSelection as Set<string> | undefined;
-      if (desktopSelection && desktopSelection.size > 0) {
+      const desktopSelection = getSelectionById(SELECTION_SOURCE_IDS.DESKTOP) as
+        | { ids?: string[] }
+        | undefined;
+      if (desktopSelection?.ids && desktopSelection.ids.length > 0) {
         // There's desktop selection, let DesktopIcons handle it
         throw new HandlerSkippedError();
       }
@@ -310,8 +321,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     assertThisFolderWindowActive();
     // If no selection in this folder window, check if there's desktop selection
     if (selectedIds.size === 0) {
-      const desktopSelection = (window as any).__desktopSelection as Set<string> | undefined;
-      if (desktopSelection && desktopSelection.size > 0) {
+      const desktopSelection = getSelectionById(SELECTION_SOURCE_IDS.DESKTOP) as
+        | { ids?: string[] }
+        | undefined;
+      if (desktopSelection?.ids && desktopSelection.ids.length > 0) {
         // There's desktop selection, let DesktopIcons handle it
         throw new HandlerSkippedError();
       }
@@ -341,26 +354,14 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     }
   }, [selectedIds, items, currentPath, assertThisFolderWindowActive]);
 
-  // Delete handler
+  // Delete handler — soft-delete into Trash
   const handleDelete = useCallback(() => {
     assertThisFolderWindowActive();
     if (selectedIds.size === 0) throw new HandlerSkippedError();
-    const folders = getDesktopFolders();
-    const hasFolders = Array.from(selectedIds).some(id => folders.some(f => f.id === id));
-    if (hasFolders) {
-      const ok = confirm(selectedIds.size === 1
-        ? 'Are you sure you want to delete this folder and all its contents?'
-        : `Are you sure you want to delete ${selectedIds.size} items?`);
-      if (!ok) return;
-    }
-    for (const id of selectedIds) {
-      if (folders.some(f => f.id === id)) deleteDesktopFolder(id);
-      else removeDesktopShortcut(id);
-    }
+    void deleteDesktopItems(Array.from(selectedIds));
     setSelectedIds(new Set());
     lastSelectedIndexRef.current = -1;
     loadItems(currentPath);
-    window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
   }, [selectedIds, currentPath, loadItems, assertThisFolderWindowActive]);
 
   // Paste handler
@@ -531,13 +532,33 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
     };
   }, [handleSelectAll, handleCopy, handleCut, handlePaste, handleDelete]);
 
-  // Store selection state globally for context menu access
+  // Publish selection for context menus / clipboard coordination
   useEffect(() => {
-    (window as any).__folderSelection = { ids: Array.from(selectedIds), path: currentPath };
-    return () => {
-      delete (window as any).__folderSelection;
-    };
-  }, [selectedIds, currentPath]);
+    const hostWindow = contentRef.current?.closest('[data-window-id]');
+    const thisWindowId = hostWindow?.getAttribute('data-window-id');
+    if (!thisWindowId) return;
+
+    return registerSelectionSource({
+      id: `${SELECTION_SOURCE_IDS.FOLDER_WINDOW}:${thisWindowId}`,
+      priority: SELECTION_PRIORITY.FOLDER_WINDOW,
+      isActive: () => {
+        const kernel = useKernel.getState();
+        const host = contentRef.current?.closest('[data-window-id]');
+        const windowId = host?.getAttribute('data-window-id');
+        return !!windowId && kernel.activeWindowId === windowId;
+      },
+      getSelection: () => {
+        const ids = Array.from(selectedIdsRef.current);
+        if (ids.length === 0) return null;
+        return {
+          type: 'folder-items',
+          ids,
+          path: currentPathRef.current,
+          count: ids.length,
+        };
+      },
+    });
+  }, []);
 
   // Drag-to-select on empty grid + click to clear
   useEffect(() => {
@@ -889,7 +910,10 @@ export function FolderWindow({ initialPath, folderId }: FolderWindowProps) {
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
-                      {renderItemIcon(program.metadata.icon, iconSize)}
+                      {renderItemIcon(
+                        resolveProgramIcon(item.programId, program.metadata.icon),
+                        iconSize
+                      )}
                       {(isList || settings.showIconLabels) && (
                         <div className="folder-window-item-label">
                           {item.customName || program.metadata.name}

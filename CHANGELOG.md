@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.5.0] - 2026-08-28
+
+### Added
+
+- Program manifest via `defineProgram`: `resolveIcon`, `protectedShortcut`, `hideFromLauncher`, `hideFromApplications`, `dock`, `shortcuts`, `desktopMenuItems`, `deleteItems` / `getDeleteLabel` / `deletePriority`
+- `core/program-registry.ts` — runtime flags (dock pins, launcher/applications visibility, protected shortcuts, desktop menu extensions)
+- `core/delete-items.ts` — pluggable delete pipeline; Trash registers the default soft-delete handler and “Move to Trash” label
+- `core/program-shortcuts.ts` — global shortcuts declared in the program manifest (replaces hardcoded Cmd+N / Cmd+T / Cmd+,)
+- `core/program-icons.ts` and `ctx.icon.register()` — dynamic program icons (e.g. trash empty vs full)
+- Folder browser as a real program (`programs/folder`); listens for `open-folder`
+- `core/dock.ts` — dock layout built from pinned programs in the manifest plus built-in chrome (`running`, `clock`, separators)
+
+### Changed
+
+- `launchOrFocusProgram` honors `allowMultipleWindows`; single-window apps focus the existing window by default
+- Dock pins come from `defineProgram({ dock })`; desktop Settings menu from `desktopMenuItems` (settings self-registers)
+- Context-menu delete actions use `deleteDesktopItems` / `getDeleteItemsLabel` instead of inline delete logic
+- Root desktop listing uses folder membership, not `programId.startsWith('folder-')`
+- Vite plugin eagerly imports all programs so manifest side effects (registry, shortcuts, delete handler) run at startup
+- JSDoc on exported APIs and module-level symbols across core, shell, programs, context-menu, file-system, wallpapers, and the programs Vite plugin
+- Program Author Guide in `README.md` (manifest, `ProgramContext`, reference implementations)
+- `tsconfig.json`: drop deprecated `baseUrl`; `paths` entries are relative to the config file (TS 6+)
+
+### Removed
+
+- `dock/items/*.ts` and the `dock/` package — layout lives in `core/dock.ts`
+- `@dock` path alias (`vite.config.ts`, `tsconfig.json`)
+- `file-system.getItemsByPath` wrapper — callers import `@core/desktop-shortcuts` directly
+
+## [1.4.0] - 2026-08-27
+
+### Added
+
+- Trash app (`programs/trash`): soft-delete storage, Restore / Delete Forever / Empty Trash
+- `core/trash.ts` — `moveToTrash`, `restoreFromTrash`, `deleteForever`, `emptyTrash`
+- Desktop icon context menu: Empty Trash via `iconContextMenu`
+- Trash dock pin; `trash` / `trash-full` icons
+- `ctx.selection.register()` — programs publish selection for context menus without core changes
+- `registerSelectionSource` / `getActiveSelection` in `core/selection.ts` (shell + apps)
+
+### Changed
+
+- Delete on desktop and in folders is Move to Trash (no confirm on soft-delete)
+- Context menu selection no longer uses `window.__*Selection` globals; registry by priority instead
+
 ## [1.3.0] - 2026-08-27
 
 ### Added
@@ -97,6 +142,8 @@
 - Core services (storage, event bus, ProgramContext)
 - First desktop shell and context menu foundation
 
+[1.5.0]: https://github.com/enegalan/deskos/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/enegalan/deskos/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/enegalan/deskos/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/enegalan/deskos/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/enegalan/deskos/compare/v1.0.0...v1.1.0

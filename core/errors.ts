@@ -2,18 +2,21 @@
  * Centralized error handling system for DeskOS
  */
 
+/** DeskOS error category codes. */
 export enum ErrorCode {
   WINDOW_NOT_FOUND = 'WINDOW_NOT_FOUND',
   STORAGE_ERROR = 'STORAGE_ERROR',
   OPERATION_FAILED = 'OPERATION_FAILED',
 }
 
+/** DeskOS error shape with code and optional recovery hint. */
 export interface DeskOSError extends Error {
   code: ErrorCode;
   context?: Record<string, unknown>;
   recoverable?: boolean;
 }
 
+/** Thrown when a window id does not exist in the kernel. */
 export class WindowNotFoundError extends Error implements DeskOSError {
   code = ErrorCode.WINDOW_NOT_FOUND;
   context?: Record<string, unknown>;
@@ -26,6 +29,7 @@ export class WindowNotFoundError extends Error implements DeskOSError {
   }
 }
 
+/** Thrown when localStorage read/write fails. */
 export class StorageError extends Error implements DeskOSError {
   code = ErrorCode.STORAGE_ERROR;
   context?: Record<string, unknown>;
@@ -66,6 +70,7 @@ class ErrorLogger {
   }
 }
 
+/** Global error logger singleton. */
 export const errorLogger = new ErrorLogger();
 
 /**

@@ -22,166 +22,268 @@ npm run dev
 
 Open http://localhost:3000 to see your DeskOS desktop.
 
-## Directory Structure
+## Create your app
+
+1. Copy a template from `programs/templates/` into `programs/<your-app-id>/`.
+2. Edit `program.tsx` — that file is your app's entry point and configuration.
+3. Build your UI in React components (see the template's `*Window.tsx` file).
+4. Save. In dev mode the app shows up in the Launcher automatically.
+
+Your app folder is self-contained. You do not need to register it anywhere else.
 
 ```
-deskos/
-├── core/                    # Kernel, state management, system services
-│   ├── kernel.ts           # Central state store (Zustand)
-│   ├── event-bus.ts        # Inter-program communication
-│   ├── storage.ts          # Scoped storage abstraction
-│   ├── context.ts          # ProgramContext factory
-│   └── program.ts          # defineProgram utility
-├── window-manager/          # Windowing logic
-│   ├── WindowManager.tsx   # Main orchestrator component
-│   ├── Window.tsx          # Individual window component
-│   └── types.ts            # Window state types
-├── system/                  # System-level programs
-│   ├── launcher/           # Application launcher
-│   └── settings/           # System settings panel
-├── programs/                # User-added programs
-│   ├── notes/              # Example: Notes app
-│   └── templates/          # Scaffolding blueprints
-│       ├── base/           # Basic program template
-│       ├── webview/        # Browser/iframe template
-│       └── media/          # Audio/video player template
-└── src/                     # App entry point
-    ├── main.tsx
-    ├── App.tsx
-    ├── Desktop.tsx
-    └── Taskbar.tsx
+programs/
+├── my-app/
+│   ├── program.tsx      # id, name, icon, launch, optional extras
+│   └── MyAppWindow.tsx  # your React UI
+└── templates/           # starting points (base, webview, media)
 ```
 
-## Creating a New Program
-
-Copy a template from `programs/templates/` into `programs/<id>/` and replace `__PROGRAM_ID__` and `__PROGRAM_NAME__`.
-
-### Program Structure
-
-Every program consists of a `program.tsx` file that exports a program definition:
+## Minimal app
 
 ```tsx
 import { defineProgram } from '@core/program';
-import { MyComponent } from './MyComponent';
+import { MyWindow } from './MyWindow';
 
 export default defineProgram({
-  id: 'my-program',
-  name: 'My Program',
-  icon: '🚀',
+  id: 'my-app',
+  name: 'My App',
+  icon: 'package', // built-in icon name or emoji
   launch: (ctx) => {
     ctx.window.create({
-      title: 'My Program',
+      title: 'My App',
       width: 600,
       height: 400,
-      component: <MyComponent ctx={ctx} />,
+      component: <MyWindow ctx={ctx} />,
     });
   },
 });
 ```
 
-### ProgramContext API
+Pass `ctx` to your window component. Everything your app can do goes through that object.
 
-Programs interact with the system through the `ProgramContext` object:
+## App configuration (`defineProgram`)
+
+Fields you set in `program.tsx`. Required ones must be present; the rest are optional.
+
+| Field                  | Required | Default       | What it does                                                                              | Example                                               |
+|------------------------|----------|---------------|-------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| `id`                   | yes      | —             | Unique id (match your folder name).                                                       | `'my-app'`                                            |
+| `name`                 | yes      | —             | Shown in the Launcher and as the default window title.                                    | `'My App'`                                            |
+| `icon`                 | yes      | —             | Launcher, desktop shortcut, and taskbar icon (built-in name or emoji).                    | `'package'` or `'🚀'`                                 |
+| `launch`               | yes      | —             | Called when the app opens; create your window here.                                       | `(ctx) => ctx.window.create({ … })`                   |
+| `allowMultipleWindows` | no       | `false`       | `false`: reopening focuses the existing window. `true`: each launch opens another window. | `true`                                                |
+| `dock`                 | no       | not pinned    | Pin to the taskbar. Lower `order` = further left.                                         | `{ pin: true, order: 10 }`                            |
+| `shortcuts`            | no       | none          | Global keyboard shortcuts (see below).                                                    | `[{ key: 'N', metaKey: true, action: 'launch-new' }]` |
+| `hideFromLauncher`     | no       | `false`       | Hide from the Launcher grid.                                                              | `true`                                                |
+| `hideFromApplications` | no       | `false`       | Hide from the `/Applications` folder.                                                     | `true`                                                |
+| `protectedShortcut`    | no       | `false`       | Desktop shortcut cannot be deleted.                                                       | `true`                                                |
+| `desktopMenuItems`     | no       | none          | Extra items on the **desktop background** right-click menu.                               | `() => [{ id: '…', label: '…', action: () => {} }]`   |
+| `iconContextMenu`      | no       | none          | Extra items on **your app's desktop shortcut** right-click menu.                          | `() => [{ id: '…', label: '…', action: () => {} }]`   |
+| `resolveIcon`          | no       | static `icon` | Return a different icon at runtime (e.g. empty vs full).                                  | `() => (isFull ? 'trash-full' : 'trash')`             |
+
+Example with optional fields:
 
 ```tsx
-interface ProgramContext {
-  window: WindowAPI;      // Create/manage windows
-  storage: StorageAPI;    // Scoped key-value storage
-  events: EventBusAPI;    // Emit/listen to events
-  system: SystemAPI;      // Read-only system info
-}
+export default defineProgram({
+  id: 'my-app',
+  name: 'My App',
+  icon: 'package',
+  dock: { pin: true, order: 10 },
+  shortcuts: [{ key: 'N', metaKey: true, description: 'New window', action: 'launch-new' }],
+  launch: (ctx) => {
+    ctx.window.create({
+      title: 'My App',
+      width: 600,
+      height: 400,
+      component: <MyWindow ctx={ctx} />,
+    });
+  },
+});
 ```
 
-#### Window API
+### Taskbar pin
 
 ```tsx
-// Create a new window
+dock: { pin: true, order: 10 },
+```
+
+### Keyboard shortcuts
+
+```tsx
+shortcuts: [
+  { key: 'N', metaKey: true, description: 'New window', action: 'launch-new' },
+  { key: 'COMMA', metaKey: true, description: 'Settings', action: 'launch' },
+],
+```
+
+| Field         | Required | Default    | Notes                                                             |
+|---------------|----------|------------|-------------------------------------------------------------------|
+| `key`         | yes      | —          | `'N'`, `'COMMA'`, `'DELETE'`, etc.                                |
+| `metaKey`     | no       | `true`     | Cmd on macOS. Use `ctrlKey` / `shiftKey` / `altKey` as needed.    |
+| `action`      | no       | `'launch'` | `'launch'` — focus or open; `'launch-new'` — always a new window. |
+| `description` | no       | —          | Shown in shortcut help (optional).                                |
+
+### Desktop menus
+
+Add entries to the desktop background menu:
+
+```tsx
+import { launchOrFocusProgram } from '@core/context';
+
+desktopMenuItems: () => [
+  {
+    id: 'open-my-app',
+    label: 'My App',
+    icon: 'package',
+    action: () => launchOrFocusProgram('my-app'),
+  },
+],
+```
+
+Add entries when the user right-clicks your app's desktop shortcut:
+
+```tsx
+iconContextMenu: () => [
+  { id: 'refresh', label: 'Refresh', icon: 'open', action: () => { /* … */ } },
+],
+```
+
+## What you can do in your app (`ctx`)
+
+### Windows
+
+```tsx
 const windowId = ctx.window.create({
-  title: 'Window Title',
+  title: 'My App',
   width: 600,
   height: 400,
-  component: <MyComponent />,
+  minWidth: 320,
+  minHeight: 200,
+  component: <MyWindow ctx={ctx} />,
 });
 
-// Window management
 ctx.window.close(windowId);
 ctx.window.focus(windowId);
 ctx.window.minimize(windowId);
 ctx.window.maximize(windowId);
+ctx.window.restore(windowId);
 ctx.window.setTitle(windowId, 'New Title');
+ctx.window.getWindows(); // your app's open windows
 ```
 
-#### Storage API
+Omit `x` / `y` to center the window with a small random offset.
 
-Storage is automatically scoped to your program:
+### Save data (per app)
+
+Data is stored under your app's id — it never clashes with other apps:
 
 ```tsx
-// Save data
-ctx.storage.setItem('settings', { theme: 'dark' });
-
-// Retrieve data
-const settings = ctx.storage.getItem<Settings>('settings');
-
-// Other operations
-ctx.storage.removeItem('settings');
+ctx.storage.setItem('items', [{ id: '1', text: 'Hello' }]);
+const items = ctx.storage.getItem<Item[]>('items');
+ctx.storage.removeItem('items');
 ctx.storage.clear();
-const keys = ctx.storage.keys();
+ctx.storage.keys();
 ```
 
-#### Events API
-
-Communicate between program instances:
+### Events (inside your app or between your windows)
 
 ```tsx
-// Emit an event
-ctx.events.emit('data:updated', { id: 123 });
-
-// Listen to events
-const unsubscribe = ctx.events.on('data:updated', (data) => {
-  console.log('Data updated:', data);
-});
-
-// Clean up when done
-unsubscribe();
+ctx.events.emit('note:saved', { id: '42' });
+const off = ctx.events.on('note:saved', (payload) => { /* … */ });
+ctx.events.once('ready', () => { /* … */ });
+off();
 ```
 
-## Customization
+Prefix with `system:` to listen to desk-wide events (e.g. `system:open-folder`).
 
-### Theming
+### System info
 
-DeskOS uses CSS custom properties for theming. Edit `src/styles.css` to customize:
+```tsx
+ctx.system.version;    // DeskOS version
+ctx.system.theme;      // 'light' | 'dark'
+ctx.system.programId;  // your app id
+```
+
+### Right-click menus inside your window
+
+Register a menu for elements in your UI:
+
+```tsx
+useEffect(() => {
+  return ctx.contextMenu.register('.note-row', {
+    id: 'note-actions',
+    generator: () => [
+      { id: 'delete', label: 'Delete', icon: 'delete', action: () => deleteNote() },
+    ],
+  });
+}, [ctx]);
+```
+
+Selectors are limited to your app's windows automatically.
+
+### Selection (for right-click and keyboard actions)
+
+Tell DeskOS what the user has selected inside your app so context menus and Delete work correctly:
+
+```tsx
+useEffect(() => {
+  return ctx.selection.register(
+    () =>
+      selectedIds.size
+        ? { type: 'notes', ids: [...selectedIds], count: selectedIds.size }
+        : null,
+    { id: 'main', isActive: () => isWindowFocused }
+  );
+}, [ctx]);
+```
+
+Return `null` when nothing is selected.
+
+### Dynamic icon
+
+Change your app's icon on the taskbar or desktop shortcut while running:
+
+```tsx
+useEffect(() => {
+  return ctx.icon.register(() => (hasUnread ? 'mail-unread' : 'mail'));
+}, [ctx, hasUnread]);
+```
+
+Or set `resolveIcon` in `defineProgram` if the icon does not depend on React state.
+
+### Open another app
+
+```tsx
+import { launchOrFocusProgram } from '@core/context';
+
+await launchOrFocusProgram('settings');
+await launchOrFocusProgram('folder', true); // force new window
+```
+
+## Icons
+
+Built-in icon names are in `@core/icons`. Render them with the shared component:
+
+```tsx
+import { Icon } from '@components/Icon';
+
+<Icon name="notes" size={32} />
+```
+
+You can also use an emoji string as `icon` in `defineProgram`.
+
+## Theming
+
+DeskOS uses CSS custom properties. Edit `src/styles.css`:
 
 ```css
 :root {
   --color-accent: #5c9fff;
   --color-bg-primary: #0a0a0f;
   --font-sans: 'IBM Plex Sans', sans-serif;
-  /* ... */
 }
 ```
-
-### Window Manager
-
-The window manager is fully customizable. Edit files in `window-manager/` to:
-
-- Change window appearance
-- Modify drag/resize behavior
-- Implement tiling layouts
-- Add window snapping
-
-## Architecture
-
-DeskOS uses a build-time program discovery system:
-
-1. The Vite plugin scans `programs/` and `system/` directories
-2. It extracts metadata from `program.tsx` files
-3. A virtual module (`virtual:programs`) is generated with lazy imports
-4. The Launcher uses this registry to display and launch programs
-
-This approach provides:
-- **Type Safety**: Full TypeScript support for program definitions
-- **Tree Shaking**: Only included programs are bundled
-- **Hot Module Replacement**: New programs appear instantly during development
 
 ## Contributing
 

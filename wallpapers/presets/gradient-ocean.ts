@@ -1,3 +1,4 @@
+/** Built-in wallpaper preset: ocean gradient. */
 export const wallpaper = {
   id: 'gradient-ocean',
   name: 'Gradient Ocean',

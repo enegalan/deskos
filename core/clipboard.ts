@@ -3,15 +3,19 @@
  * Manages copy, cut, paste, and delete operations for desktop items and folder items
  */
 
+/** Kind of desktop item stored on the clipboard. */
 export type ClipboardItemType = 'shortcut' | 'folder';
 
+/** Single item reference in clipboard data. */
 export interface ClipboardItem {
   id: string;
   type: ClipboardItemType;
 }
 
+/** Whether clipboard items were copied or cut. */
 export type ClipboardOperation = 'copy' | 'cut';
 
+/** Clipboard payload for desktop or folder item operations. */
 export interface ClipboardData {
   type: 'desktop-items' | 'folder-items';
   items: ClipboardItem[];
@@ -29,10 +33,12 @@ let cutHandlers: Array<{ handler: () => void; priority: number }> = [];
 let pasteHandlers: Array<{ handler: () => void; priority: number }> = [];
 let deleteHandlers: Array<{ handler: () => void; priority: number }> = [];
 
-// Priority constants
+/** Handler priority: desktop icon surface. */
 const PRIORITY_DESKTOP = 0;
+/** Handler priority: focused folder window. */
 const PRIORITY_FOLDER_WINDOW = 1;
 
+/** Dispatch event when clipboard contents change. */
 function notifyClipboardUpdated(): void {
   window.dispatchEvent(new CustomEvent('deskos-clipboard-updated'));
 }
@@ -176,13 +182,13 @@ export function getClipboard(): ClipboardData | null {
   return clipboardData;
 }
 
-// Export priority constants
+/** Priority levels for clipboard keyboard handlers. */
 export const CLIPBOARD_PRIORITY = {
   DESKTOP: PRIORITY_DESKTOP,
   FOLDER_WINDOW: PRIORITY_FOLDER_WINDOW,
 };
 
-// Special error to indicate handler should not process (try next handler)
+/** Thrown by a handler to defer to the next handler in the priority chain. */
 export class HandlerSkippedError extends Error {
   constructor() {
     super('Handler skipped - try next handler');

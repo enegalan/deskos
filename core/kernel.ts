@@ -12,6 +12,7 @@ import {
   TASKBAR_HEIGHT,
 } from './constants';
 
+/** Runtime state of a single program window. */
 export interface WindowState {
   id: string;
   programId: string;
@@ -35,6 +36,7 @@ export interface WindowState {
   };
 }
 
+/** Options passed to {@link WindowAPI.create}. */
 export interface WindowCreateOptions {
   title?: string;
   x?: number;
@@ -49,6 +51,7 @@ export interface WindowCreateOptions {
 /** Dock date display presets */
 export type DateFormat = 'medium' | 'long' | 'iso' | 'dmy' | 'mdy';
 
+/** Supported dock date format ids. */
 const DATE_FORMATS: DateFormat[] = ['medium', 'long', 'iso', 'dmy', 'mdy'];
 
 /**
@@ -60,8 +63,10 @@ export function isDateFormat(value: unknown): value is DateFormat {
   return typeof value === 'string' && DATE_FORMATS.includes(value as DateFormat);
 }
 
+/** Folder window item layout mode. */
 export type FolderViewMode = 'grid' | 'list';
 
+/** Persisted user-facing system preferences. */
 export interface SystemSettings {
   theme: 'light' | 'dark';
   wallpaper: string;
@@ -87,6 +92,7 @@ export function getMaxIconSize(gridSize: number, showIconLabels: boolean): numbe
   return Math.max(MIN_ICON_SIZE, gridSize - reserved);
 }
 
+/** Zustand store shape for the DeskOS window manager kernel. */
 export interface KernelState {
   windows: WindowState[];
   windowOrder: string[];
@@ -116,8 +122,10 @@ function generateWindowId(): string {
   return `window-${++windowIdCounter}-${Date.now()}`;
 }
 
+/** localStorage key for persisted {@link SystemSettings}. */
 const SETTINGS_STORAGE_KEY = 'deskos:system:settings';
 
+/** Default {@link SystemSettings} when nothing is stored yet. */
 const defaultSettings: SystemSettings = {
   theme: 'dark',
   wallpaper: '',
@@ -201,6 +209,10 @@ function saveSettings(settings: SystemSettings): void {
   }
 }
 
+/**
+ * Zustand hook for kernel state (windows, focus, settings).
+ * Used by the shell and {@link createProgramContext}.
+ */
 export const useKernel = create<KernelState>((set, get) => ({
   windows: [],
   windowOrder: [],

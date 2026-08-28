@@ -4,7 +4,9 @@
  */
 
 const DB_NAME = 'deskos-wallpapers';
+/** IndexedDB schema version for the wallpaper store. */
 const DB_VERSION = 1;
+/** IndexedDB object store name for wallpaper blobs. */
 const STORE_NAME = 'wallpapers';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -165,6 +167,7 @@ export interface WallpaperMetadata {
   fileSize: number;
 }
 
+/** localStorage key for custom wallpaper metadata list. */
 const WALLPAPERS_LIST_KEY = 'deskos:custom-wallpapers';
 
 /**

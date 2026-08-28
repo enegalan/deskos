@@ -3,6 +3,7 @@
  * Provides SVG icon registry and utilities
  */
 
+/** Built-in and custom icon names used across DeskOS UI. */
 export type IconName =
   | 'launcher'
   | 'settings'
@@ -18,6 +19,8 @@ export type IconName =
   | 'new-folder'
   | 'rename'
   | 'delete'
+  | 'trash'
+  | 'trash-full'
   | 'open'
   | 'new-window'
   | 'view'
@@ -49,15 +52,17 @@ export type IconName =
   | 'package'
   | string; // Allow custom icon names / emoji for user programs
 
+/** Registered SVG icon definition. */
 export interface IconDefinition {
   name: IconName;
   svg: string;
   viewBox?: string;
 }
 
+/** In-memory SVG icon registry. */
 const iconRegistry = new Map<IconName, IconDefinition>();
 
-// System icons
+/** Built-in system icons registered at startup. */
 const systemIcons: IconDefinition[] = [
   {
     name: 'launcher',
@@ -127,6 +132,16 @@ const systemIcons: IconDefinition[] = [
   {
     name: 'delete',
     svg: '<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'trash',
+    svg: '<path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M8.25 6.75V4.5a1.5 1.5 0 0 1 1.5-1.5h4.5a1.5 1.5 0 0 1 1.5 1.5v2.25m2.25 0V19.5a1.5 1.5 0 0 1-1.5 1.5H7.5a1.5 1.5 0 0 1-1.5-1.5V6.75h12z"/>',
+    viewBox: '0 0 24 24',
+  },
+  {
+    name: 'trash-full',
+    svg: '<path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M8.25 6.75V4.5a1.5 1.5 0 0 1 1.5-1.5h4.5a1.5 1.5 0 0 1 1.5 1.5v2.25m2.25 0V19.5a1.5 1.5 0 0 1-1.5 1.5H7.5a1.5 1.5 0 0 1-1.5-1.5V6.75h12zM10 11v5m4-5v5"/>',
     viewBox: '0 0 24 24',
   },
   {

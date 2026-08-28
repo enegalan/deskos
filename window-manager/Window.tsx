@@ -3,8 +3,10 @@ import { useKernel } from '@core/kernel';
 import type { WindowState } from '@core/kernel';
 import { Icon } from '../components/Icon';
 
+/** Resize handle direction for window edges and corners. */
 type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
+/** Pointer drag state while moving a window. */
 interface DragState {
   isDragging: boolean;
   startX: number;
@@ -13,6 +15,7 @@ interface DragState {
   offsetY: number;
 }
 
+/** Pointer resize state while resizing a window. */
 interface ResizeState {
   isResizing: boolean;
   direction: ResizeDirection | null;
@@ -24,6 +27,7 @@ interface ResizeState {
   startPosY: number;
 }
 
+/** Stacking z-index layers for desktop, windows, overlays, and taskbar. */
 const Z_INDEX = {
   DESKTOP: 0,
   WINDOW_BASE: 1000,
@@ -53,6 +57,7 @@ function calculateZIndex(windowId: string, windowOrder: string[], isFocused: boo
   return Z_INDEX.WINDOW_BASE + position;
 }
 
+/** Props for a managed program window shell. */
 interface WindowProps {
   window: WindowState;
   windowOrder: string[];

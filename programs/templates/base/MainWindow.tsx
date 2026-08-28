@@ -4,7 +4,7 @@ interface MainWindowProps {
   ctx: ProgramContext;
 }
 
-export function MainWindow({ ctx }: MainWindowProps) {
+export function MainWindow({ ctx: _ctx }: MainWindowProps) {
   return (
     <div style={{ padding: 'var(--space-lg)' }}>
       <h1 style={{ marginBottom: 'var(--space-md)' }}>__PROGRAM_NAME__</h1>

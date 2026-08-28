@@ -1,6 +1,6 @@
 {
   "name": "deskos",
-  "version": "1.3.0",
+  "version": "1.5.0",
   "type": "module",
   "description": "A modular web-based desktop environment with windows, applications, and real multitasking",
   "scripts": {

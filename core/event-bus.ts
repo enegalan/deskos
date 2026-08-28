@@ -1,5 +1,7 @@
+/** Callback for a single event-bus subscription. */
 export type EventHandler<T = unknown> = (payload: T) => void;
 
+/** Scoped pub/sub API exposed to programs. */
 export interface EventBusAPI {
   emit<T = unknown>(event: string, payload?: T): void;
   on<T = unknown>(event: string, handler: EventHandler<T>): () => void;
@@ -7,9 +9,10 @@ export interface EventBusAPI {
   once<T = unknown>(event: string, handler: EventHandler<T>): () => void;
 }
 
+/** Internal listener map keyed by event name. */
 type ListenerMap = Map<string, Set<EventHandler<unknown>>>;
 
-// Global event bus instance
+/** Global event-bus listener registry. */
 const listeners: ListenerMap = new Map();
 
 /**
@@ -93,7 +96,7 @@ export function createScopedEventBus(programId: string): EventBusAPI {
   };
 }
 
-// System-level event types
+/** Well-known system event names emitted on the global bus. */
 export const SystemEvents = {
   CONTEXT_MENU_OPENED: 'system:contextmenu:opened',
   CONTEXT_MENU_CLOSED: 'system:contextmenu:closed',

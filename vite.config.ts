@@ -12,7 +12,6 @@ export default defineConfig({
       '@programs': resolve(__dirname, 'programs'),
       '@components': resolve(__dirname, 'components'),
       '@file-system': resolve(__dirname, 'file-system'),
-      '@dock': resolve(__dirname, 'dock'),
       '@wallpapers': resolve(__dirname, 'wallpapers'),
     },
   },

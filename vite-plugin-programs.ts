@@ -1,7 +1,12 @@
+/**
+ * Vite plugin: scans program entry files and exposes virtual:programs.
+ */
+
 import { Plugin } from 'vite';
 import { readdirSync, existsSync, readFileSync } from 'fs';
 import { resolve, join } from 'path';
 
+/** Program manifest extracted from a program entry file. */
 interface ProgramMetadata {
   id: string;
   name: string;
@@ -9,9 +14,12 @@ interface ProgramMetadata {
   path: string;
 }
 
+/** Virtual module id imported as virtual:programs. */
 const VIRTUAL_MODULE_ID = 'virtual:programs';
+/** Vite-resolved id for the virtual programs module. */
 const RESOLVED_VIRTUAL_MODULE_ID = '\0' + VIRTUAL_MODULE_ID;
 
+/** Parse id/name/icon from a program source file without executing it. */
 function extractMetadata(filePath: string): ProgramMetadata | null {
   try {
     const content = readFileSync(filePath, 'utf-8');
@@ -35,6 +43,7 @@ function extractMetadata(filePath: string): ProgramMetadata | null {
   return null;
 }
 
+/** Discover all runnable programs under `programs/`. */
 function scanProgramDirectories(rootDir: string): ProgramMetadata[] {
   const programs: ProgramMetadata[] = [];
   const directories = ['programs'];
@@ -71,8 +80,9 @@ function scanProgramDirectories(rootDir: string): ProgramMetadata[] {
   return programs;
 }
 
+/** Generate the virtual module source for the program registry. */
 function generateVirtualModule(programs: ProgramMetadata[], rootDir: string): string {
-  const imports: string[] = [];
+  const eagerImports: string[] = [];
   const registryEntries: string[] = [];
   const listEntries: string[] = [];
 
@@ -82,6 +92,9 @@ function generateVirtualModule(programs: ProgramMetadata[], rootDir: string): st
       .replace(rootDir, '')
       .replace(/\\/g, '/')
       .replace(/^\//, '');
+
+    // Eager-load so defineProgram side effects (dock, shortcuts, delete, icons) register at startup
+    eagerImports.push(`import '/${relativePath}';`);
 
     registryEntries.push(`
   '${program.id}': {
@@ -101,7 +114,7 @@ function generateVirtualModule(programs: ProgramMetadata[], rootDir: string): st
   }`);
   }
 
-  return `${imports.join('\n')}
+  return `${eagerImports.join('\n')}
 
 export const programs = {${registryEntries.join(',')},
 };
@@ -111,6 +124,7 @@ export const programList = [${listEntries.join(',')},
 `;
 }
 
+/** Vite plugin that builds and hot-reloads the `virtual:programs` module. */
 export function programsPlugin(): Plugin {
   let rootDir: string;
   let cachedModule: string | null = null;

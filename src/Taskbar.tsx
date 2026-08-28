@@ -3,7 +3,9 @@ import { useKernel } from '@core/kernel';
 import { formatDockClock } from '@core/dock-clock';
 import { programList } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
-import { DOCK_ITEMS, getDockPinnedProgramIds } from '../dock/dock';
+import { resolveProgramIcon } from '@core/program-icons';
+import { getDockRole } from '@core/program-registry';
+import { DOCK_ITEMS, getDockPinnedProgramIds } from '@core/dock';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
@@ -15,6 +17,7 @@ export function Taskbar() {
   const restoreWindow = useKernel((state) => state.restoreWindow);
   const settings = useKernel((state) => state.settings);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [iconRevision, setIconRevision] = useState(0);
 
   const handleLaunchProgram = async (programId: string) => {
     await launchOrFocusProgram(programId);
@@ -32,6 +35,12 @@ export function Taskbar() {
       setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const refreshIcons = () => setIconRevision((n) => n + 1);
+    window.addEventListener('program-icon-updated', refreshIcons);
+    return () => window.removeEventListener('program-icon-updated', refreshIcons);
   }, []);
 
   const windowsByProgram = new Map<string, typeof windows>();
@@ -59,6 +68,8 @@ export function Taskbar() {
     const isActive = programWindows.some((w) => w.id === activeWindowId);
     const isLauncher = variant === 'launcher';
     const isRunningSlot = variant === 'window';
+    const iconName = resolveProgramIcon(programId, program.icon);
+    void iconRevision;
 
     return (
       <button
@@ -93,19 +104,19 @@ export function Taskbar() {
         data-program-id={programId}
       >
         <div className="dock-icon-wrapper">
-          {hasIcon(program.icon as IconName) ? (
+          {hasIcon(iconName as IconName) ? (
             <Icon
-              name={(isLauncher ? program.icon || 'launcher' : program.icon) as IconName}
+              name={(isLauncher ? iconName || 'launcher' : iconName) as IconName}
               size={48}
               color={isLauncher || isRunningSlot ? 'rgba(255, 255, 255, 0.9)' : undefined}
               fallback={
-                typeof program.icon === 'string' && !hasIcon(program.icon as IconName)
-                  ? program.icon
+                typeof iconName === 'string' && !hasIcon(iconName as IconName)
+                  ? iconName
                   : undefined
               }
             />
           ) : (
-            <span>{isLauncher ? program.icon || '⊞' : program.icon}</span>
+            <span>{isLauncher ? iconName || '⊞' : iconName}</span>
           )}
         </div>
         {(isRunningSlot || hasWindows) && <div className="dock-indicator" />}
@@ -139,7 +150,7 @@ export function Taskbar() {
             );
           }
 
-          const variant = item.programId === 'launcher' ? 'launcher' : 'program';
+          const variant = getDockRole(item.programId) === 'launcher' ? 'launcher' : 'program';
           return renderProgramButton(item.programId, variant);
         })}
       </div>

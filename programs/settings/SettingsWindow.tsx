@@ -45,6 +45,7 @@ function getStorageUsageLabel(): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Props for the Settings program window. */
 interface SettingsWindowProps {
   /** Program context (system info, etc.) */
   ctx: ProgramContext;

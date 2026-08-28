@@ -1,3 +1,4 @@
+/** Computed menu position with flip/shift metadata. */
 export interface MenuPosition {
   x: number;
   y: number;
@@ -7,11 +8,13 @@ export interface MenuPosition {
   shiftY: number;
 }
 
+/** Measured menu width and height (px). */
 export interface MenuDimensions {
   width: number;
   height: number;
 }
 
+/** Viewport size and scroll offset used for menu collision detection. */
 export interface ViewportInfo {
   width: number;
   height: number;

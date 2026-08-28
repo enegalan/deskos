@@ -27,6 +27,7 @@ export function ToastContainer() {
   );
 }
 
+/** Props for a single toast notification row. */
 interface ToastProps {
   notification: Notification;
 }

@@ -3,8 +3,14 @@ import { useKernel } from './kernel';
 import { createSecureScopedStorage, type StorageAPI } from './storage';
 import { createScopedEventBus, type EventBusAPI } from './event-bus';
 import { ContextMenuManager, type ContextMenuProvider, type MenuContext, type MenuItem } from '../context-menu/ContextMenuManager';
+import {
+  registerSelectionSource,
+  SELECTION_PRIORITY,
+} from './selection';
+import { registerProgramIconResolver } from './program-icons';
 import packageJson from '../package.json';
 
+/** Window lifecycle API exposed to programs via {@link ProgramContext}. */
 export interface WindowAPI {
   create(options: WindowCreateOptions): string;
   close(windowId: string): void;
@@ -16,6 +22,7 @@ export interface WindowAPI {
   getWindows(): WindowState[];
 }
 
+/** Read-only system metadata for the running program. */
 export interface SystemAPI {
   readonly version: string;
   readonly theme: 'light' | 'dark';
@@ -48,6 +55,47 @@ export interface ContextMenuAPI {
   }): () => void;
 }
 
+/**
+ * Publish program selection for context menus and other system features.
+ * Return null/undefined from the getter when nothing is selected.
+ *
+ * @example
+ * useEffect(() => {
+ *   return ctx.selection.register(() => {
+ *     const ids = Array.from(selectedIdsRef.current);
+ *     return ids.length ? { type: 'my-items', ids } : null;
+ *   });
+ * }, [ctx]);
+ */
+export interface SelectionAPI {
+  /**
+   * Register a selection getter for this program.
+   *
+   * @param getSelection - Return null/undefined when nothing is selected
+   * @param options.id - Source id suffix (`{programId}:{id}`, default `default`)
+   * @param options.priority - Override {@link SELECTION_PRIORITY.PROGRAM}
+   * @param options.isActive - Return true if the selection is active
+   * @returns Unregister function
+   */
+  register(
+    getSelection: () => unknown | null | undefined,
+    options?: { id?: string; priority?: number; isActive?: () => boolean }
+  ): () => void;
+}
+
+/**
+ * Register a dynamic icon resolver for this program (overrides {@link defineProgram.resolveIcon}).
+ *
+ * @example
+ * useEffect(() => {
+ *   return ctx.icon.register(() => (hasUnread ? 'mail-unread' : 'mail'));
+ * }, [ctx, hasUnread]);
+ */
+export interface IconAPI {
+  register(resolver: () => string): () => void;
+}
+
+/** Semantic context-menu targets that are not scoped to a program window. */
 const SEMANTIC_MENU_TARGETS = new Set(['desktop', 'window', 'file', 'folder-window']);
 
 /** Scope a CSS selector to this program's windows; leave semantic targets unchanged. */
@@ -62,12 +110,15 @@ function scopeContextMenuTarget(target: string, programId: string): string {
   return `${scope} ${target}`;
 }
 
+/** Full program-facing API surface (window, storage, events, menus, selection). */
 export interface ProgramContext {
   window: WindowAPI;
   storage: StorageAPI;
   events: EventBusAPI;
   system: SystemAPI;
   contextMenu: ContextMenuAPI;
+  selection: SelectionAPI;
+  icon: IconAPI;
 }
 
 /**
@@ -101,9 +152,9 @@ export async function launchOrFocusProgram(
     return;
   }
   
-  // If there's an existing window, focus it instead of creating a new one
-  // (This applies regardless of allowMultiple - default behavior is to focus existing)
-  if (existingWindows.length > 0) {
+  // If there's an existing window and the program is single-window, focus it
+  const allowMultiple = module.default.allowMultipleWindows === true;
+  if (existingWindows.length > 0 && !forceNewWindow && !allowMultiple) {
     const windowToFocus = existingWindows[0];
     
     // Restore if minimized
@@ -241,6 +292,36 @@ function createContextMenuAPI(programId: string): ContextMenuAPI {
 }
 
 /**
+ * Creates a SelectionAPI for a specific program.
+ */
+function createSelectionAPI(programId: string): SelectionAPI {
+  return {
+    register(
+      getSelection: () => unknown | null | undefined,
+      options?: { id?: string; priority?: number; isActive?: () => boolean }
+    ): () => void {
+      return registerSelectionSource({
+        id: `${programId}:${options?.id ?? 'default'}`,
+        priority: options?.priority ?? SELECTION_PRIORITY.PROGRAM,
+        isActive: options?.isActive,
+        getSelection,
+      });
+    },
+  };
+}
+
+/**
+ * Creates an IconAPI for a specific program.
+ */
+function createIconAPI(programId: string): IconAPI {
+  return {
+    register(resolver: () => string): () => void {
+      return registerProgramIconResolver(programId, resolver);
+    },
+  };
+}
+
+/**
  * Creates a complete ProgramContext for a specific program.
  * This is the only interface through which programs interact with the system.
  */
@@ -252,6 +333,8 @@ function createProgramContext(programId: string, icon: string = 'package'): Prog
     events: createScopedEventBus(programId),
     system: createSystemAPI(programId),
     contextMenu: createContextMenuAPI(programId),
+    selection: createSelectionAPI(programId),
+    icon: createIconAPI(programId),
   };
 
   return new Proxy(context, {

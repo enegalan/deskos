@@ -160,12 +160,10 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
         });
       }
       
-      // Delete action - adapt label based on selection
       const totalSelectedForDelete = selectedShortcuts.length + selectedFolders.length;
-      const deleteLabel = totalSelectedForDelete > 1 
-        ? `Delete (${totalSelectedForDelete} items)`
-        : 'Delete';
-      
+      const { getDeleteItemsLabel, deleteDesktopItems } = await import('@core/delete-items');
+      const deleteLabel = getDeleteItemsLabel(totalSelectedForDelete);
+
       items.push({
         id: 'folder-icon-delete',
         label: deleteLabel,
@@ -173,31 +171,7 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
         shortcut: 'Delete',
         action: async () => {
           try {
-            const { removeDesktopShortcut, deleteDesktopFolder } = await import('@core/desktop-shortcuts');
-            
-            // Show confirmation dialog if there are folders to delete
-            if (selectedFolders.length > 0) {
-              const folderMessage = selectedFolders.length === 1
-                ? 'Are you sure you want to delete this folder and all its contents?'
-                : `Are you sure you want to delete ${selectedFolders.length} folders and all their contents?`;
-              
-              if (!confirm(folderMessage)) {
-                return; // User cancelled
-              }
-            }
-            
-            // Delete all selected shortcuts (no confirmation needed for shortcuts)
-            for (const shortcutId of selectedShortcuts) {
-              removeDesktopShortcut(shortcutId);
-            }
-            
-            // Delete all selected folders
-            for (const folderId of selectedFolders) {
-              deleteDesktopFolder(folderId);
-            }
-            
-            // Dispatch custom event to notify DesktopIcons to refresh
-            window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+            await deleteDesktopItems([...selectedShortcuts, ...selectedFolders]);
           } catch (error) {
             console.error('[FolderIcon] Error deleting items:', error);
           }

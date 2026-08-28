@@ -6,6 +6,7 @@ export default defineProgram({
   id: 'notes',
   name: 'Notes',
   icon: 'notes',
+  dock: { pin: true, order: 10 },
   launch: (ctx) => {
     ctx.window.create({
       title: 'Notes',

@@ -1,3 +1,4 @@
+/** Scoped key-value storage API for a program. */
 export interface StorageAPI {
   getItem<T = unknown>(key: string): T | null;
   setItem<T = unknown>(key: string, value: T): void;
@@ -6,6 +7,7 @@ export interface StorageAPI {
   keys(): string[];
 }
 
+/** Prefix for all DeskOS localStorage keys. */
 const STORAGE_PREFIX = 'deskos';
 
 /**

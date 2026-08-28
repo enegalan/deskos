@@ -2,8 +2,10 @@
  * Toast notification system for DeskOS
  */
 
+/** Toast severity / styling variant. */
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 
+/** Toast notification payload. */
 export interface Notification {
   id: string;
   type: NotificationType;
@@ -13,6 +15,7 @@ export interface Notification {
   timestamp: number;
 }
 
+/** In-memory toast queue with subscriber notifications. */
 class NotificationManager {
   private notifications: Notification[] = [];
   private listeners: Set<(notifications: Notification[]) => void> = new Set();
@@ -95,5 +98,5 @@ class NotificationManager {
   }
 }
 
-// Singleton instance
+/** Global toast notification manager singleton. */
 export const notificationManager = new NotificationManager();
