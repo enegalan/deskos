@@ -9,22 +9,43 @@ type FolderOpenRequest = {
   initialPath?: string;
 };
 
-/** Pending folder open requests consumed on folder program launch. */
-const pendingOpens: FolderOpenRequest[] = [];
+/** Shared across HMR so open-folder never stacks duplicate listeners. */
+type FolderOpenBridge = {
+  pending: FolderOpenRequest[];
+  queue: (request: FolderOpenRequest) => void;
+};
 
-/** Queue a folder open request and launch (or focus) the folder program. */
-function queueFolderOpen(request: FolderOpenRequest): void {
-  pendingOpens.push(request);
-  void launchOrFocusProgram('folder', true);
+const BRIDGE_KEY = '__deskosFolderOpenBridge';
+
+function getFolderOpenBridge(): FolderOpenBridge {
+  const win = window as Window & { [BRIDGE_KEY]?: FolderOpenBridge };
+  if (!win[BRIDGE_KEY]) {
+    const bridge: FolderOpenBridge = {
+      pending: [],
+      queue(request) {
+        bridge.pending.push(request);
+        void launchOrFocusProgram('folder', true);
+      },
+    };
+    win[BRIDGE_KEY] = bridge;
+    window.addEventListener('open-folder', (e) => {
+      const detail = (e as CustomEvent<{ folderId?: string; initialPath?: string }>).detail;
+      if (detail?.folderId || detail?.initialPath) {
+        win[BRIDGE_KEY]!.queue({ folderId: detail.folderId, initialPath: detail.initialPath });
+      }
+    });
+  } else {
+    // Keep queue pointing at latest launchOrFocusProgram after HMR.
+    win[BRIDGE_KEY].queue = (request) => {
+      win[BRIDGE_KEY]!.pending.push(request);
+      void launchOrFocusProgram('folder', true);
+    };
+  }
+  return win[BRIDGE_KEY];
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('open-folder', (e) => {
-    const detail = (e as CustomEvent<{ folderId: string }>).detail;
-    if (detail?.folderId) {
-      queueFolderOpen({ folderId: detail.folderId });
-    }
-  });
+  getFolderOpenBridge();
 }
 
 /** Folder browser — opens desktop folders and special locations. */
@@ -36,10 +57,12 @@ export default defineProgram({
   hideFromApplications: true,
   allowMultipleWindows: true,
   launch: (ctx) => {
-    const request = pendingOpens.shift() || {};
+    const bridge = getFolderOpenBridge();
+    const request = bridge.pending.shift() || {};
     const folder = request.folderId ? getFolderById(request.folderId) : undefined;
+    const pathLabel = request.initialPath?.split('/').filter(Boolean).pop();
     ctx.window.create({
-      title: folder?.name || 'Folder',
+      title: folder?.name || pathLabel || 'Folder',
       width: 800,
       height: 600,
       component: (

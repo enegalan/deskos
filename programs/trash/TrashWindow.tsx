@@ -15,6 +15,7 @@ import {
 } from '@core/trash';
 import { resolveProgramIcon } from '@core/program-icons';
 import { getGridSize, isDesktopFolder, isDesktopShortcut } from '@core/desktop-shortcuts';
+import { dialog } from '@core/dialog';
 import { Icon } from '../../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 
@@ -138,12 +139,14 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
               ? `Delete Forever (${selectedIdsForMenu.length} items)`
               : 'Delete Forever',
             icon: 'delete',
-            action: () => {
+            action: async () => {
               const count = selectedIdsForMenu.length;
-              const ok = confirm(
+              const ok = await dialog.confirm(
                 count === 1
                   ? 'Are you sure you want to permanently delete this item?'
-                  : `Are you sure you want to permanently delete ${count} items?`
+                  : `Are you sure you want to permanently delete ${count} items?`,
+                'Delete Forever',
+                { danger: true }
               );
               if (!ok) return;
               deleteForever(selectedIdsForMenu);
@@ -206,9 +209,15 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
             label: 'Empty Trash',
             icon: 'delete',
             enabled: !empty,
-            action: () => {
+            action: async () => {
               if (isTrashEmpty()) return;
-              if (!confirm('Are you sure you want to permanently erase the items in the Trash?')) {
+              if (
+                !(await dialog.confirm(
+                  'Are you sure you want to permanently erase the items in the Trash?',
+                  'Empty Trash',
+                  { danger: true }
+                ))
+              ) {
                 return;
               }
               emptyTrash();
@@ -251,22 +260,30 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
     ctx.events.emit('trash:restored', { ids });
   }, [selectedIds, ctx.events]);
 
-  const handleDeleteForever = useCallback(() => {
+  const handleDeleteForever = useCallback(async () => {
     if (selectedIds.size === 0) return;
     const count = selectedIds.size;
-    const ok = confirm(
+    const ok = await dialog.confirm(
       count === 1
         ? 'Are you sure you want to permanently delete this item?'
-        : `Are you sure you want to permanently delete ${count} items?`
+        : `Are you sure you want to permanently delete ${count} items?`,
+      'Delete Forever',
+      { danger: true }
     );
     if (!ok) return;
     deleteForever(Array.from(selectedIds));
     setSelectedIds(new Set());
   }, [selectedIds]);
 
-  const handleEmpty = useCallback(() => {
+  const handleEmpty = useCallback(async () => {
     if (isTrashEmpty()) return;
-    if (!confirm('Are you sure you want to permanently erase the items in the Trash?')) {
+    if (
+      !(await dialog.confirm(
+        'Are you sure you want to permanently erase the items in the Trash?',
+        'Empty Trash',
+        { danger: true }
+      ))
+    ) {
       return;
     }
     emptyTrash();

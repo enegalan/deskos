@@ -15,6 +15,7 @@ import {
 } from '@core/wallpaper-storage';
 import { BUILTIN_WALLPAPERS } from '../../wallpapers/wallpapers';
 import { useState, useEffect } from 'react';
+import { dialog } from '@core/dialog';
 
 /** Host browser label from userAgent (no version noise). */
 function getBrowserLabel(): string {
@@ -137,7 +138,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
     updateSettings({ showSeconds: !settings.showSeconds });
   };
 
-  const handleWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWallpaperUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
       console.log('[Settings] No file selected');
@@ -148,13 +149,13 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      await dialog.alert('Please select an image file');
       return;
     }
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image size must be less than 10MB');
+      await dialog.alert('Image size must be less than 10MB');
       return;
     }
 
@@ -179,18 +180,18 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
           console.log('[Settings] Settings updated');
         } catch (error) {
           console.error('[Settings] Failed to save wallpaper:', error);
-          alert(
+          await dialog.alert(
             'Failed to save wallpaper: ' + (error instanceof Error ? error.message : String(error))
           );
         }
       } else {
         console.error('[Settings] No data URL generated');
-        alert('Error reading image file');
+        await dialog.alert('Error reading image file');
       }
     };
-    reader.onerror = (error) => {
+    reader.onerror = async (error) => {
       console.error('[Settings] FileReader error:', error);
-      alert('Error reading image file');
+      await dialog.alert('Error reading image file');
     };
     reader.readAsDataURL(file);
 
@@ -200,7 +201,11 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
 
   const handleDeleteCustomWallpaper = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this wallpaper?')) {
+    if (
+      await dialog.confirm('Are you sure you want to delete this wallpaper?', 'Confirm', {
+        danger: true,
+      })
+    ) {
       try {
         await removeCustomWallpaper(id);
         setCustomWallpapers(getCustomWallpapers());
@@ -210,7 +215,7 @@ export function SettingsWindow({ ctx }: SettingsWindowProps) {
         }
       } catch (error) {
         console.error('[Settings] Failed to delete wallpaper:', error);
-        alert('Failed to delete wallpaper');
+        await dialog.alert('Failed to delete wallpaper');
       }
     }
   };

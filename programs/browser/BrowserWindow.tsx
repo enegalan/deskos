@@ -82,6 +82,10 @@ interface MenuAction {
 
 interface BrowserWindowProps {
   ctx: ProgramContext;
+  /** Optional URL to open on mount (e.g. local file blob or asset). */
+  initialUrl?: string;
+  /** Optional window/tab title hint for `initialUrl`. */
+  initialTitle?: string;
 }
 
 /** Monotonic counter for generated tab ids. */
@@ -92,14 +96,15 @@ function createTabId(): string {
   return `tab-${++tabIdCounter}-${Date.now()}`;
 }
 
-/** Create a new tab opened on the home page. */
-function createTab(): BrowserTab {
+/** Create a new tab opened on the home page (or a given URL). */
+function createTab(initialUrl = HOME_URL, title?: string): BrowserTab {
+  const url = normalizeUrl(initialUrl);
   return {
     id: createTabId(),
-    history: [HOME_URL],
+    history: [url],
     historyIndex: 0,
-    inputUrl: HOME_URL,
-    title: 'New Tab',
+    inputUrl: url,
+    title: title || tabTitleForUrl(url) || 'New Tab',
     loading: false,
     reloadKey: 0,
   };
@@ -163,6 +168,10 @@ function normalizeUrl(input: string): string {
   if (trimmed === HOME_URL || trimmed.startsWith('about:') || trimmed.startsWith('chrome://')) {
     return trimmed;
   }
+  // Local VFS / asset opens: blob URLs and absolute site paths.
+  if (trimmed.startsWith('blob:') || trimmed.startsWith('data:') || trimmed.startsWith('/')) {
+    return trimmed;
+  }
   if (trimmed.includes('://')) {
     try {
       const parsed = new URL(trimmed);
@@ -189,6 +198,9 @@ function isInternalPage(url: string): boolean {
 function getIframeSrc(url: string): string | undefined {
   if (isInternalPage(url)) return undefined;
   if (url.startsWith('chrome://')) return url;
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('/')) {
+    return url;
+  }
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
@@ -570,14 +582,21 @@ function BrowserContent({
 }
 
 /** Browser window with tabs, toolbar, address bar, bookmarks, and iframe navigation. */
-export function BrowserWindow({ ctx }: BrowserWindowProps) {
+export function BrowserWindow({ ctx, initialUrl, initialTitle }: BrowserWindowProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const addressRef = useRef<HTMLInputElement>(null);
 
-  const [session, setSession] = useWindowSessionState<BrowserWindowSession>(
-    'main',
-    createDefaultBrowserSession
-  );
+  const [session, setSession] = useWindowSessionState<BrowserWindowSession>('main', () => {
+    if (initialUrl) {
+      const tab = createTab(initialUrl, initialTitle);
+      return {
+        tabs: [serializeTab(tab)],
+        activeTabId: tab.id,
+        showBookmarks: true,
+      };
+    }
+    return createDefaultBrowserSession();
+  });
   const [tabRuntime, setTabRuntime] = useState<Record<string, TabRuntime>>({});
 
   const mergeTabRuntime = useCallback(
@@ -911,8 +930,26 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
   const handleBookmarkDragStart = useCallback((e: DragEvent<HTMLButtonElement>, url: string) => {
     suppressBookmarkClickRef.current = true;
     e.dataTransfer.setData(BOOKMARK_DRAG_TYPE, url);
+    e.dataTransfer.setData('text/uri-list', url);
+    e.dataTransfer.setData('text/plain', url);
     e.dataTransfer.effectAllowed = 'copy';
   }, []);
+
+  /** Drag the current page URL out of the address bar onto the desktop. */
+  const handleAddressUrlDragStart = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      const url = getTabUrl(activeTab);
+      if (!url || url.startsWith('about:') || url.startsWith('chrome://')) {
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.setData(BOOKMARK_DRAG_TYPE, url);
+      e.dataTransfer.setData('text/uri-list', url);
+      e.dataTransfer.setData('text/plain', url);
+      e.dataTransfer.effectAllowed = 'copy';
+    },
+    [activeTab]
+  );
 
   const handleBookmarkDragEnd = useCallback(() => {
     window.setTimeout(() => {
@@ -1598,9 +1635,12 @@ export function BrowserWindow({ ctx }: BrowserWindowProps) {
         <form className="ie-address-bar" onSubmit={handleNavigate}>
           <div
             className={`ie-address-field${addressDragOver ? ' drag-over' : ''}`}
+            draggable
+            onDragStart={handleAddressUrlDragStart}
             onDragOver={handleAddressDragOver}
             onDragLeave={handleAddressDragLeave}
             onDrop={handleAddressDrop}
+            title="Drag to desktop to save this link"
           >
             <button
               type="button"

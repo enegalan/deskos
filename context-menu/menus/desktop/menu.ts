@@ -2,6 +2,7 @@ import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMen
 import { useKernel } from '@core/kernel';
 import { ICON_SIZE_LARGE, ICON_SIZE_MEDIUM, ICON_SIZE_SMALL } from '@core/constants';
 import { organizeIconsByName, organizeIconsByDate } from '@core/desktop-shortcuts';
+import { dialog } from '@core/dialog';
 
 /** Register the desktop context menu provider */
 export function registerDesktopMenu(manager: ContextMenuManager): void {
@@ -138,6 +139,84 @@ export function registerDesktopMenu(manager: ContextMenuManager): void {
               }
             } catch (error) {
               console.error('[Desktop] Error creating folder:', error);
+            }
+          },
+        },
+        {
+          id: 'desktop-new-file',
+          label: 'New File',
+          icon: 'file',
+          action: async (context: MenuContext) => {
+            try {
+              const fileName = await dialog.prompt('Enter file name:', '', 'New File', {
+                required: true,
+              });
+              if (!fileName || !fileName.trim()) return;
+
+              const { createDesktopFile, findItemAtPosition, pixelToClampedGrid } =
+                await import('@core/desktop-shortcuts');
+              const desktopElement = document.querySelector('.desktop');
+              if (
+                desktopElement &&
+                context.event &&
+                'clientX' in context.event &&
+                'clientY' in context.event
+              ) {
+                const rect = desktopElement.getBoundingClientRect();
+                const x = context.event.clientX - rect.left;
+                const y = context.event.clientY - rect.top;
+                const gridPos = pixelToClampedGrid(x, y, {
+                  width: rect.width,
+                  height: rect.height,
+                });
+
+                const existingItem = findItemAtPosition(gridPos.x, gridPos.y);
+                if (existingItem) {
+                  console.warn(
+                    '[Desktop] Cannot create file: position already occupied by',
+                    existingItem
+                  );
+                  return;
+                }
+
+                createDesktopFile(fileName.trim(), gridPos.x, gridPos.y);
+              } else {
+                createDesktopFile(fileName.trim());
+              }
+            } catch (error) {
+              console.error('[Desktop] Error creating file:', error);
+            }
+          },
+        },
+        {
+          id: 'desktop-upload-file',
+          label: 'Upload Files…',
+          icon: 'file',
+          action: async (context: MenuContext) => {
+            try {
+              const { pickAndImportFiles } = await import('@core/file-transfer');
+              const { pixelToClampedGrid } = await import('@core/desktop-shortcuts');
+              const desktopElement = document.querySelector('.desktop');
+              let x: number | undefined;
+              let y: number | undefined;
+              if (
+                desktopElement &&
+                context.event &&
+                'clientX' in context.event &&
+                'clientY' in context.event
+              ) {
+                const rect = desktopElement.getBoundingClientRect();
+                const gridPos = pixelToClampedGrid(
+                  context.event.clientX - rect.left,
+                  context.event.clientY - rect.top,
+                  { width: rect.width, height: rect.height }
+                );
+                x = gridPos.x;
+                y = gridPos.y;
+              }
+              pickAndImportFiles({ x, y });
+            } catch (error) {
+              console.error('[Desktop] Error uploading files:', error);
             }
           },
         },

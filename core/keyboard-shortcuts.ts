@@ -4,6 +4,7 @@
 
 import { useKernel } from './kernel';
 import { getAllSelectAllHandlers } from './selection';
+import { dialog } from './dialog';
 
 /** Key or key name accepted by the keyboard shortcuts manager. */
 export type ShortcutKey =
@@ -23,14 +24,14 @@ export interface KeyboardShortcut {
 
 /** Run handlers in priority order until one succeeds (not skipped). */
 async function runPriorityHandlers(
-  getHandlers: () => Array<{ handler: () => void; priority: number }>,
+  getHandlers: () => Array<{ handler: () => void | Promise<void>; priority: number }>,
   label: string
 ): Promise<void> {
   const { HandlerSkippedError } = await import('@core/clipboard');
   const handlers = getHandlers();
   for (const { handler } of handlers) {
     try {
-      handler();
+      await handler();
       return;
     } catch (error) {
       if (error instanceof HandlerSkippedError) {
@@ -57,8 +58,8 @@ class KeyboardShortcutsManager {
     this.register({
       key: 'Q',
       metaKey: true,
-      action: () => {
-        if (confirm('Are you sure you want to quit?')) {
+      action: async () => {
+        if (await dialog.confirm('Are you sure you want to quit?', 'Quit', { danger: true })) {
           window.location.reload();
         }
       },

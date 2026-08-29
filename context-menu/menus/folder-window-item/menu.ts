@@ -1,5 +1,6 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
 import type { ClipboardItemType } from '@core/clipboard';
+import { dialog } from '@core/dialog';
 
 const CLIPBOARD_ITEM_TYPES: ReadonlySet<string> = new Set([
   'folder',
@@ -7,6 +8,7 @@ const CLIPBOARD_ITEM_TYPES: ReadonlySet<string> = new Set([
   'image',
   'video',
   'audio',
+  'file',
 ]);
 
 /** Parse a DOM `data-item-type` into a clipboard type, or `null` if invalid. */
@@ -172,6 +174,11 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
                   new CustomEvent('open-folder', { detail: { folderId: itemId } })
                 );
               }
+            } else if (itemType === 'file') {
+              const { getFileById } = await import('@core/desktop-shortcuts');
+              const { openDesktopItem } = await import('@core/open-file');
+              const file = getFileById(itemId);
+              if (file) await openDesktopItem(file);
             } else {
               const programId = itemEl.dataset.programId;
               if (programId) {
@@ -181,6 +188,41 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             }
           },
         });
+
+        if (itemType === 'folder') {
+          items.push({
+            id: 'folder-window-item-open-new-window',
+            label: 'Open in New Window',
+            icon: 'new-window',
+            action: () => {
+              window.dispatchEvent(
+                new CustomEvent('open-folder', { detail: { folderId: itemId } })
+              );
+            },
+          });
+        }
+
+        if (itemType === 'shortcut') {
+          const programId = itemEl.dataset.programId;
+          if (programId) {
+            const { programs } = await import('virtual:programs');
+            const program = programs[programId];
+            if (program) {
+              const module = await program.load();
+              if (module.default.allowMultipleWindows === true) {
+                items.push({
+                  id: 'folder-window-item-open-new-window',
+                  label: 'Open in New Window',
+                  icon: 'new-window',
+                  action: async () => {
+                    const { launchOrFocusProgram } = await import('@core/context');
+                    await launchOrFocusProgram(programId, true);
+                  },
+                });
+              }
+            }
+          }
+        }
 
         items.push({
           id: 'folder-window-item-separator-1',
@@ -239,7 +281,14 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
         },
       });
 
-      if (!isMultiple && itemType === 'folder') {
+      if (
+        !isMultiple &&
+        (itemType === 'folder' ||
+          itemType === 'file' ||
+          itemType === 'image' ||
+          itemType === 'video' ||
+          itemType === 'audio')
+      ) {
         items.push({
           id: 'folder-window-item-separator-rename',
           type: 'separator',
@@ -250,11 +299,45 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
           label: 'Rename',
           icon: 'rename',
           action: async () => {
-            const newName = prompt('Enter new folder name:');
-            if (newName && newName.trim()) {
-              const { renameDesktopFolder } = await import('@core/desktop-shortcuts');
-              renameDesktopFolder(itemId, newName.trim());
+            if (itemType === 'folder') {
+              const newName = await dialog.prompt('Enter new folder name:');
+              if (newName && newName.trim()) {
+                const { renameDesktopFolder } = await import('@core/desktop-shortcuts');
+                renameDesktopFolder(itemId, newName.trim());
+              }
+            } else if (itemType === 'file') {
+              const { getFileById, renameDesktopFile } = await import('@core/desktop-shortcuts');
+              const file = getFileById(itemId);
+              const newName = await dialog.prompt('Enter new file name:', file?.name ?? '');
+              if (newName && newName.trim()) {
+                renameDesktopFile(itemId, newName.trim());
+              }
+            } else {
+              const { getMediaById, renameDesktopMedia } = await import('@core/desktop-shortcuts');
+              const media = getMediaById(itemId);
+              const newName = await dialog.prompt('Enter new name:', media?.name ?? '');
+              if (newName && newName.trim()) {
+                renameDesktopMedia(itemId, newName.trim());
+              }
             }
+          },
+        });
+      }
+
+      if (
+        !isMultiple &&
+        (itemType === 'file' ||
+          itemType === 'image' ||
+          itemType === 'video' ||
+          itemType === 'audio')
+      ) {
+        items.push({
+          id: 'folder-window-item-download',
+          label: 'Download',
+          icon: 'download',
+          action: async () => {
+            const { downloadItemById } = await import('@core/file-transfer');
+            await downloadItemById(itemId);
           },
         });
       }

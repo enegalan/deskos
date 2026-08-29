@@ -1,5 +1,6 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
 import { useKernel, type FolderViewMode } from '@core/kernel';
+import { dialog } from '@core/dialog';
 
 /**
  * Read the folder path from a folder-window host element.
@@ -60,9 +61,11 @@ export function registerFolderWindowMenu(manager: ContextMenuManager): void {
         ],
       });
 
-      const { getFolderByPath } = await import('@core/desktop-shortcuts');
-      const canCreateFolder = path === '/Desktop' || !!getFolderByPath(path);
-      if (canCreateFolder) {
+      const { getFolderByPath, isWritableSpecialPath } = await import('@core/desktop-shortcuts');
+      const isUserFolder = path === '/Desktop' || !!getFolderByPath(path);
+      const canCreateItems = isUserFolder || isWritableSpecialPath(path);
+
+      if (isUserFolder) {
         items.push({
           id: 'folder-window-new-folder',
           label: 'New Folder',
@@ -74,6 +77,41 @@ export function registerFolderWindowMenu(manager: ContextMenuManager): void {
               createDesktopFolder('New Folder', undefined, undefined, parentPath);
             } catch (error) {
               console.error('[FolderWindow] Error creating folder:', error);
+            }
+          },
+        });
+      }
+
+      if (canCreateItems) {
+        items.push({
+          id: 'folder-window-new-file',
+          label: 'New File',
+          icon: 'file',
+          action: async () => {
+            try {
+              const fileName = await dialog.prompt('Enter file name:', '', 'New File', {
+                required: true,
+              });
+              if (!fileName || !fileName.trim()) return;
+              const { createDesktopFile } = await import('@core/desktop-shortcuts');
+              const parentPath = path === '/Desktop' ? undefined : path;
+              createDesktopFile(fileName.trim(), undefined, undefined, parentPath);
+            } catch (error) {
+              console.error('[FolderWindow] Error creating file:', error);
+            }
+          },
+        });
+        items.push({
+          id: 'folder-window-upload-file',
+          label: 'Upload Files…',
+          icon: 'file',
+          action: async () => {
+            try {
+              const { pickAndImportFiles } = await import('@core/file-transfer');
+              const parentPath = path === '/Desktop' ? undefined : path;
+              pickAndImportFiles({ parentPath });
+            } catch (error) {
+              console.error('[FolderWindow] Error uploading files:', error);
             }
           },
         });

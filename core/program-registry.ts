@@ -45,9 +45,10 @@ interface ProgramFlags {
 const programFlags = new Map<string, ProgramFlags>();
 
 /** @internal Registry of desktop menu providers set via defineProgram */
-const desktopMenuProviders: Array<
+const desktopMenuProviders = new Map<
+  string,
   () => ProgramDesktopMenuItem[] | Promise<ProgramDesktopMenuItem[]>
-> = [];
+>();
 
 /** @internal Called by defineProgram */
 export function registerProgramFlags(
@@ -59,7 +60,9 @@ export function registerProgramFlags(
   const { desktopMenuItems, ...rest } = flags;
   programFlags.set(programId, rest);
   if (desktopMenuItems) {
-    desktopMenuProviders.push(desktopMenuItems);
+    desktopMenuProviders.set(programId, desktopMenuItems);
+  } else {
+    desktopMenuProviders.delete(programId);
   }
 }
 
@@ -133,7 +136,7 @@ export function getDockRole(programId: string): 'launcher' | 'default' | undefin
  */
 export async function getDesktopMenuExtensionItems(): Promise<MenuItem[]> {
   const items: MenuItem[] = [];
-  for (const provider of desktopMenuProviders) {
+  for (const provider of desktopMenuProviders.values()) {
     try {
       const extensionItems = await provider();
       for (const item of extensionItems) {

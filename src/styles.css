@@ -65,6 +65,7 @@
   --z-overlay: 5000;
   --z-taskbar: 6000;
   --z-context-menu: 7000;
+  --z-dialog: 8000;
 }
 
 /* Light theme overrides */
@@ -182,6 +183,61 @@ textarea,
   padding: 0;
 }
 
+.dock-item-slot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+}
+
+.dock-window-picker {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 180px;
+  max-width: 260px;
+  padding: 6px;
+  border-radius: 10px;
+  background: rgba(20, 20, 28, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px);
+  z-index: 2;
+}
+
+.dock-window-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dock-window-picker-item:hover,
+.dock-window-picker-item.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dock-window-picker-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-window-picker-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .dock-item:hover {
   transform: translateY(-8px) scale(1.2);
 }
@@ -234,6 +290,12 @@ textarea,
 
 .dock-item.running .dock-indicator {
   opacity: 0.45;
+}
+
+.dock-item.running .dock-indicator-multi {
+  width: 10px;
+  border-radius: 2px;
+  opacity: 0.7;
 }
 
 .dock-item.active .dock-indicator,
@@ -774,6 +836,34 @@ textarea,
 .settings-format-button.active:hover {
   background: var(--color-accent);
   opacity: 0.9;
+}
+
+/* Text Editor app */
+.text-editor-window {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-surface);
+}
+
+.text-editor-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: none;
+  resize: none;
+  padding: var(--space-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+}
+
+.text-editor-textarea::placeholder {
+  color: var(--color-text-muted);
 }
 
 /* Notes app */
@@ -2472,6 +2562,119 @@ textarea,
 }
 
 /* Toast Notifications */
+/* System dialog (alert / confirm / prompt) */
+.system-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.system-dialog {
+  width: min(360px, 100%);
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  color: var(--color-text-primary);
+  opacity: 1;
+}
+
+.system-dialog-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.system-dialog-message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+}
+
+.system-dialog-form {
+  margin-top: 12px;
+}
+
+.system-dialog-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-elevated, var(--color-bg-secondary));
+  color: var(--color-text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.system-dialog-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-glow);
+}
+
+.system-dialog-input-error,
+.system-dialog-input-error:focus {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.25);
+}
+
+.system-dialog-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-error);
+}
+
+.system-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.system-dialog-btn {
+  min-width: 72px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.system-dialog-btn:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.system-dialog-btn-primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.system-dialog-btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.system-dialog-btn-danger {
+  border-color: #c62828;
+  background: #c62828;
+  color: #fff;
+}
+
+.system-dialog-btn-danger:hover {
+  filter: brightness(1.08);
+}
+
 .toast-container {
   position: fixed;
   top: 20px;

@@ -14,9 +14,16 @@ import {
   DESKOS_ITEM_IDS_MIME,
   readDraggedItemIds,
 } from '@core/desktop-shortcuts';
+import {
+  hasExternalFileDrag,
+  importOsFiles,
+  importUrlToDesktop,
+  readDraggedUrl,
+} from '@core/file-transfer';
 import { getWallpaper, isWallpaperReference } from '@core/wallpaper-storage';
 import { getWallpaperTone, type WallpaperTone } from '../wallpapers/wallpapers';
 import { ToastContainer } from '@components/Toast';
+import { DialogContainer } from '@components/Dialog';
 
 /** Desktop shell: wallpaper, icons, windows, dock, context menus, and drop targets. */
 export function Desktop() {
@@ -204,8 +211,9 @@ export function Desktop() {
         type === 'application/x-deskos-program-id' ||
         type === DESKOS_ITEM_IDS_MIME
     );
+    const hasExternal = hasExternalFileDrag(types);
 
-    if (hasDeskosData && desktopRef.current) {
+    if ((hasDeskosData || hasExternal) && desktopRef.current) {
       const rect = desktopRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -223,9 +231,9 @@ export function Desktop() {
         setDragGridPosition(null);
       }
 
-      // Use 'copy' for program-id (from taskbar), 'move' for others
+      // Use 'copy' for program-id / external files, 'move' for deskos items
       const hasProgramId = types.includes('application/x-deskos-program-id');
-      e.dataTransfer.dropEffect = hasProgramId ? 'copy' : 'move';
+      e.dataTransfer.dropEffect = hasProgramId || hasExternal ? 'copy' : 'move';
     } else {
       setDragGridPosition(null);
     }
@@ -250,8 +258,9 @@ export function Desktop() {
           type === 'application/x-deskos-program-id' ||
           type === DESKOS_ITEM_IDS_MIME
       );
+      const hasExternal = hasExternalFileDrag(types);
 
-      if (hasDeskosData) {
+      if (hasDeskosData || hasExternal) {
         const rect = desktopRef.current.getBoundingClientRect();
         const isOverDesktop =
           e.clientX >= rect.left &&
@@ -269,6 +278,10 @@ export function Desktop() {
           const y = e.clientY - rect.top;
           const gridPos = pixelToClampedGrid(x, y, { width: rect.width, height: rect.height });
           setDragGridPosition(gridPos);
+          if (hasExternal) {
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+          }
         } else {
           clearDragIndicator();
         }
@@ -350,9 +363,11 @@ export function Desktop() {
         getDesktopFolders,
         getDesktopShortcuts,
         getMediaById,
+        getFileById,
         updateDesktopShortcutPosition,
         updateFolderPosition,
         placeMediaOnDesktop,
+        placeFileOnDesktop,
         removeItemFromFolder,
         clampGridPosition,
       } = await import('@core/desktop-shortcuts');
@@ -364,7 +379,8 @@ export function Desktop() {
       const primaryItem =
         shortcuts.find((s) => s.id === primaryId) ||
         folders.find((f) => f.id === primaryId) ||
-        getMediaById(primaryId);
+        getMediaById(primaryId) ||
+        getFileById(primaryId);
       const primaryOrigin = primaryItem
         ? { x: primaryItem.x, y: primaryItem.y }
         : { x: gridPos.x, y: gridPos.y };
@@ -386,13 +402,16 @@ export function Desktop() {
         const shortcut = shortcuts.find((s) => s.id === itemId);
         const folder = folders.find((f) => f.id === itemId);
         const mediaItem = getMediaById(itemId);
+        const fileItem = getFileById(itemId);
         const origin = shortcut
           ? { x: shortcut.x, y: shortcut.y }
           : folder
             ? { x: folder.x, y: folder.y }
             : mediaItem
               ? { x: mediaItem.x, y: mediaItem.y }
-              : primaryOrigin;
+              : fileItem
+                ? { x: fileItem.x, y: fileItem.y }
+                : primaryOrigin;
         const offsetX = origin.x - primaryOrigin.x;
         const offsetY = origin.y - primaryOrigin.y;
         const pos = clampGridPosition(gridPos.x + offsetX, gridPos.y + offsetY, {
@@ -406,11 +425,26 @@ export function Desktop() {
           updateFolderPosition(itemId, pos.x, pos.y);
         } else if (mediaItem) {
           placeMediaOnDesktop(itemId, pos.x, pos.y);
+        } else if (fileItem) {
+          placeFileOnDesktop(itemId, pos.x, pos.y);
         }
       }
 
       window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
       console.log('[Desktop] Drop: Dispatched desktop-shortcuts-updated event');
+      return;
+    }
+
+    // OS files dropped onto the desktop
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await importOsFiles(e.dataTransfer.files, { x: gridPos.x, y: gridPos.y });
+      return;
+    }
+
+    // URL / bookmark from Browser (or external uri-list)
+    const draggedUrl = readDraggedUrl(e.dataTransfer);
+    if (draggedUrl) {
+      await importUrlToDesktop(draggedUrl, { x: gridPos.x, y: gridPos.y });
       return;
     }
 
@@ -466,6 +500,7 @@ export function Desktop() {
       <Taskbar />
       <ContextMenuRenderer />
       <ToastContainer />
+      <DialogContainer />
     </div>
   );
 }
