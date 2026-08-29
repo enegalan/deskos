@@ -18,6 +18,7 @@ import {
   isVideoItem,
   getGridSize,
   addItemToFolder,
+  folderContainsItem,
   getFolderByPath,
   DESKOS_ITEM_IDS_MIME,
   readDraggedItemIds,
@@ -803,9 +804,15 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
       if (itemIds.length === 0) return;
 
       for (const itemId of itemIds) {
-        if (itemId !== targetFolder.id) {
-          addItemToFolder(targetFolder.id, itemId);
+        if (itemId === targetFolder.id) continue;
+        // Reject dropping a folder onto one of its own descendants.
+        if (
+          getDesktopFolders().some((f) => f.id === itemId) &&
+          folderContainsItem(itemId, targetFolder.id)
+        ) {
+          continue;
         }
+        addItemToFolder(targetFolder.id, itemId);
       }
       draggedItemIdsRef.current = [];
       loadItems(currentPath);

@@ -103,8 +103,10 @@ export function VideosWindow({ ctx, initialVideos, initialStartIndex }: VideosWi
   const [duration, setDuration] = useState(0);
   const [controlsVisible, setControlsVisible] = useState(true);
 
-  // Keep restore target in sync (playlist change resets to 0; reload keeps saved).
-  restoreTimeRef.current = safeSavedTime;
+  // Keep restore target in sync after commit (playlist change → 0; reload keeps saved).
+  useEffect(() => {
+    restoreTimeRef.current = safeSavedTime;
+  }, [safeSavedTime]);
 
   /** Write playback position into session state (throttled or forced). */
   const persistPosition = useCallback(

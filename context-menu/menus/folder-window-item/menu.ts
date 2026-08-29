@@ -1,4 +1,18 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
+import type { ClipboardItemType } from '@core/clipboard';
+
+const CLIPBOARD_ITEM_TYPES: ReadonlySet<string> = new Set([
+  'folder',
+  'shortcut',
+  'image',
+  'video',
+]);
+
+/** Parse a DOM `data-item-type` into a clipboard type, or `null` if invalid. */
+function parseClipboardItemType(value: string | undefined): ClipboardItemType | null {
+  if (!value || !CLIPBOARD_ITEM_TYPES.has(value)) return null;
+  return value as ClipboardItemType;
+}
 
 /** Register the folder window item context menu provider */
 export function registerFolderWindowItemMenu(manager: ContextMenuManager): void {
@@ -15,8 +29,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
       }
 
       const itemId = itemEl.dataset.itemId;
-      const itemType = itemEl.dataset.itemType as
-        'folder' | 'shortcut' | 'image' | 'video' | undefined;
+      const itemType = parseClipboardItemType(itemEl.dataset.itemType);
       if (!itemId || !itemType) {
         return items;
       }
@@ -61,7 +74,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             },
           });
           items.push({
-            id: 'folder-window-item-separator-media',
+            id: 'folder-window-item-separator-image',
             type: 'separator',
             label: '',
           });
@@ -93,7 +106,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             },
           });
           items.push({
-            id: 'folder-window-item-separator-media',
+            id: 'folder-window-item-separator-video',
             type: 'separator',
             label: '',
           });
@@ -156,8 +169,9 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             type: 'folder-items',
             items: selectedIds.map((id) => {
               const el = document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null;
-              const type = (el?.dataset.itemType || (id === itemId ? itemType : 'shortcut')) as
-                'folder' | 'shortcut' | 'image' | 'video';
+              const type =
+                parseClipboardItemType(el?.dataset.itemType) ||
+                (id === itemId ? itemType : 'shortcut');
               return { id, type };
             }),
             operation: 'copy',
@@ -180,8 +194,9 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             type: 'folder-items',
             items: selectedIds.map((id) => {
               const el = document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null;
-              const type = (el?.dataset.itemType || (id === itemId ? itemType : 'shortcut')) as
-                'folder' | 'shortcut' | 'image' | 'video';
+              const type =
+                parseClipboardItemType(el?.dataset.itemType) ||
+                (id === itemId ? itemType : 'shortcut');
               return { id, type };
             }),
             operation: 'cut',

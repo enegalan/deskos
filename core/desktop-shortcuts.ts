@@ -223,6 +223,7 @@ export function addDesktopShortcut(
     const rootItems = [
       ...shortcuts.filter((s) => !inFolders.has(s.id)),
       ...folders.filter(isRootDesktopFolder),
+      ...getDesktopSurfaceMedia(),
     ];
     const position = findNextAvailablePosition(rootItems.map((item) => ({ x: item.x, y: item.y })));
     x = position.x;
@@ -454,7 +455,37 @@ function saveKnownMediaUrls(urls: Set<string>): void {
   systemStorage.setItem(MEDIA_KNOWN_URLS_KEY, Array.from(urls));
 }
 
-/** Seed library once from bundled catalog; deleted URLs are not re-created. */
+/** Trash storage key (read-only here to avoid a circular import with trash.ts). */
+const TRASH_STORAGE_KEY = 'trash-items';
+
+/** Collect media ids/urls currently represented in the trash tree. */
+function collectTrashMediaRefs(): { ids: Set<string>; urls: Set<string> } {
+  type TrashLike = { item: DesktopItem; nested?: TrashLike[] };
+  const ids = new Set<string>();
+  const urls = new Set<string>();
+  const walk = (entries: TrashLike[]) => {
+    for (const entry of entries) {
+      if (isMediaItem(entry.item)) {
+        ids.add(entry.item.id);
+        urls.add(getMediaUrl(entry.item));
+      }
+      if (entry.nested) walk(entry.nested);
+    }
+  };
+  walk(systemStorage.getItem<TrashLike[]>(TRASH_STORAGE_KEY) || []);
+  return { ids, urls };
+}
+
+/** Whether this is the original catalog seed row (not a user copy). */
+function isOriginalSeedRecord(item: DesktopMediaItem, kind: 'image' | 'video'): boolean {
+  return item.kind === kind && item.id === `${kind}-${item.name}`;
+}
+
+/**
+ * Seed library once from bundled catalog; deleted URLs are not re-created.
+ * Also drops original seeds whose URL left the catalog, unless the record is
+ * nested in a folder/special location or represented in the trash.
+ */
 export function ensureMediaLibrarySeeded(
   kind: 'image' | 'video',
   catalog: Array<{ name: string; url: string }>
@@ -463,7 +494,25 @@ export function ensureMediaLibrarySeeded(
   const known = getKnownMediaUrls();
   media.forEach((item) => known.add(getMediaUrl(item)));
 
+  const catalogUrls = new Set(catalog.map((entry) => entry.url));
+  const contained = getIdsInsideFolders();
+  const trashRefs = collectTrashMediaRefs();
+
   let changed = false;
+
+  // Drop original seeds no longer in the catalog (keep copies / nested / trash).
+  for (let i = media.length - 1; i >= 0; i--) {
+    const item = media[i];
+    if (!isOriginalSeedRecord(item, kind)) continue;
+    const url = getMediaUrl(item);
+    if (catalogUrls.has(url)) continue;
+    if (contained.has(item.id) || trashRefs.ids.has(item.id) || trashRefs.urls.has(url)) {
+      continue;
+    }
+    media.splice(i, 1);
+    changed = true;
+  }
+
   catalog.forEach((entry, i) => {
     if (known.has(entry.url)) return;
     known.add(entry.url);
@@ -1492,6 +1541,7 @@ export function createDesktopFolder(
     const rootItems = [
       ...shortcuts.filter((s) => !inFolders.has(s.id)),
       ...folders.filter(isRootDesktopFolder),
+      ...getDesktopSurfaceMedia(),
     ];
     const position = findNextAvailablePosition(rootItems.map((item) => ({ x: item.x, y: item.y })));
     x = position.x;
@@ -1644,6 +1694,23 @@ export function getItemsByPath(path: string): DesktopItem[] {
 }
 
 /**
+ * True if `searchId` is nested under `folderId` at any depth.
+ */
+export function folderContainsItem(folderId: string, searchId: string): boolean {
+  const folders = getDesktopFolders();
+  const visit = (id: string): boolean => {
+    const folder = folders.find((f) => f.id === id);
+    if (!folder) return false;
+    for (const childId of folder.contents) {
+      if (childId === searchId) return true;
+      if (visit(childId)) return true;
+    }
+    return false;
+  };
+  return visit(folderId);
+}
+
+/**
  * Add an item to a folder
  */
 export function addItemToFolder(folderId: string, itemId: string): void {
@@ -1658,6 +1725,10 @@ export function addItemToFolder(folderId: string, itemId: string): void {
   // Prevent adding item if it's already in the folder
   if (folder.contents.includes(itemId)) return;
 
+  // Reject moving a folder into one of its own descendants (cycle).
+  const itemFolder = folders.find((f) => f.id === itemId);
+  if (itemFolder && folderContainsItem(itemId, folderId)) return;
+
   // Remove item from its current parent if it's a folder
   folders.forEach((f) => {
     if (f.id !== folderId && f.contents.includes(itemId)) {
@@ -1668,7 +1739,6 @@ export function addItemToFolder(folderId: string, itemId: string): void {
   folder.contents.push(itemId);
 
   // If the item being added is a folder, update its parentPath
-  const itemFolder = folders.find((f) => f.id === itemId);
   if (itemFolder) {
     // Calculate the new parent path
     const folderPath =
