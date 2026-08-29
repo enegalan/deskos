@@ -1,4 +1,13 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
+import type { ClipboardItemType } from '@core/clipboard';
+
+const CLIPBOARD_ITEM_TYPES: ReadonlySet<string> = new Set(['folder', 'shortcut', 'image', 'video']);
+
+/** Parse a DOM `data-item-type` into a clipboard type, or `null` if invalid. */
+function parseClipboardItemType(value: string | undefined): ClipboardItemType | null {
+  if (!value || !CLIPBOARD_ITEM_TYPES.has(value)) return null;
+  return value as ClipboardItemType;
+}
 
 /** Register the folder window item context menu provider */
 export function registerFolderWindowItemMenu(manager: ContextMenuManager): void {
@@ -15,7 +24,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
       }
 
       const itemId = itemEl.dataset.itemId;
-      const itemType = itemEl.dataset.itemType as 'folder' | 'shortcut' | 'image' | undefined;
+      const itemType = parseClipboardItemType(itemEl.dataset.itemType);
       if (!itemId || !itemType) {
         return items;
       }
@@ -32,10 +41,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
           : [itemId];
       const isMultiple = selectedIds.length > 1;
 
-      // Read-only image entries (e.g. inside /Images) get only a "Preview"
-      // action that opens the hidden image previewer. It browses just the
-      // selected images: one selected image opens on its own, several open as
-      // a carousel. Copy/cut/rename/delete do not apply to a bundled asset.
+      // Image / video files: Preview or Play, then the same file ops as other items.
       if (itemType === 'image') {
         const picked = (isMultiple ? selectedIds : [itemId])
           .map((id) => document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
@@ -46,7 +52,6 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
           }));
 
         if (picked.length > 0) {
-          // Start on the image the user actually right-clicked.
           const startIndex = Math.max(
             0,
             picked.findIndex(
@@ -63,11 +68,47 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
               );
             },
           });
+          items.push({
+            id: 'folder-window-item-separator-image',
+            type: 'separator',
+            label: '',
+          });
         }
-        return items;
+      } else if (itemType === 'video') {
+        const picked = (isMultiple ? selectedIds : [itemId])
+          .map((id) => document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
+          .filter((el): el is HTMLElement => !!el && el.dataset.itemType === 'video')
+          .map((el) => ({
+            src: el.dataset.itemUrl as string,
+            name: el.dataset.itemName as string,
+          }));
+
+        if (picked.length > 0) {
+          const startIndex = Math.max(
+            0,
+            picked.findIndex(
+              (vid) => vid.src === itemEl.dataset.itemUrl && vid.name === itemEl.dataset.itemName
+            )
+          );
+          items.push({
+            id: 'folder-window-item-play',
+            label: picked.length > 1 ? `Play ${picked.length} videos` : 'Play',
+            icon: 'play',
+            action: async () => {
+              window.dispatchEvent(
+                new CustomEvent('open-video', { detail: { videos: picked, startIndex } })
+              );
+            },
+          });
+          items.push({
+            id: 'folder-window-item-separator-video',
+            type: 'separator',
+            label: '',
+          });
+        }
       }
 
-      if (!isMultiple) {
+      if (!isMultiple && itemType !== 'image' && itemType !== 'video') {
         items.push({
           id: 'folder-window-item-open',
           label: 'Open',
@@ -121,14 +162,13 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             '/Desktop';
           copy({
             type: 'folder-items',
-            items: selectedIds.map((id) => ({
-              id,
-              type:
-                id === itemId
-                  ? itemType
-                  : ((document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
-                      ?.dataset.itemType as 'folder' | 'shortcut') || 'shortcut',
-            })),
+            items: selectedIds.map((id) => {
+              const el = document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null;
+              const type =
+                parseClipboardItemType(el?.dataset.itemType) ||
+                (id === itemId ? itemType : 'shortcut');
+              return { id, type };
+            }),
             operation: 'copy',
             sourcePath: path,
           });
@@ -147,14 +187,13 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             '/Desktop';
           cut({
             type: 'folder-items',
-            items: selectedIds.map((id) => ({
-              id,
-              type:
-                id === itemId
-                  ? itemType
-                  : ((document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
-                      ?.dataset.itemType as 'folder' | 'shortcut') || 'shortcut',
-            })),
+            items: selectedIds.map((id) => {
+              const el = document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null;
+              const type =
+                parseClipboardItemType(el?.dataset.itemType) ||
+                (id === itemId ? itemType : 'shortcut');
+              return { id, type };
+            }),
             operation: 'cut',
             sourcePath: path,
           });

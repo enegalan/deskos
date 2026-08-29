@@ -1847,6 +1847,16 @@ textarea,
   transition: filter 0.15s ease;
 }
 
+.desktop-media-thumb {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-xs, 2px);
+  pointer-events: none;
+}
+
 .desktop-icon:hover .desktop-icon-image {
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
 }
@@ -2139,6 +2149,13 @@ textarea,
   background: var(--color-surface-hover);
 }
 
+.folder-window-item.drag-over-target {
+  background: rgba(var(--color-accent-rgb), 0.15);
+  border: 2px dashed rgba(var(--color-accent-rgb), 0.6);
+  border-radius: 8px;
+  transform: scale(1.05);
+}
+
 .folder-window-item.selected {
   background: rgba(var(--color-accent-rgb), 0.2);
   outline: 2px solid rgba(var(--color-accent-rgb), 0.6);
@@ -2368,6 +2385,13 @@ textarea,
   font-weight: 500;
   padding-left: calc(var(--space-md) + 4px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.folder-sidebar-item.drag-over-target {
+  background: rgba(var(--color-accent-rgb), 0.2);
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+  color: var(--color-text-primary);
 }
 
 .folder-sidebar-item.active::before {
@@ -2720,4 +2744,180 @@ textarea,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Videos app — video player / playlist */
+.videos-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-primary);
+}
+
+.videos-viewer-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: var(--space-md);
+  overflow: hidden;
+  background: #0a0a0a;
+}
+
+.videos-viewer-video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  background: #000;
+}
+
+.videos-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    opacity var(--transition-fast),
+    visibility var(--transition-fast);
+}
+
+.videos-nav:hover {
+  background: var(--color-surface-active);
+}
+
+.videos-nav-prev {
+  left: var(--space-md);
+}
+
+.videos-nav-next {
+  right: var(--space-md);
+}
+
+.videos-tools {
+  position: absolute;
+  left: var(--space-md);
+  right: var(--space-md);
+  bottom: var(--space-md);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface);
+  transition:
+    opacity var(--transition-fast),
+    visibility var(--transition-fast);
+}
+
+.videos-viewer-caption {
+  flex-shrink: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    opacity var(--transition-fast),
+    visibility var(--transition-fast),
+    max-height var(--transition-fast),
+    padding var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+/* Idle while playing: hide nav, toolbar, caption so the frame is clear. */
+.videos-viewer.videos-chrome-hidden .videos-nav,
+.videos-viewer.videos-chrome-hidden .videos-tools,
+.videos-viewer.videos-chrome-hidden .videos-viewer-caption {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.videos-viewer.videos-chrome-hidden .videos-viewer-caption {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-color: transparent;
+}
+
+.videos-viewer.videos-chrome-hidden .videos-viewer-stage {
+  cursor: none;
+}
+
+.videos-viewer.videos-chrome-hidden .videos-viewer-video {
+  cursor: none;
+}
+
+.videos-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.videos-tool-btn:hover {
+  background: var(--color-surface-active);
+}
+
+.videos-volume-range {
+  flex-shrink: 0;
+  width: 72px;
+  height: 4px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.videos-seek {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-xs);
+}
+
+.videos-seek-range {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.videos-time {
+  flex-shrink: 0;
+  min-width: 2.5em;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { programs } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
 import { getMaxIconSize, useKernel } from '@core/kernel';
-import { DRAG_START_THRESHOLD, ICON_EMOJI_SCALE, ICON_GLYPH_SCALE } from '@core/constants';
+import { ICON_EMOJI_SCALE, ICON_GLYPH_SCALE } from '@core/constants';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
 import {
@@ -29,52 +29,27 @@ import {
 import {
   getDesktopShortcuts,
   getDesktopFolders,
+  getDesktopSurfaceMedia,
   updateDesktopShortcutPosition,
-  findItemAtPosition,
-  swapItemPositions,
-  pixelToGrid,
-  clampGridPosition,
   getGridMetrics,
-  addItemToFolder,
-  isDesktopFolder,
+  isImageItem,
+  isVideoItem,
+  getMediaUrl,
   updateFolderPosition,
-  computeGroupDropPositions,
+  updateMediaPosition,
   type DesktopShortcut,
   type DesktopFolder,
+  type DesktopMediaItem,
 } from '@core/desktop-shortcuts';
 import { deleteDesktopItems } from '@core/delete-items';
 import { resolveProgramIcon } from '@core/program-icons';
-
-/**
- * Highlight the desktop icon under a drag, or clear all highlights.
- *
- * @param itemId - Shortcut/folder id to mark, or `null` to clear
- */
-function setDragOverTarget(itemId: string | null) {
-  document.querySelectorAll('.desktop-icon').forEach((el) => {
-    el.classList.remove('drag-over-target');
-  });
-  if (itemId) {
-    const target = document.querySelector(
-      `[data-shortcut-id="${itemId}"], [data-folder-id="${itemId}"]`
-    );
-    target?.classList.add('drag-over-target');
-  }
-}
+import { useDesktopIconDrag, type DesktopDragGroup } from './useDesktopIconDrag';
 
 /** True when a folder browser window is focused (desktop defers clipboard shortcuts to it). */
 function isFolderWindowActive(): boolean {
   const { activeWindowId, windows } = useKernel.getState();
   if (!activeWindowId) return false;
   return windows.some((w) => w.id === activeWindowId && w.programId === 'folder');
-}
-
-/** Active multi-icon drag on the desktop surface */
-interface DesktopDragGroup {
-  ids: string[];
-  primaryId: string;
-  delta: { x: number; y: number };
-  origins: Record<string, { x: number; y: number }>;
 }
 
 /** Props for a single desktop shortcut icon. */
@@ -122,29 +97,29 @@ const DesktopIcon = memo(function DesktopIcon({
 }: DesktopIconProps) {
   void layoutTick;
   const settings = useKernel((state) => state.settings);
-  const [isDragging, setIsDragging] = useState(false);
-  const [visualPosition, setVisualPosition] = useState({ x: shortcut.x, y: shortcut.y });
-  const [gridPosition, setGridPosition] = useState<{ x: number; y: number } | null>(null);
-  const [isOverFolderWindow, setIsOverFolderWindow] = useState(false);
-  const iconRef = useRef<HTMLDivElement>(null);
   const lastClickTimeRef = useRef<number>(0);
   const clickTimeoutRef = useRef<number | null>(null);
-  const dragStateRef = useRef<{
-    isDragging: boolean;
-    offsetX: number;
-    offsetY: number;
-    startX: number;
-    startY: number;
-    animationFrame: number | null;
-    lastPosition: { x: number; y: number } | null;
-  }>({
-    isDragging: false,
-    offsetX: 0,
-    offsetY: 0,
-    startX: 0,
-    startY: 0,
-    animationFrame: null,
-    lastPosition: null,
+  const {
+    iconRef,
+    isDragging,
+    gridPosition,
+    isOverFolderWindow,
+    displayPosition,
+    handleMouseDown,
+    showDragging,
+  } = useDesktopIconDrag({
+    id: shortcut.id,
+    x: shortcut.x,
+    y: shortcut.y,
+    getDragIds,
+    getItemOrigin,
+    dragGroup,
+    onDragGroupStart,
+    onDragGroupMove,
+    onDragGroupEnd,
+    resolveItemPosition,
+    onSelect,
+    onUpdate,
   });
 
   const handleLaunch = useCallback(async () => {
@@ -153,16 +128,12 @@ const DesktopIcon = memo(function DesktopIcon({
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      // Don't trigger click if we were dragging
-      if (dragStateRef.current.isDragging) {
-        return;
-      }
+      if (isDragging) return;
 
       const now = Date.now();
       const timeSinceLastClick = now - lastClickTimeRef.current;
 
       if (timeSinceLastClick < 300 && timeSinceLastClick > 0) {
-        // Double click detected
         if (clickTimeoutRef.current) {
           clearTimeout(clickTimeoutRef.current);
           clickTimeoutRef.current = null;
@@ -170,7 +141,6 @@ const DesktopIcon = memo(function DesktopIcon({
         handleLaunch();
         lastClickTimeRef.current = 0;
       } else {
-        // Single click - select the icon and wait to see if it becomes a double click
         onSelect(e);
         lastClickTimeRef.current = now;
         if (clickTimeoutRef.current) {
@@ -182,350 +152,8 @@ const DesktopIcon = memo(function DesktopIcon({
         }, 300);
       }
     },
-    [handleLaunch, onSelect]
+    [handleLaunch, onSelect, isDragging]
   );
-
-  // Update visual position when shortcut position changes externally
-  useEffect(() => {
-    const inGroup = dragGroup?.ids.includes(shortcut.id);
-    if (!isDragging && !dragStateRef.current.isDragging && !inGroup) {
-      // Only update if the position actually changed to avoid overwriting during drag
-      if (visualPosition.x !== shortcut.x || visualPosition.y !== shortcut.y) {
-        setVisualPosition({ x: shortcut.x, y: shortcut.y });
-      }
-    }
-  }, [
-    shortcut.x,
-    shortcut.y,
-    isDragging,
-    visualPosition.x,
-    visualPosition.y,
-    dragGroup,
-    shortcut.id,
-  ]);
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.button !== 0) return; // Only handle left mouse button
-
-      const desktopElement = document.querySelector('.desktop');
-      const desktopRect = desktopElement?.getBoundingClientRect();
-      if (!desktopRect || !iconRef.current) return;
-
-      // Calculate offset immediately on mouse down for precise tracking
-      const iconRect = iconRef.current.getBoundingClientRect();
-      const iconXRelativeToDesktop = iconRect.left - desktopRect.left;
-      const iconYRelativeToDesktop = iconRect.top - desktopRect.top;
-
-      // Offset is the distance from click point to icon's top-left corner
-      const initialOffsetX = e.clientX - desktopRect.left - iconXRelativeToDesktop;
-      const initialOffsetY = e.clientY - desktopRect.top - iconYRelativeToDesktop;
-
-      const startX = e.clientX;
-      const startY = e.clientY;
-      let hasMoved = false;
-      let dragIds: string[] = [shortcut.id];
-      let origins: Record<string, { x: number; y: number }> = {
-        [shortcut.id]: { x: shortcut.x, y: shortcut.y },
-      };
-
-      const updatePosition = (moveEvent: MouseEvent) => {
-        if (!iconRef.current || !desktopElement) return;
-
-        // Check if icon is over a folder window - if so, don't show grid indicator
-        const elementUnderMouse = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
-        const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-        const isOverFolderWindow = !!folderWindowMain;
-
-        // If over a folder window, don't calculate grid position or show indicator
-        if (isOverFolderWindow) {
-          setGridPosition(null);
-          setDragOverTarget(null);
-          return;
-        }
-
-        const currentDesktopRect = desktopElement.getBoundingClientRect();
-        const bounds = {
-          width: currentDesktopRect.width,
-          height: currentDesktopRect.height,
-        };
-        const { cellWidth, cellHeight } = getGridMetrics(bounds);
-
-        // Calculate position relative to desktop
-        let rawX = moveEvent.clientX - currentDesktopRect.left - initialOffsetX;
-        let rawY = moveEvent.clientY - currentDesktopRect.top - initialOffsetY;
-
-        // Icon fills one grid cell
-        const iconWidth = cellWidth;
-        const iconHeight = cellHeight;
-
-        // Constrain position to desktop bounds
-        const minX = 0;
-        const minY = 0;
-        const maxX = currentDesktopRect.width - iconWidth;
-        const maxY = currentDesktopRect.height - iconHeight;
-
-        rawX = Math.max(minX, Math.min(maxX, rawX));
-        rawY = Math.max(minY, Math.min(maxY, rawY));
-
-        // Snap by icon center so adjacent cell highlights past midpoint
-        const snapped = pixelToGrid(rawX + cellWidth / 2, rawY + cellHeight / 2, bounds);
-        const gridPos = clampGridPosition(snapped.x, snapped.y, bounds);
-
-        const origin = origins[shortcut.id];
-        onDragGroupMove({ x: rawX - origin.x, y: rawY - origin.y });
-        setVisualPosition({ x: rawX, y: rawY });
-        setGridPosition(gridPos);
-        dragStateRef.current.lastPosition = gridPos;
-
-        const collidingItem = findItemAtPosition(gridPos.x, gridPos.y, dragIds);
-        setDragOverTarget(collidingItem?.id ?? null);
-      };
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        const deltaX = Math.abs(moveEvent.clientX - startX);
-        const deltaY = Math.abs(moveEvent.clientY - startY);
-
-        // Only start dragging if mouse moved more than the threshold
-        if ((deltaX > DRAG_START_THRESHOLD || deltaY > DRAG_START_THRESHOLD) && !hasMoved) {
-          hasMoved = true;
-          dragIds = getDragIds(shortcut.id);
-          if (dragIds.length === 1) {
-            onSelect(undefined, true);
-          }
-          origins = Object.fromEntries(dragIds.map((id) => [id, getItemOrigin(id)]));
-          onDragGroupStart(dragIds, shortcut.id, origins);
-          if (iconRef.current) {
-            dragStateRef.current = {
-              isDragging: true,
-              offsetX: initialOffsetX,
-              offsetY: initialOffsetY,
-              startX: shortcut.x,
-              startY: shortcut.y,
-              animationFrame: null,
-              lastPosition: null,
-            };
-            setIsDragging(true);
-            iconRef.current.style.zIndex = '10000';
-          }
-        }
-
-        // Continue dragging if already started
-        if (hasMoved && dragStateRef.current.isDragging) {
-          // Check if mouse is over a folder window or desktop
-          const elementUnderMouse = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
-          const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-          const desktopElement = elementUnderMouse?.closest('.desktop');
-
-          // When over a window, increase z-index of container to keep icon visible
-          if (iconRef.current) {
-            const container = iconRef.current.closest('.desktop-icons-container');
-            if (folderWindowMain) {
-              setIsOverFolderWindow(true);
-              if (container) {
-                container.classList.add('dragging-over-window');
-              }
-              iconRef.current.style.zIndex = '100000';
-              folderWindowMain.classList.add('drag-over');
-              iconRef.current.classList.add('dragging-over-folder');
-            } else if (desktopElement) {
-              setIsOverFolderWindow(false);
-              if (container) {
-                container.classList.remove('dragging-over-window');
-              }
-              iconRef.current.style.zIndex = '10000';
-              desktopElement.classList.add('drag-over');
-              iconRef.current.classList.add('dragging-over-desktop');
-            } else {
-              setIsOverFolderWindow(false);
-              if (container) {
-                container.classList.remove('dragging-over-window');
-              }
-              iconRef.current.style.zIndex = '10000';
-              iconRef.current.classList.remove('dragging-over-folder', 'dragging-over-desktop');
-              document.querySelectorAll('.folder-window-main, .desktop').forEach((el) => {
-                el.classList.remove('drag-over');
-              });
-            }
-          }
-
-          // Cancel previous animation frame if exists
-          if (dragStateRef.current.animationFrame !== null) {
-            cancelAnimationFrame(dragStateRef.current.animationFrame);
-          }
-
-          // Use requestAnimationFrame for smooth updates
-          dragStateRef.current.animationFrame = requestAnimationFrame(() => {
-            updatePosition(moveEvent);
-          });
-        }
-      };
-
-      const handleMouseUp = (e?: MouseEvent) => {
-        // Cancel any pending animation frame
-        if (dragStateRef.current.animationFrame !== null) {
-          cancelAnimationFrame(dragStateRef.current.animationFrame);
-          dragStateRef.current.animationFrame = null;
-        }
-
-        // Remove dragging-over-window class from container
-        const container = iconRef.current?.closest('.desktop-icons-container');
-        if (container) {
-          container.classList.remove('dragging-over-window');
-        }
-
-        // Reset z-index
-        if (iconRef.current) {
-          iconRef.current.style.zIndex = '';
-        }
-
-        setDragOverTarget(null);
-        document.querySelectorAll('.desktop-icon').forEach((el) => {
-          el.classList.remove('dragging-over-folder', 'dragging-over-desktop');
-        });
-
-        // Remove drag-over classes from windows and desktop
-        document.querySelectorAll('.folder-window-main, .desktop').forEach((el) => {
-          el.classList.remove('drag-over');
-        });
-
-        if (hasMoved && dragStateRef.current.isDragging) {
-          // Check if mouse is over a folder window
-          let handledByFolderWindow = false;
-          if (e) {
-            const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
-            const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-            if (folderWindowMain) {
-              const path = (folderWindowMain as HTMLElement).dataset.folderPath;
-              if (path) {
-                handledByFolderWindow = true;
-                Promise.all([
-                  import('@file-system/file-system'),
-                  import('@core/desktop-shortcuts'),
-                ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
-                  const resolved = resolvePath(path);
-                  if (resolved.type === 'folder') {
-                    const targetFolder = getFolderByPath(path);
-                    if (targetFolder) {
-                      // Add items to the folder
-                      for (const id of dragIds) {
-                        if (id !== targetFolder.id) {
-                          addItemToFolder(targetFolder.id, id);
-                        }
-                      }
-                      setVisualPosition({ x: shortcut.x, y: shortcut.y });
-                      // Dispatch event to update folder window
-                      window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-                    }
-                  }
-                });
-              }
-            }
-          }
-
-          // If handled by folder window, skip desktop collision check
-          if (handledByFolderWindow) {
-            // Reset dragging state
-            dragStateRef.current.isDragging = false;
-            setIsDragging(false);
-            setGridPosition(null);
-            setIsOverFolderWindow(false);
-            onDragGroupEnd();
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp as EventListener);
-            return;
-          }
-
-          const desktopElement = document.querySelector('.desktop');
-          if (desktopElement && iconRef.current) {
-            // Calculate final position based on last mouse position
-            // Use the last calculated grid position for final placement
-            const finalPos = dragStateRef.current.lastPosition;
-
-            if (finalPos) {
-              const collidingItem = findItemAtPosition(finalPos.x, finalPos.y, dragIds);
-
-              if (collidingItem && isDesktopFolder(collidingItem)) {
-                for (const id of dragIds) {
-                  if (id !== collidingItem.id) {
-                    addItemToFolder(collidingItem.id, id);
-                  }
-                }
-                setVisualPosition({ x: shortcut.x, y: shortcut.y });
-              } else if (collidingItem && dragIds.length === 1) {
-                const targetX = collidingItem.x;
-                const targetY = collidingItem.y;
-                swapItemPositions(shortcut.id, collidingItem.id);
-                setVisualPosition({ x: targetX, y: targetY });
-              } else {
-                const positions = computeGroupDropPositions(
-                  dragIds,
-                  origins,
-                  shortcut.id,
-                  finalPos
-                );
-                for (const id of dragIds) {
-                  const pos = positions[id];
-                  if (pos) resolveItemPosition(id, pos.x, pos.y);
-                }
-                const primaryPos = positions[shortcut.id] ?? finalPos;
-                setVisualPosition({ x: primaryPos.x, y: primaryPos.y });
-                onUpdate();
-              }
-            } else {
-              // No final position, just call onUpdate
-              onUpdate();
-            }
-
-            // Reset z-index
-            if (iconRef.current) {
-              iconRef.current.style.zIndex = '';
-            }
-
-            // Reset last position
-            dragStateRef.current.lastPosition = null;
-            setGridPosition(null);
-          }
-
-          // Reset dragging state
-          dragStateRef.current.isDragging = false;
-          setIsDragging(false);
-          setGridPosition(null);
-          setIsOverFolderWindow(false);
-          onDragGroupEnd();
-        }
-
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    },
-    [
-      shortcut.id,
-      shortcut.x,
-      shortcut.y,
-      onUpdate,
-      onSelect,
-      getDragIds,
-      getItemOrigin,
-      onDragGroupStart,
-      onDragGroupMove,
-      onDragGroupEnd,
-      resolveItemPosition,
-    ]
-  );
-
-  const inDragGroup = dragGroup?.ids.includes(shortcut.id) ?? false;
-  const displayPosition =
-    inDragGroup && dragGroup?.origins[shortcut.id]
-      ? {
-          x: dragGroup.origins[shortcut.id].x + dragGroup.delta.x,
-          y: dragGroup.origins[shortcut.id].y + dragGroup.delta.y,
-        }
-      : visualPosition;
-  const showDragging = isDragging || inDragGroup;
 
   const displayName = shortcut.customName || program.name;
   const { cellWidth, cellHeight } = getGridMetrics();
@@ -638,29 +266,29 @@ const FolderIcon = memo(function FolderIcon({
 }: FolderIconProps) {
   void layoutTick;
   const settings = useKernel((state) => state.settings);
-  const [isDragging, setIsDragging] = useState(false);
-  const [visualPosition, setVisualPosition] = useState({ x: folder.x, y: folder.y });
-  const [gridPosition, setGridPosition] = useState<{ x: number; y: number } | null>(null);
-  const [isOverFolderWindow, setIsOverFolderWindow] = useState(false);
-  const iconRef = useRef<HTMLDivElement>(null);
   const lastClickTimeRef = useRef<number>(0);
   const clickTimeoutRef = useRef<number | null>(null);
-  const dragStateRef = useRef<{
-    isDragging: boolean;
-    offsetX: number;
-    offsetY: number;
-    startX: number;
-    startY: number;
-    animationFrame: number | null;
-    lastPosition: { x: number; y: number } | null;
-  }>({
-    isDragging: false,
-    offsetX: 0,
-    offsetY: 0,
-    startX: 0,
-    startY: 0,
-    animationFrame: null,
-    lastPosition: null,
+  const {
+    iconRef,
+    isDragging,
+    gridPosition,
+    isOverFolderWindow,
+    displayPosition,
+    handleMouseDown,
+    showDragging,
+  } = useDesktopIconDrag({
+    id: folder.id,
+    x: folder.x,
+    y: folder.y,
+    getDragIds,
+    getItemOrigin,
+    dragGroup,
+    onDragGroupStart,
+    onDragGroupMove,
+    onDragGroupEnd,
+    resolveItemPosition,
+    onSelect,
+    onUpdate,
   });
 
   const handleOpen = useCallback(() => {
@@ -669,9 +297,7 @@ const FolderIcon = memo(function FolderIcon({
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (dragStateRef.current.isDragging) {
-        return;
-      }
+      if (isDragging) return;
 
       const now = Date.now();
       const timeSinceLastClick = now - lastClickTimeRef.current;
@@ -684,7 +310,6 @@ const FolderIcon = memo(function FolderIcon({
         handleOpen();
         lastClickTimeRef.current = 0;
       } else {
-        // Single click - select the folder and wait to see if it becomes a double click
         onSelect(e);
         lastClickTimeRef.current = now;
         if (clickTimeoutRef.current) {
@@ -696,320 +321,8 @@ const FolderIcon = memo(function FolderIcon({
         }, 300);
       }
     },
-    [handleOpen, onSelect]
+    [handleOpen, onSelect, isDragging]
   );
-
-  useEffect(() => {
-    const inGroup = dragGroup?.ids.includes(folder.id);
-    if (!isDragging && !dragStateRef.current.isDragging && !inGroup) {
-      // Only update if the position actually changed to avoid overwriting during drag
-      if (visualPosition.x !== folder.x || visualPosition.y !== folder.y) {
-        setVisualPosition({ x: folder.x, y: folder.y });
-      }
-    }
-  }, [folder.x, folder.y, isDragging, visualPosition.x, visualPosition.y, dragGroup, folder.id]);
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.button !== 0) return;
-
-      const desktopElement = document.querySelector('.desktop');
-      const desktopRect = desktopElement?.getBoundingClientRect();
-      if (!desktopRect || !iconRef.current) return;
-
-      const iconRect = iconRef.current.getBoundingClientRect();
-      const iconXRelativeToDesktop = iconRect.left - desktopRect.left;
-      const iconYRelativeToDesktop = iconRect.top - desktopRect.top;
-
-      const initialOffsetX = e.clientX - desktopRect.left - iconXRelativeToDesktop;
-      const initialOffsetY = e.clientY - desktopRect.top - iconYRelativeToDesktop;
-
-      const startX = e.clientX;
-      const startY = e.clientY;
-      let hasMoved = false;
-      let dragIds: string[] = [folder.id];
-      let origins: Record<string, { x: number; y: number }> = {
-        [folder.id]: { x: folder.x, y: folder.y },
-      };
-
-      const updatePosition = (moveEvent: MouseEvent) => {
-        if (!desktopElement || !iconRef.current) return;
-
-        // Check if icon is over a folder window - if so, don't show grid indicator
-        const elementUnderMouse = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
-        const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-        const isOverFolderWindow = !!folderWindowMain;
-
-        // If over a folder window, don't calculate grid position or show indicator
-        if (isOverFolderWindow) {
-          setGridPosition(null);
-          setDragOverTarget(null);
-          return;
-        }
-
-        const currentDesktopRect = desktopElement.getBoundingClientRect();
-        const bounds = {
-          width: currentDesktopRect.width,
-          height: currentDesktopRect.height,
-        };
-        const { cellWidth, cellHeight } = getGridMetrics(bounds);
-        let rawX = moveEvent.clientX - currentDesktopRect.left - initialOffsetX;
-        let rawY = moveEvent.clientY - currentDesktopRect.top - initialOffsetY;
-
-        // Icon fills one grid cell
-        const iconWidth = cellWidth;
-        const iconHeight = cellHeight;
-
-        // Constrain position to desktop bounds
-        const minX = 0;
-        const minY = 0;
-        const maxX = currentDesktopRect.width - iconWidth;
-        const maxY = currentDesktopRect.height - iconHeight;
-
-        rawX = Math.max(minX, Math.min(maxX, rawX));
-        rawY = Math.max(minY, Math.min(maxY, rawY));
-
-        // Snap by icon center so adjacent cell highlights past midpoint
-        const snapped = pixelToGrid(rawX + cellWidth / 2, rawY + cellHeight / 2, bounds);
-        const gridPos = clampGridPosition(snapped.x, snapped.y, bounds);
-
-        const origin = origins[folder.id];
-        onDragGroupMove({ x: rawX - origin.x, y: rawY - origin.y });
-        setVisualPosition({ x: rawX, y: rawY });
-        setGridPosition(gridPos);
-        dragStateRef.current.lastPosition = gridPos;
-
-        const collidingItem = findItemAtPosition(gridPos.x, gridPos.y, dragIds);
-        setDragOverTarget(collidingItem?.id ?? null);
-      };
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        const deltaX = Math.abs(moveEvent.clientX - startX);
-        const deltaY = Math.abs(moveEvent.clientY - startY);
-
-        if ((deltaX > DRAG_START_THRESHOLD || deltaY > DRAG_START_THRESHOLD) && !hasMoved) {
-          hasMoved = true;
-          dragIds = getDragIds(folder.id);
-          if (dragIds.length === 1) {
-            onSelect(undefined, true);
-          }
-          origins = Object.fromEntries(dragIds.map((id) => [id, getItemOrigin(id)]));
-          onDragGroupStart(dragIds, folder.id, origins);
-          if (iconRef.current) {
-            dragStateRef.current = {
-              isDragging: true,
-              offsetX: initialOffsetX,
-              offsetY: initialOffsetY,
-              startX: folder.x,
-              startY: folder.y,
-              animationFrame: null,
-              lastPosition: null,
-            };
-            setIsDragging(true);
-            iconRef.current.style.zIndex = '10000';
-          }
-        }
-
-        if (hasMoved && dragStateRef.current.isDragging) {
-          // Check if mouse is over a folder window or desktop
-          const elementUnderMouse = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
-          const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-          const desktopElement = elementUnderMouse?.closest('.desktop');
-
-          // When over a window, increase z-index of container to keep icon visible
-          if (iconRef.current) {
-            const container = iconRef.current.closest('.desktop-icons-container');
-            if (folderWindowMain) {
-              setIsOverFolderWindow(true);
-              if (container) {
-                container.classList.add('dragging-over-window');
-              }
-              iconRef.current.style.zIndex = '100000';
-              folderWindowMain.classList.add('drag-over');
-              iconRef.current.classList.add('dragging-over-folder');
-            } else if (desktopElement) {
-              setIsOverFolderWindow(false);
-              if (container) {
-                container.classList.remove('dragging-over-window');
-              }
-              iconRef.current.style.zIndex = '10000';
-              desktopElement.classList.add('drag-over');
-              iconRef.current.classList.add('dragging-over-desktop');
-            } else {
-              setIsOverFolderWindow(false);
-              if (container) {
-                container.classList.remove('dragging-over-window');
-              }
-              iconRef.current.style.zIndex = '10000';
-              iconRef.current.classList.remove('dragging-over-folder', 'dragging-over-desktop');
-              document.querySelectorAll('.folder-window-main, .desktop').forEach((el) => {
-                el.classList.remove('drag-over');
-              });
-            }
-          }
-
-          if (dragStateRef.current.animationFrame !== null) {
-            cancelAnimationFrame(dragStateRef.current.animationFrame);
-          }
-
-          dragStateRef.current.animationFrame = requestAnimationFrame(() => {
-            updatePosition(moveEvent);
-          });
-        }
-      };
-
-      const handleMouseUp = (e?: MouseEvent) => {
-        if (dragStateRef.current.animationFrame !== null) {
-          cancelAnimationFrame(dragStateRef.current.animationFrame);
-          dragStateRef.current.animationFrame = null;
-        }
-
-        // Remove dragging-over-window class from container
-        const container = iconRef.current?.closest('.desktop-icons-container');
-        if (container) {
-          container.classList.remove('dragging-over-window');
-        }
-
-        // Reset z-index
-        if (iconRef.current) {
-          iconRef.current.style.zIndex = '';
-        }
-
-        setDragOverTarget(null);
-        document.querySelectorAll('.desktop-icon').forEach((el) => {
-          el.classList.remove('dragging-over-folder', 'dragging-over-desktop');
-        });
-
-        // Remove drag-over classes from windows and desktop
-        document.querySelectorAll('.folder-window-main, .desktop').forEach((el) => {
-          el.classList.remove('drag-over');
-        });
-
-        if (hasMoved && dragStateRef.current.isDragging) {
-          // Check if mouse is over a folder window
-          let handledByFolderWindow = false;
-          if (e) {
-            const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
-            const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-            if (folderWindowMain) {
-              const path = (folderWindowMain as HTMLElement).dataset.folderPath;
-              if (path) {
-                handledByFolderWindow = true;
-                Promise.all([
-                  import('@file-system/file-system'),
-                  import('@core/desktop-shortcuts'),
-                ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
-                  const resolved = resolvePath(path);
-                  if (resolved.type === 'folder') {
-                    const targetFolder = getFolderByPath(path);
-                    if (targetFolder) {
-                      for (const id of dragIds) {
-                        if (id !== targetFolder.id) {
-                          addItemToFolder(targetFolder.id, id);
-                        }
-                      }
-                      setVisualPosition({ x: folder.x, y: folder.y });
-                      window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-                    }
-                  }
-                });
-              }
-            }
-          }
-
-          // If handled by folder window, skip desktop collision check
-          if (handledByFolderWindow) {
-            // Reset dragging state
-            dragStateRef.current.isDragging = false;
-            setIsDragging(false);
-            setGridPosition(null);
-            setIsOverFolderWindow(false);
-            onDragGroupEnd();
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp as EventListener);
-            return;
-          }
-
-          const desktopElement = document.querySelector('.desktop');
-          if (desktopElement && iconRef.current) {
-            const finalPos = dragStateRef.current.lastPosition;
-
-            if (finalPos) {
-              const collidingItem = findItemAtPosition(finalPos.x, finalPos.y, dragIds);
-
-              if (collidingItem && isDesktopFolder(collidingItem)) {
-                for (const id of dragIds) {
-                  if (id !== collidingItem.id) {
-                    addItemToFolder(collidingItem.id, id);
-                  }
-                }
-                setVisualPosition({ x: folder.x, y: folder.y });
-              } else if (collidingItem && dragIds.length === 1) {
-                const targetX = collidingItem.x;
-                const targetY = collidingItem.y;
-                swapItemPositions(folder.id, collidingItem.id);
-                setVisualPosition({ x: targetX, y: targetY });
-              } else {
-                const positions = computeGroupDropPositions(dragIds, origins, folder.id, finalPos);
-                for (const id of dragIds) {
-                  const pos = positions[id];
-                  if (pos) resolveItemPosition(id, pos.x, pos.y);
-                }
-                const primaryPos = positions[folder.id] ?? finalPos;
-                setVisualPosition({ x: primaryPos.x, y: primaryPos.y });
-                onUpdate();
-              }
-            } else {
-              onUpdate();
-            }
-
-            if (iconRef.current) {
-              iconRef.current.style.zIndex = '';
-            }
-
-            dragStateRef.current.lastPosition = null;
-            setGridPosition(null);
-          }
-
-          // Reset dragging state
-          dragStateRef.current.isDragging = false;
-          setIsDragging(false);
-          setGridPosition(null);
-          setIsOverFolderWindow(false);
-          onDragGroupEnd();
-        }
-
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp as EventListener);
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    },
-    [
-      folder.id,
-      folder.x,
-      folder.y,
-      onUpdate,
-      onSelect,
-      getDragIds,
-      getItemOrigin,
-      onDragGroupStart,
-      onDragGroupMove,
-      onDragGroupEnd,
-      resolveItemPosition,
-    ]
-  );
-
-  const inDragGroup = dragGroup?.ids.includes(folder.id) ?? false;
-  const displayPosition =
-    inDragGroup && dragGroup?.origins[folder.id]
-      ? {
-          x: dragGroup.origins[folder.id].x + dragGroup.delta.x,
-          y: dragGroup.origins[folder.id].y + dragGroup.delta.y,
-        }
-      : visualPosition;
-  const showDragging = isDragging || inDragGroup;
 
   const { cellWidth, cellHeight } = getGridMetrics();
   const iconSize = Math.min(
@@ -1079,10 +392,199 @@ const FolderIcon = memo(function FolderIcon({
   );
 });
 
+/** Desktop media icon — same drag / transition behavior as folder & app icons. */
+const DesktopMediaIcon = memo(function DesktopMediaIcon({
+  media,
+  mediaItems,
+  selectedIds,
+  onUpdate,
+  isSelected,
+  isCut,
+  onSelect,
+  layoutTick,
+  getDragIds,
+  getItemOrigin,
+  dragGroup,
+  onDragGroupStart,
+  onDragGroupMove,
+  onDragGroupEnd,
+  resolveItemPosition,
+}: {
+  media: DesktopMediaItem;
+  mediaItems: DesktopMediaItem[];
+  selectedIds: Set<string>;
+  onUpdate: () => void;
+  isSelected: boolean;
+  isCut?: boolean;
+  onSelect: (e?: React.MouseEvent, forceSingle?: boolean) => void;
+  layoutTick: number;
+  getDragIds: (id: string) => string[];
+  getItemOrigin: (id: string) => { x: number; y: number };
+  dragGroup: DesktopDragGroup | null;
+  onDragGroupStart: (
+    ids: string[],
+    primaryId: string,
+    origins: Record<string, { x: number; y: number }>
+  ) => void;
+  onDragGroupMove: (delta: { x: number; y: number }) => void;
+  onDragGroupEnd: () => void;
+  resolveItemPosition: (id: string, x: number, y: number) => void;
+}) {
+  void layoutTick;
+  const settings = useKernel((state) => state.settings);
+  const url = getMediaUrl(media);
+  const lastClickTimeRef = useRef(0);
+  const clickTimeoutRef = useRef<number | null>(null);
+  const {
+    iconRef,
+    isDragging,
+    gridPosition,
+    isOverFolderWindow,
+    displayPosition,
+    handleMouseDown,
+    showDragging,
+  } = useDesktopIconDrag({
+    id: media.id,
+    x: media.x,
+    y: media.y,
+    getDragIds,
+    getItemOrigin,
+    dragGroup,
+    onDragGroupStart,
+    onDragGroupMove,
+    onDragGroupEnd,
+    resolveItemPosition,
+    onSelect,
+    onUpdate,
+  });
+
+  const openMedia = useCallback(() => {
+    const ids =
+      selectedIds.has(media.id) && selectedIds.size > 1 ? Array.from(selectedIds) : [media.id];
+    let picked = ids
+      .map((itemId) => mediaItems.find((item) => item.id === itemId))
+      .filter((item): item is DesktopMediaItem => !!item && item.kind === media.kind)
+      .map((item) => ({ src: getMediaUrl(item), name: item.name }));
+    if (picked.length === 0) {
+      picked = [{ src: url, name: media.name }];
+    }
+    const startIndex = Math.max(
+      0,
+      picked.findIndex((entry) => entry.src === url && entry.name === media.name)
+    );
+    if (isImageItem(media)) {
+      window.dispatchEvent(
+        new CustomEvent('open-image', {
+          detail: { images: picked, startIndex },
+        })
+      );
+    } else {
+      window.dispatchEvent(
+        new CustomEvent('open-video', {
+          detail: { videos: picked, startIndex },
+        })
+      );
+    }
+  }, [media, mediaItems, selectedIds, url]);
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (isDragging) return;
+
+      const now = Date.now();
+      const timeSinceLastClick = now - lastClickTimeRef.current;
+
+      if (timeSinceLastClick < 300 && timeSinceLastClick > 0) {
+        if (clickTimeoutRef.current) {
+          clearTimeout(clickTimeoutRef.current);
+          clickTimeoutRef.current = null;
+        }
+        openMedia();
+        lastClickTimeRef.current = 0;
+      } else {
+        onSelect(e);
+        lastClickTimeRef.current = now;
+        if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = window.setTimeout(() => {
+          clickTimeoutRef.current = null;
+          lastClickTimeRef.current = 0;
+        }, 300);
+      }
+    },
+    [openMedia, onSelect, isDragging]
+  );
+
+  const { cellWidth, cellHeight } = getGridMetrics();
+  const iconSize = Math.min(
+    settings.iconSize,
+    getMaxIconSize(Math.min(cellWidth, cellHeight), settings.showIconLabels)
+  );
+
+  return (
+    <>
+      {isDragging && gridPosition && !isOverFolderWindow && (
+        <div
+          className="desktop-icon-grid-indicator"
+          style={{
+            left: `${gridPosition.x}px`,
+            top: `${gridPosition.y}px`,
+            width: `${cellWidth}px`,
+            height: `${cellHeight}px`,
+          }}
+        />
+      )}
+      <div
+        ref={iconRef}
+        className={`desktop-icon ${showDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''} ${isCut ? 'cut' : ''}`}
+        style={{
+          left: `${displayPosition.x}px`,
+          top: `${displayPosition.y}px`,
+          width: `${cellWidth}px`,
+          height: `${cellHeight}px`,
+          transition: showDragging ? 'none' : 'left 0.2s ease-out, top 0.2s ease-out',
+        }}
+        onMouseDown={handleMouseDown}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleClick(e);
+        }}
+        data-media-id={media.id}
+      >
+        <div
+          className="desktop-icon-image"
+          style={{
+            width: `${iconSize}px`,
+            height: `${iconSize}px`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {isImageItem(media) ? (
+            <img className="desktop-media-thumb" src={url} alt={media.name} draggable={false} />
+          ) : (
+            <video
+              className="desktop-media-thumb"
+              src={url}
+              muted
+              preload="metadata"
+              playsInline
+              draggable={false}
+            />
+          )}
+        </div>
+        {settings.showIconLabels && <div className="desktop-icon-label">{media.name}</div>}
+      </div>
+    </>
+  );
+});
+
 /** Renders desktop shortcuts and folders with selection, drag, and clipboard support. */
 export function DesktopIcons() {
   const [shortcuts, setShortcuts] = useState<DesktopShortcut[]>([]);
   const [folders, setFolders] = useState<DesktopFolder[]>([]);
+  const [mediaItems, setMediaItems] = useState<DesktopMediaItem[]>([]);
   const [programData, setProgramData] = useState<
     Record<string, { id: string; name: string; icon: string }>
   >({});
@@ -1095,10 +597,12 @@ export function DesktopIcons() {
   const selectedIdsRef = useRef(selectedIds);
   const shortcutsRef = useRef(shortcuts);
   const foldersRef = useRef(folders);
+  const mediaRef = useRef(mediaItems);
   const suppressClickClearRef = useRef(false);
   selectedIdsRef.current = selectedIds;
   shortcutsRef.current = shortcuts;
   foldersRef.current = folders;
+  mediaRef.current = mediaItems;
 
   const loadItems = useCallback(() => {
     const allFolders = getDesktopFolders();
@@ -1118,6 +622,7 @@ export function DesktopIcons() {
 
     setShortcuts(loadedShortcuts);
     setFolders(loadedFolders);
+    setMediaItems(getDesktopSurfaceMedia());
 
     // Load program metadata for each shortcut
     const data: Record<string, { id: string; name: string; icon: string }> = {};
@@ -1197,6 +702,8 @@ export function DesktopIcons() {
     if (shortcut) return { x: shortcut.x, y: shortcut.y };
     const folder = foldersRef.current.find((f) => f.id === id);
     if (folder) return { x: folder.x, y: folder.y };
+    const media = mediaRef.current.find((m) => m.id === id);
+    if (media) return { x: media.x, y: media.y };
     return { x: 0, y: 0 };
   }, []);
 
@@ -1222,6 +729,10 @@ export function DesktopIcons() {
     }
     if (foldersRef.current.some((f) => f.id === id)) {
       updateFolderPosition(id, x, y);
+      return;
+    }
+    if (mediaRef.current.some((m) => m.id === id)) {
+      updateMediaPosition(id, x, y);
     }
   }, []);
 
@@ -1261,7 +772,10 @@ export function DesktopIcons() {
         additive,
         baseSelection: new Set(selectedIdsRef.current),
         getElements: () => document.querySelectorAll('.desktop-icon'),
-        getId: (el) => el.getAttribute('data-shortcut-id') || el.getAttribute('data-folder-id'),
+        getId: (el) =>
+          el.getAttribute('data-shortcut-id') ||
+          el.getAttribute('data-folder-id') ||
+          el.getAttribute('data-media-id'),
         onRect: setMarquee,
         onSelection: (ids) => {
           setSelectedIds(ids);
@@ -1272,6 +786,7 @@ export function DesktopIcons() {
           const allItems = [
             ...shortcutsRef.current.map((s) => s.id),
             ...foldersRef.current.map((f) => f.id),
+            ...mediaRef.current.map((m) => m.id),
           ];
           let last = -1;
           ids.forEach((id) => {
@@ -1314,11 +829,11 @@ export function DesktopIcons() {
       if (isShiftClick && lastSelectedIndexRef.current >= 0) {
         // Range selection
         const allItems = [
-          ...shortcuts.map((s, i) => ({ id: s.id, type: 'shortcut' as const, index: i })),
-          ...folders.map((f, i) => ({
-            id: f.id,
-            type: 'folder' as const,
-            index: shortcuts.length + i,
+          ...shortcuts.map((s, i) => ({ id: s.id, index: i })),
+          ...folders.map((f, i) => ({ id: f.id, index: shortcuts.length + i })),
+          ...mediaItems.map((m, i) => ({
+            id: m.id,
+            index: shortcuts.length + folders.length + i,
           })),
         ];
 
@@ -1342,29 +857,23 @@ export function DesktopIcons() {
         }
         setSelectedIds(newSelection);
         const allItems = [
-          ...shortcuts.map((s, i) => ({ id: s.id, type: 'shortcut' as const, index: i })),
-          ...folders.map((f, i) => ({
-            id: f.id,
-            type: 'folder' as const,
-            index: shortcuts.length + i,
-          })),
+          ...shortcuts.map((s) => s.id),
+          ...folders.map((f) => f.id),
+          ...mediaItems.map((m) => m.id),
         ];
-        lastSelectedIndexRef.current = allItems.findIndex((item) => item.id === id);
+        lastSelectedIndexRef.current = allItems.findIndex((itemId) => itemId === id);
       } else {
         // Single selection
         setSelectedIds(new Set([id]));
         const allItems = [
-          ...shortcuts.map((s, i) => ({ id: s.id, type: 'shortcut' as const, index: i })),
-          ...folders.map((f, i) => ({
-            id: f.id,
-            type: 'folder' as const,
-            index: shortcuts.length + i,
-          })),
+          ...shortcuts.map((s) => s.id),
+          ...folders.map((f) => f.id),
+          ...mediaItems.map((m) => m.id),
         ];
-        lastSelectedIndexRef.current = allItems.findIndex((item) => item.id === id);
+        lastSelectedIndexRef.current = allItems.findIndex((itemId) => itemId === id);
       }
     },
-    [selectedIds, shortcuts, folders]
+    [selectedIds, shortcuts, folders, mediaItems]
   );
 
   // Select All handler
@@ -1372,20 +881,16 @@ export function DesktopIcons() {
     if (isFolderWindowActive()) {
       throw new HandlerSkippedError();
     }
-    const allItemIds = [...shortcuts.map((s) => s.id), ...folders.map((f) => f.id)];
+    const allItemIds = [
+      ...shortcuts.map((s) => s.id),
+      ...folders.map((f) => f.id),
+      ...mediaItems.map((m) => m.id),
+    ];
     setSelectedIds(new Set(allItemIds));
     if (allItemIds.length > 0) {
-      const allItems = [
-        ...shortcuts.map((s, i) => ({ id: s.id, type: 'shortcut' as const, index: i })),
-        ...folders.map((f, i) => ({
-          id: f.id,
-          type: 'folder' as const,
-          index: shortcuts.length + i,
-        })),
-      ];
-      lastSelectedIndexRef.current = allItems.length - 1;
+      lastSelectedIndexRef.current = allItemIds.length - 1;
     }
-  }, [shortcuts, folders]);
+  }, [shortcuts, folders, mediaItems]);
 
   // Copy handler
   const handleCopy = useCallback(() => {
@@ -1397,10 +902,15 @@ export function DesktopIcons() {
     selectedIds.forEach((id) => {
       const shortcut = shortcuts.find((s) => s.id === id);
       const folder = folders.find((f) => f.id === id);
+      const media = mediaItems.find((m) => m.id === id);
       if (shortcut) {
         items.push({ id: shortcut.id, type: 'shortcut' });
       } else if (folder) {
         items.push({ id: folder.id, type: 'folder' });
+      } else if (media && isImageItem(media)) {
+        items.push({ id: media.id, type: 'image' });
+      } else if (media && isVideoItem(media)) {
+        items.push({ id: media.id, type: 'video' });
       }
     });
 
@@ -1411,7 +921,7 @@ export function DesktopIcons() {
         operation: 'copy',
       });
     }
-  }, [selectedIds, shortcuts, folders]);
+  }, [selectedIds, shortcuts, folders, mediaItems]);
 
   // Cut handler
   const handleCut = useCallback(() => {
@@ -1423,10 +933,15 @@ export function DesktopIcons() {
     selectedIds.forEach((id) => {
       const shortcut = shortcuts.find((s) => s.id === id);
       const folder = folders.find((f) => f.id === id);
+      const media = mediaItems.find((m) => m.id === id);
       if (shortcut) {
         items.push({ id: shortcut.id, type: 'shortcut' });
       } else if (folder) {
         items.push({ id: folder.id, type: 'folder' });
+      } else if (media && isImageItem(media)) {
+        items.push({ id: media.id, type: 'image' });
+      } else if (media && isVideoItem(media)) {
+        items.push({ id: media.id, type: 'video' });
       }
     });
 
@@ -1437,7 +952,7 @@ export function DesktopIcons() {
         operation: 'cut',
       });
     }
-  }, [selectedIds, shortcuts, folders]);
+  }, [selectedIds, shortcuts, folders, mediaItems]);
 
   // Delete handler — soft-delete into Trash
   const handleDelete = useCallback(() => {
@@ -1469,17 +984,24 @@ export function DesktopIcons() {
       addDesktopShortcut,
       getDesktopShortcuts,
       getDesktopFolders,
+      getDesktopSurfaceMedia,
       findNextAvailablePosition,
       createDesktopFolder,
       getFolderById,
       removeItemFromFolder: removeFromFolder,
       getFolderByPath: folderByPath,
       updateFolderPosition: setFolderPos,
+      copyDesktopMedia: copyMedia,
+      placeMediaOnDesktop: placeMedia,
+      getMediaById,
     } = await import('@core/desktop-shortcuts');
     const allShortcuts = getDesktopShortcuts();
 
     const occupied = () =>
-      [...getDesktopShortcuts(), ...getDesktopFolders()].map((i) => ({ x: i.x, y: i.y }));
+      [...getDesktopShortcuts(), ...getDesktopFolders(), ...getDesktopSurfaceMedia()].map((i) => ({
+        x: i.x,
+        y: i.y,
+      }));
 
     try {
       if (clipboard.operation === 'copy') {
@@ -1496,6 +1018,9 @@ export function DesktopIcons() {
               const position = findNextAvailablePosition(occupied());
               createDesktopFolder(folder.name, position.x, position.y);
             }
+          } else if (item.type === 'image' || item.type === 'video') {
+            const position = findNextAvailablePosition(occupied());
+            copyMedia(item.id, position.x, position.y);
           }
         }
       } else if (clipboard.operation === 'cut') {
@@ -1506,9 +1031,15 @@ export function DesktopIcons() {
         } else {
           for (const item of clipboard.items) {
             if (clipboard.sourcePath) {
-              const sourceFolder = folderByPath(clipboard.sourcePath);
-              if (sourceFolder) {
-                removeFromFolder(sourceFolder.id, item.id);
+              const { isWritableSpecialPath, removeItemFromSpecialLocation } =
+                await import('@core/desktop-shortcuts');
+              if (isWritableSpecialPath(clipboard.sourcePath)) {
+                removeItemFromSpecialLocation(clipboard.sourcePath, item.id);
+              } else {
+                const sourceFolder = folderByPath(clipboard.sourcePath);
+                if (sourceFolder) {
+                  removeFromFolder(sourceFolder.id, item.id);
+                }
               }
             }
 
@@ -1517,6 +1048,10 @@ export function DesktopIcons() {
               updateDesktopShortcutPosition(item.id, position.x, position.y);
             } else if (item.type === 'folder') {
               setFolderPos(item.id, position.x, position.y);
+            } else if (item.type === 'image' || item.type === 'video') {
+              if (getMediaById(item.id)) {
+                placeMedia(item.id, position.x, position.y);
+              }
             }
           }
           setSelectedIds(new Set());
@@ -1604,6 +1139,26 @@ export function DesktopIcons() {
           isSelected={selectedIds.has(folder.id)}
           isCut={cutIds.has(folder.id)}
           onSelect={(e, forceSingle) => handleIconSelect(folder.id, e, forceSingle)}
+          layoutTick={layoutTick}
+          getDragIds={getDragIds}
+          getItemOrigin={getItemOrigin}
+          dragGroup={dragGroup}
+          onDragGroupStart={handleDragGroupStart}
+          onDragGroupMove={handleDragGroupMove}
+          onDragGroupEnd={handleDragGroupEnd}
+          resolveItemPosition={resolveItemPosition}
+        />
+      ))}
+      {mediaItems.map((media) => (
+        <DesktopMediaIcon
+          key={media.id}
+          media={media}
+          mediaItems={mediaItems}
+          selectedIds={selectedIds}
+          onUpdate={handleUpdate}
+          isSelected={selectedIds.has(media.id)}
+          isCut={cutIds.has(media.id)}
+          onSelect={(e, forceSingle) => handleIconSelect(media.id, e, forceSingle)}
           layoutTick={layoutTick}
           getDragIds={getDragIds}
           getItemOrigin={getItemOrigin}

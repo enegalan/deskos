@@ -210,9 +210,9 @@ export function Desktop() {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // Check if mouse is over a window (not just desktop)
+      // Window chrome (sidebar, titlebar, …) must not show the desktop grid.
       const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
-      const isOverWindow = elementUnderMouse?.closest('.window-container, .folder-window-main');
+      const isOverWindow = !!elementUnderMouse?.closest('.window');
 
       if (!isOverWindow) {
         desktopRef.current.classList.add('drag-over');
@@ -234,6 +234,11 @@ export function Desktop() {
   // Handle drag events from folder windows and taskbar (for visual feedback only)
   // Note: We don't preventDefault here to allow the React handler to work
   useEffect(() => {
+    const clearDragIndicator = () => {
+      setDragGridPosition(null);
+      desktopRef.current?.classList.remove('drag-over');
+    };
+
     const handleDragOver = (e: DragEvent) => {
       if (!desktopRef.current) return;
 
@@ -254,31 +259,27 @@ export function Desktop() {
           e.clientY >= rect.top &&
           e.clientY <= rect.bottom;
 
-        // Check if mouse is over a window (not just desktop)
         const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
-        const isOverWindow = elementUnderMouse?.closest('.window-container, .folder-window-main');
+        const isOverWindow = !!elementUnderMouse?.closest('.window');
 
         if (isOverDesktop && !isOverWindow) {
           desktopRef.current.classList.add('drag-over');
 
-          // Calculate grid position for visual indicator
           const x = e.clientX - rect.left;
           const y = e.clientY - rect.top;
           const gridPos = pixelToClampedGrid(x, y, { width: rect.width, height: rect.height });
           setDragGridPosition(gridPos);
         } else {
-          desktopRef.current.classList.remove('drag-over');
-          setDragGridPosition(null);
+          clearDragIndicator();
         }
       } else {
-        setDragGridPosition(null);
+        clearDragIndicator();
       }
     };
 
     const handleDragLeave = (e: DragEvent) => {
       if (!desktopRef.current) return;
 
-      // Only remove drag-over if we're actually leaving the desktop
       const rect = desktopRef.current.getBoundingClientRect();
       const isOverDesktop =
         e.clientX >= rect.left &&
@@ -287,28 +288,21 @@ export function Desktop() {
         e.clientY <= rect.bottom;
 
       if (!isOverDesktop) {
-        desktopRef.current.classList.remove('drag-over');
-        setDragGridPosition(null);
+        clearDragIndicator();
       }
     };
 
-    const handleDragEnd = () => {
-      setDragGridPosition(null);
-      if (desktopRef.current) {
-        desktopRef.current.classList.remove('drag-over');
-      }
-    };
-
-    // Use capture phase to ensure we see the event, but don't prevent default
-    // The actual drop handling is done by the React handler on the desktop element
+    // drop may be swallowed by sidebar (stopPropagation); still clear the grid.
     document.addEventListener('dragover', handleDragOver, true);
     document.addEventListener('dragleave', handleDragLeave, true);
-    document.addEventListener('dragend', handleDragEnd, true);
+    document.addEventListener('dragend', clearDragIndicator, true);
+    document.addEventListener('drop', clearDragIndicator, true);
 
     return () => {
       document.removeEventListener('dragover', handleDragOver, true);
       document.removeEventListener('dragleave', handleDragLeave, true);
-      document.removeEventListener('dragend', handleDragEnd, true);
+      document.removeEventListener('dragend', clearDragIndicator, true);
+      document.removeEventListener('drop', clearDragIndicator, true);
     };
   }, []);
 
@@ -330,6 +324,12 @@ export function Desktop() {
       setDragGridPosition(null);
     }
 
+    // Sidebar / window chrome drops must not land on the desktop grid.
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    if (under?.closest('.window, .folder-sidebar-item[data-drop-path]')) {
+      return;
+    }
+
     const desktopRect = desktopRef.current?.getBoundingClientRect();
     if (!desktopRect) return;
 
@@ -349,8 +349,10 @@ export function Desktop() {
       const {
         getDesktopFolders,
         getDesktopShortcuts,
+        getMediaById,
         updateDesktopShortcutPosition,
         updateFolderPosition,
+        placeMediaOnDesktop,
         removeItemFromFolder,
         clampGridPosition,
       } = await import('@core/desktop-shortcuts');
@@ -360,10 +362,15 @@ export function Desktop() {
 
       const primaryId = itemIds[0];
       const primaryItem =
-        shortcuts.find((s) => s.id === primaryId) || folders.find((f) => f.id === primaryId);
+        shortcuts.find((s) => s.id === primaryId) ||
+        folders.find((f) => f.id === primaryId) ||
+        getMediaById(primaryId);
       const primaryOrigin = primaryItem
         ? { x: primaryItem.x, y: primaryItem.y }
         : { x: gridPos.x, y: gridPos.y };
+
+      const { findSpecialLocationOfItem, removeItemFromSpecialLocation } =
+        await import('@core/desktop-shortcuts');
 
       for (const itemId of itemIds) {
         const parentFolder = folders.find((f) => f.contents.includes(itemId));
@@ -371,13 +378,21 @@ export function Desktop() {
           removeItemFromFolder(parentFolder.id, itemId);
         }
 
+        const specialParent = findSpecialLocationOfItem(itemId);
+        if (specialParent) {
+          removeItemFromSpecialLocation(specialParent, itemId);
+        }
+
         const shortcut = shortcuts.find((s) => s.id === itemId);
         const folder = folders.find((f) => f.id === itemId);
+        const mediaItem = getMediaById(itemId);
         const origin = shortcut
           ? { x: shortcut.x, y: shortcut.y }
           : folder
             ? { x: folder.x, y: folder.y }
-            : primaryOrigin;
+            : mediaItem
+              ? { x: mediaItem.x, y: mediaItem.y }
+              : primaryOrigin;
         const offsetX = origin.x - primaryOrigin.x;
         const offsetY = origin.y - primaryOrigin.y;
         const pos = clampGridPosition(gridPos.x + offsetX, gridPos.y + offsetY, {
@@ -389,6 +404,8 @@ export function Desktop() {
           updateDesktopShortcutPosition(itemId, pos.x, pos.y);
         } else if (folder) {
           updateFolderPosition(itemId, pos.x, pos.y);
+        } else if (mediaItem) {
+          placeMediaOnDesktop(itemId, pos.x, pos.y);
         }
       }
 
