@@ -13,6 +13,7 @@ import {
   getGridMetrics,
   DESKOS_ITEM_IDS_MIME,
   readDraggedItemIds,
+  isPointInDockBand,
 } from '@core/desktop-shortcuts';
 import {
   hasExternalFileDrag,
@@ -198,7 +199,6 @@ export function Desktop() {
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
     e.stopPropagation();
 
     // Check if dragging an item from a folder window or taskbar
@@ -212,6 +212,20 @@ export function Desktop() {
         type === DESKOS_ITEM_IDS_MIME
     );
     const hasExternal = hasExternalFileDrag(types);
+
+    // The dock band (and beside it) must never accept desktop shorts: a drop
+    // there would land behind or beside the dock.
+    if (isPointInDockBand(e.clientY)) {
+      desktopRef.current?.classList.remove('drag-over');
+      setDragGridPosition(null);
+      e.dataTransfer.dropEffect = 'none';
+      if (hasExternal) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    e.preventDefault();
 
     if ((hasDeskosData || hasExternal) && desktopRef.current) {
       const rect = desktopRef.current.getBoundingClientRect();
@@ -270,8 +284,9 @@ export function Desktop() {
 
         const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
         const isOverWindow = !!elementUnderMouse?.closest('.window');
+        const overDockBand = isPointInDockBand(e.clientY);
 
-        if (isOverDesktop && !isOverWindow) {
+        if (isOverDesktop && !isOverWindow && !overDockBand) {
           desktopRef.current.classList.add('drag-over');
 
           const x = e.clientX - rect.left;
@@ -283,6 +298,9 @@ export function Desktop() {
             if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
           }
         } else {
+          if (hasExternal) {
+            e.preventDefault();
+          }
           clearDragIndicator();
         }
       } else {
@@ -340,6 +358,11 @@ export function Desktop() {
     // Sidebar / window chrome drops must not land on the desktop grid.
     const under = document.elementFromPoint(e.clientX, e.clientY);
     if (under?.closest('.window, .folder-sidebar-item[data-drop-path]')) {
+      return;
+    }
+
+    // The dock band (and beside it) must never accept desktop shortcuts.
+    if (isPointInDockBand(e.clientY)) {
       return;
     }
 

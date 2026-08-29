@@ -1,6 +1,6 @@
 import { createScopedStorage } from './storage';
 import { useKernel } from './kernel';
-import { GRID_OCCUPANCY_RATIO } from './constants';
+import { DOCK_DROP_MARGIN, GRID_OCCUPANCY_RATIO } from './constants';
 
 /** Shortcut pinned to the desktop grid. */
 export interface DesktopShortcut {
@@ -1257,6 +1257,27 @@ export function getDesktopBounds(): { width: number; height: number } {
     width: window.innerWidth,
     height: window.innerHeight,
   };
+}
+
+/**
+ * Dock exclusion band in viewport coordinates. Drops aimed at the desktop
+ * inside this band land behind or beside the dock, so they must be rejected.
+ * Returns `null` when the dock isn't rendered.
+ */
+export function getDockDropBand(): { top: number; bottom: number } | null {
+  const dock = document.querySelector('.dock');
+  if (!dock) return null;
+  const rect = dock.getBoundingClientRect();
+  return { top: rect.top - DOCK_DROP_MARGIN, bottom: rect.bottom };
+}
+
+/**
+ * True when a viewport-space point falls inside the dock exclusion band,
+ * including the area beside the dock. The band spans the full viewport width.
+ */
+export function isPointInDockBand(clientY: number): boolean {
+  const band = getDockDropBand();
+  return band ? clientY >= band.top && clientY <= band.bottom : false;
 }
 
 /** Computed desktop grid layout (cell count and stretched cell size). */
