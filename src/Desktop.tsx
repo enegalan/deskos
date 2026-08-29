@@ -349,8 +349,10 @@ export function Desktop() {
       const {
         getDesktopFolders,
         getDesktopShortcuts,
+        getMediaById,
         updateDesktopShortcutPosition,
         updateFolderPosition,
+        placeMediaOnDesktop,
         removeItemFromFolder,
         clampGridPosition,
       } = await import('@core/desktop-shortcuts');
@@ -360,7 +362,9 @@ export function Desktop() {
 
       const primaryId = itemIds[0];
       const primaryItem =
-        shortcuts.find((s) => s.id === primaryId) || folders.find((f) => f.id === primaryId);
+        shortcuts.find((s) => s.id === primaryId) ||
+        folders.find((f) => f.id === primaryId) ||
+        getMediaById(primaryId);
       const primaryOrigin = primaryItem
         ? { x: primaryItem.x, y: primaryItem.y }
         : { x: gridPos.x, y: gridPos.y };
@@ -373,11 +377,14 @@ export function Desktop() {
 
         const shortcut = shortcuts.find((s) => s.id === itemId);
         const folder = folders.find((f) => f.id === itemId);
+        const mediaItem = getMediaById(itemId);
         const origin = shortcut
           ? { x: shortcut.x, y: shortcut.y }
           : folder
             ? { x: folder.x, y: folder.y }
-            : primaryOrigin;
+            : mediaItem
+              ? { x: mediaItem.x, y: mediaItem.y }
+              : primaryOrigin;
         const offsetX = origin.x - primaryOrigin.x;
         const offsetY = origin.y - primaryOrigin.y;
         const pos = clampGridPosition(gridPos.x + offsetX, gridPos.y + offsetY, {
@@ -389,6 +396,8 @@ export function Desktop() {
           updateDesktopShortcutPosition(itemId, pos.x, pos.y);
         } else if (folder) {
           updateFolderPosition(itemId, pos.x, pos.y);
+        } else if (mediaItem) {
+          placeMediaOnDesktop(itemId, pos.x, pos.y);
         }
       }
 

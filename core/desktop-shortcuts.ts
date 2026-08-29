@@ -36,10 +36,38 @@ export interface DesktopImageItem {
   icon: string;
   x: number;
   y: number;
+  /**
+   * Where the item lives when not inside a `DesktopFolder.contents` list.
+   * `/Images` = media library; `/Desktop` = desktop surface.
+   */
+  home: '/Images' | '/Desktop';
 }
 
-/** Desktop shortcut, folder, or read-only image item. */
-export type DesktopItem = DesktopShortcut | DesktopFolder | DesktopImageItem;
+/**
+ * Video entry shown inside `/Videos`, the desktop, or a user folder.
+ * Points at a bundled asset URL under `public/video/`.
+ */
+export interface DesktopVideoItem {
+  id: string;
+  name: string;
+  kind: 'video';
+  /** Asset URL served from `public/` (e.g. `/video/clip.mp4`). */
+  videoUrl: string;
+  icon: string;
+  x: number;
+  y: number;
+  /**
+   * Where the item lives when not inside a `DesktopFolder.contents` list.
+   * `/Videos` = media library; `/Desktop` = desktop surface.
+   */
+  home: '/Videos' | '/Desktop';
+}
+
+/** Persisted image or video file item. */
+export type DesktopMediaItem = DesktopImageItem | DesktopVideoItem;
+
+/** Desktop shortcut, folder, or media file item. */
+export type DesktopItem = DesktopShortcut | DesktopFolder | DesktopImageItem | DesktopVideoItem;
 
 /**
  * Type guard: whether a desktop item is a folder.
@@ -71,12 +99,38 @@ export function isImageItem(item: DesktopItem): item is DesktopImageItem {
   return 'kind' in item && item.kind === 'image';
 }
 
+/**
+ * Type guard: whether a desktop item is a read-only video entry.
+ *
+ * @param item - Shortcut, folder, image, or video
+ * @returns `true` if `item` is a `DesktopVideoItem`
+ */
+export function isVideoItem(item: DesktopItem): item is DesktopVideoItem {
+  return 'kind' in item && item.kind === 'video';
+}
+
+/**
+ * Type guard: whether a desktop item is a persisted media file.
+ */
+export function isMediaItem(item: DesktopItem): item is DesktopMediaItem {
+  return isImageItem(item) || isVideoItem(item);
+}
+
+/** Asset URL for a media item. */
+export function getMediaUrl(item: DesktopMediaItem): string {
+  return isImageItem(item) ? item.imageUrl : item.videoUrl;
+}
+
 /** System storage key for live desktop shortcuts. */
 const STORAGE_KEY = 'desktop-shortcuts';
 /** System storage key for live desktop folders. */
 const FOLDERS_STORAGE_KEY = 'desktop-folders';
 /** System storage key for folder id → absolute path map. */
 const FOLDER_PATHS_STORAGE_KEY = 'folder-paths';
+/** System storage key for persisted image/video file items. */
+const MEDIA_STORAGE_KEY = 'desktop-media';
+/** URLs already seeded from the bundled catalog (never re-seed after delete). */
+const MEDIA_KNOWN_URLS_KEY = 'media-known-urls';
 
 /**
  * Get current grid size from settings
@@ -222,6 +276,159 @@ function getIdsInsideFolders(): Set<string> {
   return ids;
 }
 
+/** Notify UI that desktop / folder / media contents changed. */
+function notifyDesktopUpdated(): void {
+  window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+}
+
+/** Get all persisted media file items. */
+export function getDesktopMedia(): DesktopMediaItem[] {
+  return systemStorage.getItem<DesktopMediaItem[]>(MEDIA_STORAGE_KEY) || [];
+}
+
+function saveDesktopMedia(media: DesktopMediaItem[]): void {
+  systemStorage.setItem(MEDIA_STORAGE_KEY, media);
+}
+
+/** URLs already known from the bundled catalog (or prior copies). */
+function getKnownMediaUrls(): Set<string> {
+  return new Set(systemStorage.getItem<string[]>(MEDIA_KNOWN_URLS_KEY) || []);
+}
+
+function saveKnownMediaUrls(urls: Set<string>): void {
+  systemStorage.setItem(MEDIA_KNOWN_URLS_KEY, Array.from(urls));
+}
+
+/** Seed library once from bundled catalog; deleted URLs are not re-created. */
+export function ensureMediaLibrarySeeded(
+  kind: 'image' | 'video',
+  catalog: Array<{ name: string; url: string }>
+): void {
+  const media = getDesktopMedia();
+  const known = getKnownMediaUrls();
+  media.forEach((item) => known.add(getMediaUrl(item)));
+
+  let changed = false;
+  catalog.forEach((entry, i) => {
+    if (known.has(entry.url)) return;
+    known.add(entry.url);
+    changed = true;
+    media.push(
+      kind === 'image'
+        ? {
+            id: `image-${entry.name}`,
+            name: entry.name,
+            kind: 'image',
+            imageUrl: entry.url,
+            icon: 'image',
+            x: 0,
+            y: i,
+            home: '/Images',
+          }
+        : {
+            id: `video-${entry.name}`,
+            name: entry.name,
+            kind: 'video',
+            videoUrl: entry.url,
+            icon: 'video',
+            x: 0,
+            y: i,
+            home: '/Videos',
+          }
+    );
+  });
+
+  saveKnownMediaUrls(known);
+  if (changed) saveDesktopMedia(media);
+}
+
+/** Media shown in `/Images` or `/Videos` (not inside a user folder). */
+export function getLibraryMediaItems(home: '/Images' | '/Videos'): DesktopMediaItem[] {
+  const inFolders = getIdsInsideFolders();
+  return getDesktopMedia().filter((item) => !inFolders.has(item.id) && item.home === home);
+}
+
+/** Media on the desktop surface. */
+export function getDesktopSurfaceMedia(): DesktopMediaItem[] {
+  const inFolders = getIdsInsideFolders();
+  return getDesktopMedia().filter((item) => !inFolders.has(item.id) && item.home === '/Desktop');
+}
+
+/**
+ * Look up a media item by id.
+ */
+export function getMediaById(mediaId: string): DesktopMediaItem | null {
+  return getDesktopMedia().find((item) => item.id === mediaId) || null;
+}
+
+/** Clone a media item onto the desktop (or at x/y if given). */
+export function copyDesktopMedia(
+  sourceId: string,
+  x?: number,
+  y?: number
+): DesktopMediaItem | null {
+  const source = getMediaById(sourceId);
+  if (!source) return null;
+
+  let posX = x;
+  let posY = y;
+  if (posX === undefined || posY === undefined) {
+    const occupied = [
+      ...getDesktopShortcuts()
+        .filter((s) => !getIdsInsideFolders().has(s.id))
+        .map((s) => ({ x: s.x, y: s.y })),
+      ...getDesktopFolders()
+        .filter((f) => !f.parentPath || f.parentPath === '/Desktop')
+        .map((f) => ({ x: f.x, y: f.y })),
+      ...getDesktopSurfaceMedia().map((m) => ({ x: m.x, y: m.y })),
+    ];
+    const next = findNextAvailablePosition(occupied);
+    posX = next.x;
+    posY = next.y;
+  }
+
+  const id = `${source.kind}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const clone: DesktopMediaItem = isImageItem(source)
+    ? { ...source, id, x: posX, y: posY, home: '/Desktop' }
+    : { ...source, id, x: posX, y: posY, home: '/Desktop' };
+
+  const media = getDesktopMedia();
+  media.push(clone);
+  saveDesktopMedia(media);
+  notifyDesktopUpdated();
+  return clone;
+}
+
+/** Move media to the desktop grid (also removes it from any folder). */
+export function placeMediaOnDesktop(mediaId: string, x: number, y: number): void {
+  const media = getDesktopMedia();
+  const item = media.find((m) => m.id === mediaId);
+  if (!item) return;
+
+  const folders = getDesktopFolders();
+  let foldersChanged = false;
+  folders.forEach((folder) => {
+    if (folder.contents.includes(mediaId)) {
+      folder.contents = folder.contents.filter((id) => id !== mediaId);
+      foldersChanged = true;
+    }
+  });
+  if (foldersChanged) systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+
+  const clamped = clampGridPosition(x, y);
+  item.x = clamped.x;
+  item.y = clamped.y;
+  item.home = '/Desktop';
+  saveDesktopMedia(media);
+  rememberGridMetrics();
+  notifyDesktopUpdated();
+}
+
+/** Alias used by desktop icon reposition. */
+export function updateMediaPosition(mediaId: string, x: number, y: number): void {
+  placeMediaOnDesktop(mediaId, x, y);
+}
+
 /**
  * Find any desktop-surface item at a grid cell (ignores nested folder contents)
  */
@@ -235,6 +442,7 @@ export function findItemAtPosition(
   );
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
+  const media = getDesktopSurfaceMedia();
   const inFolders = getIdsInsideFolders();
   const metrics = getGridMetrics();
   const col = Math.round(x / metrics.cellWidth);
@@ -258,7 +466,16 @@ export function findItemAtPosition(
     );
   });
 
-  return folder || null;
+  if (folder) return folder;
+
+  return (
+    media.find((m) => {
+      if (exclude.has(m.id)) return false;
+      return (
+        Math.round(m.x / metrics.cellWidth) === col && Math.round(m.y / metrics.cellHeight) === row
+      );
+    }) || null
+  );
 }
 
 /** MIME type for multi-item drag payloads (JSON string[]) */
@@ -290,10 +507,16 @@ export function readDraggedItemIds(dataTransfer: DataTransfer): string[] {
 export function swapItemPositions(itemId1: string, itemId2: string): void {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
+  const media = getDesktopMedia();
 
-  // Find both items
-  const item1 = shortcuts.find((s) => s.id === itemId1) || folders.find((f) => f.id === itemId1);
-  const item2 = shortcuts.find((s) => s.id === itemId2) || folders.find((f) => f.id === itemId2);
+  const item1 =
+    shortcuts.find((s) => s.id === itemId1) ||
+    folders.find((f) => f.id === itemId1) ||
+    media.find((m) => m.id === itemId1);
+  const item2 =
+    shortcuts.find((s) => s.id === itemId2) ||
+    folders.find((f) => f.id === itemId2) ||
+    media.find((m) => m.id === itemId2);
 
   if (item1 && item2) {
     const tempX = item1.x;
@@ -303,12 +526,11 @@ export function swapItemPositions(itemId1: string, itemId2: string): void {
     item2.x = tempX;
     item2.y = tempY;
 
-    // Save changes
     systemStorage.setItem(STORAGE_KEY, shortcuts);
     systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+    saveDesktopMedia(media);
     rememberGridMetrics();
 
-    // Dispatch event to notify DesktopIcons to refresh
     window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
   }
 }
@@ -579,6 +801,10 @@ export function getDesktopSurfacePositions(
   getDesktopFolders().forEach((f) => {
     if (exclude.has(f.id) || !isRootDesktopFolder(f)) return;
     positions.push({ x: f.x, y: f.y });
+  });
+  getDesktopSurfaceMedia().forEach((m) => {
+    if (exclude.has(m.id)) return;
+    positions.push({ x: m.x, y: m.y });
   });
 
   return positions;
@@ -1167,7 +1393,8 @@ export function getDesktopItems(path?: string): DesktopItem[] {
     const inFolders = getIdsInsideFolders();
     const rootShortcuts = shortcuts.filter((s) => !inFolders.has(s.id));
     const rootFolders = folders.filter((f) => !f.parentPath || f.parentPath === '/Desktop');
-    return [...rootShortcuts, ...rootFolders];
+    const rootMedia = getDesktopSurfaceMedia();
+    return [...rootShortcuts, ...rootFolders, ...rootMedia];
   }
 
   // For specific paths, we'll need the file-system module
@@ -1234,15 +1461,18 @@ export function getItemsByPath(path: string): DesktopItem[] {
 
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
+  const media = getDesktopMedia();
 
   return folder.contents
     .map((itemId) => {
       const shortcut = shortcuts.find((s) => s.id === itemId);
       if (shortcut) return shortcut;
       const subFolder = folders.find((f) => f.id === itemId);
-      return subFolder || null;
+      if (subFolder) return subFolder;
+      const mediaItem = media.find((m) => m.id === itemId);
+      return mediaItem || null;
     })
-    .filter((item): item is DesktopShortcut | DesktopFolder => item !== null);
+    .filter((item): item is DesktopItem => item !== null);
 }
 
 /**
@@ -1283,6 +1513,14 @@ export function addItemToFolder(folderId: string, itemId: string): void {
     paths[itemId] = newPath;
   }
 
+  // Media moved into a folder leaves the library / desktop surface.
+  const media = getDesktopMedia();
+  const mediaItem = media.find((m) => m.id === itemId);
+  if (mediaItem) {
+    mediaItem.home = '/Desktop';
+    saveDesktopMedia(media);
+  }
+
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);
 
@@ -1307,6 +1545,14 @@ export function removeItemFromFolder(folderId: string, itemId: string): void {
     // Update path mapping
     const newPath = `/Desktop/${itemFolder.name}`;
     paths[itemId] = newPath;
+  }
+
+  // Media removed from a folder lands on the desktop surface.
+  const media = getDesktopMedia();
+  const mediaItem = media.find((m) => m.id === itemId);
+  if (mediaItem) {
+    mediaItem.home = '/Desktop';
+    saveDesktopMedia(media);
   }
 
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);

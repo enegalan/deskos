@@ -15,6 +15,7 @@ import {
   isDesktopFolder,
   isDesktopShortcut,
   isImageItem,
+  isVideoItem,
   getGridSize,
   addItemToFolder,
   getFolderByPath,
@@ -154,12 +155,7 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
   // Listen for desktop-shortcuts-updated to refresh when items are added via drag and drop
   useEffect(() => {
     const handleShortcutsUpdated = () => {
-      // Reload items if we're viewing a folder
-      const resolved = resolvePath(currentPath);
-      if (resolved.type === 'folder') {
-        console.log('[FolderWindow] Desktop shortcuts updated, reloading items');
-        loadItems(currentPath);
-      }
+      loadItems(currentPath);
     };
 
     window.addEventListener('desktop-shortcuts-updated', handleShortcutsUpdated);
@@ -235,6 +231,16 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           new CustomEvent('open-image', {
             detail: {
               images: [{ src: item.imageUrl, name: item.name }],
+              startIndex: 0,
+            },
+          })
+        );
+      } else if (isVideoItem(item)) {
+        // Double-click plays just this video, on its own.
+        window.dispatchEvent(
+          new CustomEvent('open-video', {
+            detail: {
+              videos: [{ src: item.videoUrl, name: item.name }],
               startIndex: 0,
             },
           })
@@ -348,6 +354,10 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           clipboardItems.push({ id: item.id, type: 'shortcut' });
         } else if (isDesktopFolder(item)) {
           clipboardItems.push({ id: item.id, type: 'folder' });
+        } else if (isImageItem(item)) {
+          clipboardItems.push({ id: item.id, type: 'image' });
+        } else if (isVideoItem(item)) {
+          clipboardItems.push({ id: item.id, type: 'video' });
         }
       }
     });
@@ -385,6 +395,10 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           clipboardItems.push({ id: item.id, type: 'shortcut' });
         } else if (isDesktopFolder(item)) {
           clipboardItems.push({ id: item.id, type: 'folder' });
+        } else if (isImageItem(item)) {
+          clipboardItems.push({ id: item.id, type: 'image' });
+        } else if (isVideoItem(item)) {
+          clipboardItems.push({ id: item.id, type: 'video' });
         }
       }
     });
@@ -441,7 +455,7 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
       return;
     }
 
-    const { getDesktopShortcuts, getDesktopFolders, removeItemFromFolder } =
+    const { getDesktopShortcuts, getDesktopFolders, getMediaById, copyDesktopMedia, removeItemFromFolder } =
       await import('@core/desktop-shortcuts');
     const allShortcuts = getDesktopShortcuts();
     const allFolders = getDesktopFolders();
@@ -456,8 +470,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           // Verify item exists
           const shortcut = allShortcuts.find((s) => s.id === item.id);
           const folder = allFolders.find((f) => f.id === item.id);
+          const media = item.type === 'image' || item.type === 'video' ? getMediaById(item.id) : null;
 
-          if (!shortcut && !folder) {
+          if (!shortcut && !folder && !media) {
             console.warn('[FolderWindow] Paste: Item not found', item.id);
             continue;
           }
@@ -493,9 +508,12 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
               const {
                 getDesktopFolders: getCurrentFolders,
                 getDesktopShortcuts: getCurrentShortcuts,
+                getDesktopMedia: getCurrentMedia,
+                copyDesktopMedia: copyMedia,
               } = await import('@core/desktop-shortcuts');
               const currentFolders = getCurrentFolders();
               const currentShortcuts = getCurrentShortcuts();
+              const currentMedia = getCurrentMedia();
 
               const sourceFolder = currentFolders.find((f) => f.id === sourceFolderId);
               if (!sourceFolder) return;
@@ -506,6 +524,7 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
               for (const contentId of sourceFolder.contents) {
                 const contentShortcut = currentShortcuts.find((s) => s.id === contentId);
                 const contentFolder = currentFolders.find((f) => f.id === contentId);
+                const contentMedia = currentMedia.find((m) => m.id === contentId);
 
                 if (contentShortcut) {
                   // Copy shortcut
@@ -530,11 +549,17 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                   addItemToFolder(targetFolderId, newContentFolder.id);
                   // Recursively copy its contents
                   await copyFolderContents(contentFolder.id, newContentFolder.id);
+                } else if (contentMedia) {
+                  const clone = copyMedia(contentMedia.id);
+                  if (clone) addItemToFolder(targetFolderId, clone.id);
                 }
               }
             };
 
             await copyFolderContents(folder.id, newFolder.id);
+          } else if (media) {
+            const clone = copyDesktopMedia(media.id);
+            if (clone) addItemToFolder(currentFolder.id, clone.id);
           }
         }
       } else if (clipboard.operation === 'cut') {
@@ -547,14 +572,20 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           for (const item of clipboard.items) {
             const shortcut = allShortcuts.find((s) => s.id === item.id);
             const folder = allFolders.find((f) => f.id === item.id);
+            const media =
+              item.type === 'image' || item.type === 'video' ? getMediaById(item.id) : null;
 
-            if (!shortcut && !folder) {
+            if (!shortcut && !folder && !media) {
               console.warn('[FolderWindow] Paste: Item not found for cut', item.id);
               continue;
             }
 
             if (clipboard.type === 'folder-items' && clipboard.sourcePath) {
-              if (clipboard.sourcePath !== currentPath) {
+              if (
+                clipboard.sourcePath !== currentPath &&
+                clipboard.sourcePath !== '/Images' &&
+                clipboard.sourcePath !== '/Videos'
+              ) {
                 const sourceResolved = resolvePath(clipboard.sourcePath);
                 if (sourceResolved.type === 'folder') {
                   const sourceFolder = getFolderByPath(clipboard.sourcePath);
@@ -700,10 +731,24 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
     };
   }, []);
 
+  const draggedItemIdsRef = useRef<string[]>([]);
+
+  const hasDeskosDragData = useCallback((dataTransfer: DataTransfer) => {
+    const types = Array.from(dataTransfer.types);
+    return types.some(
+      (type) =>
+        type === 'application/x-deskos-shortcut-id' ||
+        type === 'application/x-deskos-folder-id' ||
+        type === 'application/x-deskos-program-id' ||
+        type === DESKOS_ITEM_IDS_MIME
+    );
+  }, []);
+
   const handleItemDragStart = useCallback(
     (item: DesktopItem, e: React.DragEvent) => {
       const ids =
         selectedIds.has(item.id) && selectedIds.size > 1 ? Array.from(selectedIds) : [item.id];
+      draggedItemIdsRef.current = ids;
       e.dataTransfer.setData(DESKOS_ITEM_IDS_MIME, JSON.stringify(ids));
       if (isDesktopFolder(item)) {
         e.dataTransfer.setData('application/x-deskos-folder-id', item.id);
@@ -715,27 +760,73 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
     [selectedIds]
   );
 
-  // Handle drag and drop from desktop to folder window
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Check if dragging a desktop item
-    const types = Array.from(e.dataTransfer.types);
-    const hasDeskosData = types.some(
-      (type) =>
-        type === 'application/x-deskos-shortcut-id' ||
-        type === 'application/x-deskos-folder-id' ||
-        type === 'application/x-deskos-program-id' ||
-        type === DESKOS_ITEM_IDS_MIME
-    );
-
-    if (hasDeskosData) {
-      e.dataTransfer.dropEffect = 'move';
-      if (contentRef.current) {
-        contentRef.current.classList.add('drag-over');
-      }
-    }
+  const handleItemDragEnd = useCallback(() => {
+    draggedItemIdsRef.current = [];
+    document.querySelectorAll('.folder-window-item.drag-over-target').forEach((el) => {
+      el.classList.remove('drag-over-target');
+    });
+    contentRef.current?.classList.remove('drag-over');
   }, []);
+
+  /** Drop onto a nested folder icon (move into that folder, not the open window). */
+  const handleFolderItemDragOver = useCallback(
+    (targetFolder: DesktopItem, e: React.DragEvent) => {
+      if (!isDesktopFolder(targetFolder) || !hasDeskosDragData(e.dataTransfer)) return;
+      if (draggedItemIdsRef.current.includes(targetFolder.id)) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      contentRef.current?.classList.remove('drag-over');
+      e.currentTarget.classList.add('drag-over-target');
+    },
+    [hasDeskosDragData]
+  );
+
+  const handleFolderItemDragLeave = useCallback((e: React.DragEvent) => {
+    const related = e.relatedTarget as Node | null;
+    if (related && e.currentTarget.contains(related)) return;
+    e.currentTarget.classList.remove('drag-over-target');
+  }, []);
+
+  const handleFolderItemDrop = useCallback(
+    (targetFolder: DesktopItem, e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.classList.remove('drag-over-target');
+      contentRef.current?.classList.remove('drag-over');
+
+      if (!isDesktopFolder(targetFolder)) return;
+
+      const itemIds = readDraggedItemIds(e.dataTransfer);
+      if (itemIds.length === 0) return;
+
+      for (const itemId of itemIds) {
+        if (itemId !== targetFolder.id) {
+          addItemToFolder(targetFolder.id, itemId);
+        }
+      }
+      draggedItemIdsRef.current = [];
+      loadItems(currentPath);
+      window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+    },
+    [currentPath, loadItems]
+  );
+
+  // Handle drag and drop from desktop to folder window
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (hasDeskosDragData(e.dataTransfer)) {
+        e.dataTransfer.dropEffect = 'move';
+        if (contentRef.current) {
+          contentRef.current.classList.add('drag-over');
+        }
+      }
+    },
+    [hasDeskosDragData]
+  );
 
   // Handle mouse move to detect dragging over folder window (for custom drag system)
   useEffect(() => {
@@ -849,6 +940,30 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
         alt={name}
         loading="lazy"
         draggable={false}
+      />
+    </div>
+  );
+
+  // First-frame video thumbnail (muted, metadata-only) in the same box as icons.
+  const renderVideoThumb = (url: string, name: string, size: number) => (
+    <div
+      className="folder-window-item-icon"
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <video
+        className="folder-window-item-thumb"
+        src={url}
+        muted
+        preload="metadata"
+        playsInline
+        draggable={false}
+        aria-label={name}
       />
     </div>
   );
@@ -989,6 +1104,10 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                       style={gridStyle}
                       draggable={true}
                       onDragStart={(e) => handleItemDragStart(item, e)}
+                      onDragEnd={handleItemDragEnd}
+                      onDragOver={(e) => handleFolderItemDragOver(item, e)}
+                      onDragLeave={handleFolderItemDragLeave}
+                      onDrop={(e) => handleFolderItemDrop(item, e)}
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
@@ -1012,6 +1131,7 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                       style={gridStyle}
                       draggable={true}
                       onDragStart={(e) => handleItemDragStart(item, e)}
+                      onDragEnd={handleItemDragEnd}
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
@@ -1036,10 +1156,35 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                       data-item-url={item.imageUrl}
                       data-item-name={item.name}
                       style={gridStyle}
+                      draggable={true}
+                      onDragStart={(e) => handleItemDragStart(item, e)}
+                      onDragEnd={handleItemDragEnd}
                       onClick={(e) => handleItemClick(item, e)}
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
                       {renderImageThumb(item.imageUrl, item.name, iconSize)}
+                      {(isList || settings.showIconLabels) && (
+                        <div className="folder-window-item-label">{item.name}</div>
+                      )}
+                    </div>
+                  );
+                } else if (isVideoItem(item)) {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`folder-window-item video-item ${selectedClass} ${cutClass}`}
+                      data-item-id={item.id}
+                      data-item-type="video"
+                      data-item-url={item.videoUrl}
+                      data-item-name={item.name}
+                      style={gridStyle}
+                      draggable={true}
+                      onDragStart={(e) => handleItemDragStart(item, e)}
+                      onDragEnd={handleItemDragEnd}
+                      onClick={(e) => handleItemClick(item, e)}
+                      onDoubleClick={() => handleItemDoubleClick(item)}
+                    >
+                      {renderVideoThumb(item.videoUrl, item.name, iconSize)}
                       {(isList || settings.showIconLabels) && (
                         <div className="folder-window-item-label">{item.name}</div>
                       )}

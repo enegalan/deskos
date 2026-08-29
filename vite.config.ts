@@ -4,9 +4,10 @@ import { resolve } from 'path';
 import { programsPlugin } from './vite-plugin-programs';
 import { pageTitlePlugin } from './vite-plugin-page-title';
 import { imagesPlugin } from './vite-plugin-images';
+import { videosPlugin } from './vite-plugin-videos';
 
 export default defineConfig({
-  plugins: [react(), programsPlugin(), imagesPlugin(), pageTitlePlugin()],
+  plugins: [react(), programsPlugin(), imagesPlugin(), videosPlugin(), pageTitlePlugin()],
   resolve: {
     alias: {
       '@core': resolve(__dirname, 'core'),
