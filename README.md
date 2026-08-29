@@ -254,6 +254,20 @@ useEffect(() => {
 
 Return `null` when nothing is selected.
 
+### System dialogs (alert / confirm / prompt)
+
+Use the shared dialog instead of `window.alert` / `confirm` / `prompt`. Dialogs queue one at a time and return promises:
+
+```tsx
+import { dialog } from '@core/dialog';
+
+await dialog.alert('Saved.', 'Notes');
+const ok = await dialog.confirm('Delete this note?', 'Delete', { danger: true });
+const name = await dialog.prompt('File name:', 'untitled.txt', 'New File', { required: true });
+```
+
+`confirm` resolves to `boolean`. `prompt` resolves to the trimmed string or `null` if cancelled.
+
 ### Dynamic icon
 
 Change your app's icon on the taskbar or desktop shortcut while running:

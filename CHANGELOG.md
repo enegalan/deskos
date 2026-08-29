@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.7.0] - 2026-08-29
+
+### Added
+
+- Text Editor program (`programs/text-editor`) — create and edit VFS text files; dock pin; multi-window; opens via `open-text-file`
+- Photos program (`programs/photos`) — hidden image previewer with carousel, zoom, and rotate (opens via `open-image`)
+- Videos program (`programs/videos`) — hidden video player with playlist (opens via `open-video`)
+- Music program (`programs/music`) — hidden audio player with playlist (opens via `open-audio`)
+- System dialogs (`core/dialog.ts`, `components/Dialog.tsx`) — queued `alert` / `confirm` / `prompt` for apps and menus
+- File associations (`core/file-associations.ts`) and open pipeline (`core/open-file.ts`) — extension → Text Editor / Browser / Photos / Videos
+- Desktop and folder “New File” — prompt for a name (custom extension supported); `createDesktopFile` / file items in the VFS
+- Writable special locations `/Images`, `/Videos`, `/Music` with seeded media libraries from `public/`
+- Vite plugins `vite-plugin-images.ts`, `vite-plugin-videos.ts`, `vite-plugin-music.ts` (+ virtual modules)
+- File transfer helpers (`core/file-transfer.ts`) — OS file import/export and Browser URL → desktop item drag
+- ESLint + Prettier config and npm scripts (`lint`, `lint:fix`, `format`, `format:check`)
+- Icons: `music`, `video`, `play`, `pause` (and related media UI glyphs)
+
+### Changed
+
+- Desktop / folder / sidebar drag-and-drop for moving items between surfaces and special locations
+- Context menus for folder window items; clipboard type parsing for cut/copy/paste of files and media
+- Special-location membership and media/file placement live in `core/desktop-shortcuts.ts`
+- Confirm / rename / empty-trash flows use the shared dialog instead of `window.prompt` / `window.confirm`
+
 ## [1.6.0] - 2026-08-28
 
 ### Added
@@ -164,6 +188,7 @@
 - Core services (storage, event bus, ProgramContext)
 - First desktop shell and context menu foundation
 
+[1.7.0]: https://github.com/enegalan/deskos/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/enegalan/deskos/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/enegalan/deskos/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/enegalan/deskos/compare/v1.3.0...v1.4.0
