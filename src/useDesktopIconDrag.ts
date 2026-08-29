@@ -15,6 +15,7 @@ import {
   addItemToFolder,
   isDesktopFolder,
   computeGroupDropPositions,
+  isPointInDockBand,
 } from '@core/desktop-shortcuts';
 
 /** Active multi-icon drag on the desktop surface. */
@@ -164,6 +165,15 @@ export function useDesktopIconDrag({
         const origin = origins[id];
         onDragGroupMove({ x: rawX - origin.x, y: rawY - origin.y });
         setVisualPosition({ x: rawX, y: rawY });
+
+        // Shortcuts must not be dropped beside the dock: keep the icon following
+        // the pointer, but refuse to snap it into the dock band.
+        if (isPointInDockBand(moveEvent.clientY)) {
+          setGridPosition(null);
+          setDragOverTarget(null);
+          return;
+        }
+
         setGridPosition(gridPos);
         dragStateRef.current.lastPosition = gridPos;
 

@@ -30,7 +30,10 @@ export const ICON_EMOJI_SCALE = 0.7;
 export const GRID_OCCUPANCY_RATIO = 0.5;
 
 /** Dock / usable viewport taskbar height (px). */
-export const TASKBAR_HEIGHT = 48;
+export const TASKBAR_HEIGHT = 104;
+
+/** Vertical margin above the dock where desktop drops are rejected (px). */
+export const DOCK_DROP_MARGIN = 24;
 
 /** Pixels of movement before a desktop icon drag starts. */
 export const DRAG_START_THRESHOLD = 5;
