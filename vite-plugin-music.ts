@@ -64,7 +64,9 @@ export function musicPlugin(): Plugin {
       const musicDir = resolve(rootDir, 'public/music').replace(/\\/g, '/');
 
       const refresh = (file: string) => {
-        if (!file.replace(/\\/g, '/').startsWith(musicDir)) return;
+        const normalized = file.replace(/\\/g, '/');
+        // Require a directory boundary so siblings like `music-old` do not match.
+        if (normalized !== musicDir && !normalized.startsWith(`${musicDir}/`)) return;
         const module = server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_MODULE_ID);
         if (module) {
           server.moduleGraph.invalidateModule(module);
