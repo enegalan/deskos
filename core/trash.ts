@@ -477,8 +477,7 @@ function restoreShortcutEntry(
   if (shortcuts.some((s) => s.id === entry.item.id)) return;
 
   const isSpecial = parentPath !== null && isWritableSpecialPath(parentPath);
-  const targetParent =
-    parentPath && parentPath !== '/Desktop' && !isSpecial ? parentPath : null;
+  const targetParent = parentPath && parentPath !== '/Desktop' && !isSpecial ? parentPath : null;
   let x = entry.item.x;
   let y = entry.item.y;
 

@@ -11,11 +11,7 @@ import {
 } from '../file-system/file-system';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
-import {
-  DESKOS_ITEM_IDS_MIME,
-  readDraggedItemIds,
-  moveItemsToPath,
-} from '@core/desktop-shortcuts';
+import { DESKOS_ITEM_IDS_MIME, readDraggedItemIds, moveItemsToPath } from '@core/desktop-shortcuts';
 
 /**
  * Resolve a path/location icon name to a known `IconName`, falling back to `folder`.

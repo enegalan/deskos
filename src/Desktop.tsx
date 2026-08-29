@@ -369,10 +369,8 @@ export function Desktop() {
         ? { x: primaryItem.x, y: primaryItem.y }
         : { x: gridPos.x, y: gridPos.y };
 
-      const {
-        findSpecialLocationOfItem,
-        removeItemFromSpecialLocation,
-      } = await import('@core/desktop-shortcuts');
+      const { findSpecialLocationOfItem, removeItemFromSpecialLocation } =
+        await import('@core/desktop-shortcuts');
 
       for (const itemId of itemIds) {
         const parentFolder = folders.find((f) => f.contents.includes(itemId));

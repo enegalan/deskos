@@ -1,12 +1,7 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
 import type { ClipboardItemType } from '@core/clipboard';
 
-const CLIPBOARD_ITEM_TYPES: ReadonlySet<string> = new Set([
-  'folder',
-  'shortcut',
-  'image',
-  'video',
-]);
+const CLIPBOARD_ITEM_TYPES: ReadonlySet<string> = new Set(['folder', 'shortcut', 'image', 'video']);
 
 /** Parse a DOM `data-item-type` into a clipboard type, or `null` if invalid. */
 function parseClipboardItemType(value: string | undefined): ClipboardItemType | null {

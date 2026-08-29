@@ -43,10 +43,7 @@ import {
 } from '@core/desktop-shortcuts';
 import { deleteDesktopItems } from '@core/delete-items';
 import { resolveProgramIcon } from '@core/program-icons';
-import {
-  useDesktopIconDrag,
-  type DesktopDragGroup,
-} from './useDesktopIconDrag';
+import { useDesktopIconDrag, type DesktopDragGroup } from './useDesktopIconDrag';
 
 /** True when a folder browser window is focused (desktop defers clipboard shortcuts to it). */
 function isFolderWindowActive(): boolean {
@@ -463,9 +460,7 @@ const DesktopMediaIcon = memo(function DesktopMediaIcon({
 
   const openMedia = useCallback(() => {
     const ids =
-      selectedIds.has(media.id) && selectedIds.size > 1
-        ? Array.from(selectedIds)
-        : [media.id];
+      selectedIds.has(media.id) && selectedIds.size > 1 ? Array.from(selectedIds) : [media.id];
     let picked = ids
       .map((itemId) => mediaItems.find((item) => item.id === itemId))
       .filter((item): item is DesktopMediaItem => !!item && item.kind === media.kind)

@@ -1,4 +1,10 @@
-import { useState, useEffect, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { DRAG_START_THRESHOLD } from '@core/constants';
 import {
   findItemAtPosition,
@@ -278,7 +284,8 @@ export function useDesktopIconDrag({
             ) as HTMLElement | null;
             const sidebarPath = sidebarTarget?.dataset.dropPath;
             const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-            const path = sidebarPath || (folderWindowMain as HTMLElement | null)?.dataset.folderPath;
+            const path =
+              sidebarPath || (folderWindowMain as HTMLElement | null)?.dataset.folderPath;
 
             if (path) {
               handledByFolderWindow = true;
