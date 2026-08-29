@@ -2387,6 +2387,13 @@ textarea,
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.folder-sidebar-item.drag-over-target {
+  background: rgba(var(--color-accent-rgb), 0.2);
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+  color: var(--color-text-primary);
+}
+
 .folder-sidebar-item.active::before {
   height: 100%;
   background: rgba(255, 255, 255, 0.3);

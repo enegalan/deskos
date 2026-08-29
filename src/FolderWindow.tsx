@@ -767,6 +767,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
     document.querySelectorAll('.folder-window-item.drag-over-target').forEach((el) => {
       el.classList.remove('drag-over-target');
     });
+    document.querySelectorAll('.folder-sidebar-item.drag-over-target').forEach((el) => {
+      el.classList.remove('drag-over-target');
+    });
     contentRef.current?.classList.remove('drag-over');
   }, []);
 

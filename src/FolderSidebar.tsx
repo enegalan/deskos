@@ -11,6 +11,11 @@ import {
 } from '../file-system/file-system';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
+import {
+  DESKOS_ITEM_IDS_MIME,
+  readDraggedItemIds,
+  moveItemsToPath,
+} from '@core/desktop-shortcuts';
 
 /**
  * Resolve a path/location icon name to a known `IconName`, falling back to `folder`.
@@ -20,6 +25,17 @@ import { hasIcon, type IconName } from '@core/icons';
  */
 function sidebarIcon(name: string): IconName {
   return (hasIcon(name as IconName) ? name : 'folder') as IconName;
+}
+
+/** Whether the drag payload can be dropped onto a sidebar path. */
+function hasDeskosDragData(dataTransfer: DataTransfer): boolean {
+  return Array.from(dataTransfer.types).some(
+    (type) =>
+      type === 'application/x-deskos-shortcut-id' ||
+      type === 'application/x-deskos-folder-id' ||
+      type === 'application/x-deskos-program-id' ||
+      type === DESKOS_ITEM_IDS_MIME
+  );
 }
 
 /** Props for the folder sidebar navigation panel. */
@@ -83,6 +99,33 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
 
   const isCurrentPath = (path: string) => currentPath === path;
 
+  const handlePathDragOver = useCallback((path: string, e: React.DragEvent) => {
+    if (!hasDeskosDragData(e.dataTransfer) || path === '/Applications') return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('drag-over-target');
+  }, []);
+
+  const handlePathDragLeave = useCallback((e: React.DragEvent) => {
+    const related = e.relatedTarget as Node | null;
+    if (related && e.currentTarget.contains(related)) return;
+    e.currentTarget.classList.remove('drag-over-target');
+  }, []);
+
+  const handlePathDrop = useCallback((path: string, e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.remove('drag-over-target');
+
+    if (!hasDeskosDragData(e.dataTransfer) || path === '/Applications') return;
+
+    const itemIds = readDraggedItemIds(e.dataTransfer);
+    if (itemIds.length === 0) return;
+
+    moveItemsToPath(path, itemIds);
+  }, []);
+
   return (
     <div className="folder-sidebar">
       <div className="folder-sidebar-header">
@@ -108,8 +151,13 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
               {Object.entries(SPECIAL_LOCATIONS).map(([key, location]) => (
                 <button
                   key={key}
+                  type="button"
                   className={`folder-sidebar-item ${isCurrentPath(location.path) ? 'active' : ''}`}
+                  data-drop-path={location.path}
                   onClick={() => handleLocationClick(key as SpecialLocation)}
+                  onDragOver={(e) => handlePathDragOver(location.path, e)}
+                  onDragLeave={handlePathDragLeave}
+                  onDrop={(e) => handlePathDrop(location.path, e)}
                   title={location.path}
                 >
                   <span className="folder-sidebar-item-icon">
@@ -143,8 +191,13 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
                 favorites.map((path) => (
                   <div key={path} className="folder-sidebar-item-row">
                     <button
+                      type="button"
                       className={`folder-sidebar-item ${isCurrentPath(path) ? 'active' : ''}`}
+                      data-drop-path={path}
                       onClick={() => onNavigate(path)}
+                      onDragOver={(e) => handlePathDragOver(path, e)}
+                      onDragLeave={handlePathDragLeave}
+                      onDrop={(e) => handlePathDrop(path, e)}
                       title={path}
                     >
                       <span className="folder-sidebar-item-icon">
@@ -155,6 +208,7 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
                       </span>
                     </button>
                     <button
+                      type="button"
                       className="folder-sidebar-item-action"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -186,8 +240,13 @@ export function FolderSidebar({ currentPath, onNavigate }: FolderSidebarProps) {
                 recentItems.slice(0, 10).map((item) => (
                   <button
                     key={item.path}
+                    type="button"
                     className={`folder-sidebar-item ${isCurrentPath(item.path) ? 'active' : ''}`}
+                    data-drop-path={item.path}
                     onClick={() => onNavigate(item.path)}
+                    onDragOver={(e) => handlePathDragOver(item.path, e)}
+                    onDragLeave={handlePathDragLeave}
+                    onDrop={(e) => handlePathDrop(item.path, e)}
                     title={item.path}
                   >
                     <span className="folder-sidebar-item-icon">

@@ -432,6 +432,80 @@ export function removeItemFromSpecialLocation(path: string, itemId: string): voi
   notifyDesktopUpdated();
 }
 
+/**
+ * Move items into a filesystem path (writable special location, user folder, or Desktop).
+ * Used by folder-sidebar drops and desktop-icon drops onto sidebar targets.
+ *
+ * @returns `true` if the path accepted the items
+ */
+export function moveItemsToPath(path: string, itemIds: string[]): boolean {
+  const uniqueIds = [...new Set(itemIds)];
+  if (uniqueIds.length === 0) return false;
+  if (path === '/Applications') return false;
+
+  if (isWritableSpecialPath(path)) {
+    for (const itemId of uniqueIds) {
+      moveItemToSpecialLocation(path, itemId);
+    }
+    return true;
+  }
+
+  if (path === '/Desktop') {
+    const occupied = getDesktopSurfacePositions(uniqueIds);
+    for (const itemId of uniqueIds) {
+      const parentFolder = getDesktopFolders().find((folder) => folder.contents.includes(itemId));
+      if (parentFolder) {
+        removeItemFromFolder(parentFolder.id, itemId);
+      }
+
+      const specialParent = findSpecialLocationOfItem(itemId);
+      if (specialParent) {
+        removeItemFromSpecialLocation(specialParent, itemId);
+      }
+
+      const next = findNextAvailablePosition(occupied);
+      occupied.push(next);
+
+      if (getMediaById(itemId)) {
+        placeMediaOnDesktop(itemId, next.x, next.y);
+        continue;
+      }
+
+      const folders = getDesktopFolders();
+      const folder = folders.find((entry) => entry.id === itemId);
+      if (folder) {
+        folder.parentPath = '/Desktop';
+        const paths = getFolderPaths();
+        paths[itemId] = `/Desktop/${folder.name}`;
+        setFolderPaths(paths);
+        systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+        updateFolderPosition(itemId, next.x, next.y);
+        continue;
+      }
+
+      if (getDesktopShortcuts().some((shortcut) => shortcut.id === itemId)) {
+        updateDesktopShortcutPosition(itemId, next.x, next.y);
+      }
+    }
+    return true;
+  }
+
+  const targetFolder = getFolderByPath(path);
+  if (!targetFolder) return false;
+
+  for (const itemId of uniqueIds) {
+    if (itemId === targetFolder.id) continue;
+    if (
+      getDesktopFolders().some((folder) => folder.id === itemId) &&
+      folderContainsItem(itemId, targetFolder.id)
+    ) {
+      continue;
+    }
+    addItemToFolder(targetFolder.id, itemId);
+  }
+  return true;
+}
+
 /** Notify UI that desktop / folder / media contents changed. */
 function notifyDesktopUpdated(): void {
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));

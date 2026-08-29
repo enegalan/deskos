@@ -131,8 +131,10 @@ export function useDesktopIconDrag({
         if (!desktopElement || !iconRef.current) return;
 
         const elementUnderMouse = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
-        const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-        if (folderWindowMain) {
+        const overFolderDrop =
+          elementUnderMouse?.closest('.folder-window-main') ||
+          elementUnderMouse?.closest('.folder-sidebar-item[data-drop-path]');
+        if (overFolderDrop) {
           setGridPosition(null);
           setDragOverTarget(null);
           return;
@@ -192,12 +194,28 @@ export function useDesktopIconDrag({
 
         if (hasMoved && dragStateRef.current.isDragging) {
           const elementUnderMouse = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+          const sidebarTarget = elementUnderMouse?.closest(
+            '.folder-sidebar-item[data-drop-path]'
+          ) as HTMLElement | null;
           const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
           const overDesktop = elementUnderMouse?.closest('.desktop');
 
+          document.querySelectorAll('.folder-sidebar-item.drag-over-target').forEach((el) => {
+            el.classList.remove('drag-over-target');
+          });
+
           if (iconRef.current) {
             const container = iconRef.current.closest('.desktop-icons-container');
-            if (folderWindowMain) {
+            if (sidebarTarget && sidebarTarget.dataset.dropPath !== '/Applications') {
+              setIsOverFolderWindow(true);
+              container?.classList.add('dragging-over-window');
+              iconRef.current.style.zIndex = '100000';
+              sidebarTarget.classList.add('drag-over-target');
+              iconRef.current.classList.add('dragging-over-folder');
+              document.querySelectorAll('.folder-window-main, .desktop').forEach((el) => {
+                el.classList.remove('drag-over');
+              });
+            } else if (folderWindowMain) {
               setIsOverFolderWindow(true);
               container?.classList.add('dragging-over-window');
               iconRef.current.style.zIndex = '100000';
@@ -247,53 +265,27 @@ export function useDesktopIconDrag({
         document.querySelectorAll('.folder-window-main, .desktop').forEach((el) => {
           el.classList.remove('drag-over');
         });
+        document.querySelectorAll('.folder-sidebar-item.drag-over-target').forEach((el) => {
+          el.classList.remove('drag-over-target');
+        });
 
         if (hasMoved && dragStateRef.current.isDragging) {
           let handledByFolderWindow = false;
           if (upEvent) {
             const elementUnderMouse = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+            const sidebarTarget = elementUnderMouse?.closest(
+              '.folder-sidebar-item[data-drop-path]'
+            ) as HTMLElement | null;
+            const sidebarPath = sidebarTarget?.dataset.dropPath;
             const folderWindowMain = elementUnderMouse?.closest('.folder-window-main');
-            if (folderWindowMain) {
-              const path = (folderWindowMain as HTMLElement).dataset.folderPath;
-              if (path) {
-                handledByFolderWindow = true;
-                Promise.all([
-                  import('@file-system/file-system'),
-                  import('@core/desktop-shortcuts'),
-                ]).then(
-                  ([
-                    { resolvePath },
-                    {
-                      getFolderByPath,
-                      addItemToFolder: addToFolder,
-                      isWritableSpecialPath,
-                      moveItemToSpecialLocation,
-                    },
-                  ]) => {
-                    if (isWritableSpecialPath(path)) {
-                      for (const dragId of dragIds) {
-                        moveItemToSpecialLocation(path, dragId);
-                      }
-                      setVisualPosition({ x, y });
-                      window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-                      return;
-                    }
-                    const resolved = resolvePath(path);
-                    if (resolved.type === 'folder') {
-                      const targetFolder = getFolderByPath(path);
-                      if (targetFolder) {
-                        for (const dragId of dragIds) {
-                          if (dragId !== targetFolder.id) {
-                            addToFolder(targetFolder.id, dragId);
-                          }
-                        }
-                        setVisualPosition({ x, y });
-                        window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-                      }
-                    }
-                  }
-                );
-              }
+            const path = sidebarPath || (folderWindowMain as HTMLElement | null)?.dataset.folderPath;
+
+            if (path) {
+              handledByFolderWindow = true;
+              import('@core/desktop-shortcuts').then(({ moveItemsToPath }) => {
+                moveItemsToPath(path, dragIds);
+                setVisualPosition({ x, y });
+              });
             }
           }
 
