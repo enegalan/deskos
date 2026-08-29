@@ -5,9 +5,17 @@ import { programsPlugin } from './vite-plugin-programs';
 import { pageTitlePlugin } from './vite-plugin-page-title';
 import { imagesPlugin } from './vite-plugin-images';
 import { videosPlugin } from './vite-plugin-videos';
+import { musicPlugin } from './vite-plugin-music';
 
 export default defineConfig({
-  plugins: [react(), programsPlugin(), imagesPlugin(), videosPlugin(), pageTitlePlugin()],
+  plugins: [
+    react(),
+    programsPlugin(),
+    imagesPlugin(),
+    videosPlugin(),
+    musicPlugin(),
+    pageTitlePlugin(),
+  ],
   resolve: {
     alias: {
       '@core': resolve(__dirname, 'core'),

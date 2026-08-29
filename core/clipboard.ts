@@ -4,7 +4,7 @@
  */
 
 /** Kind of desktop item stored on the clipboard. */
-export type ClipboardItemType = 'shortcut' | 'folder' | 'image' | 'video';
+export type ClipboardItemType = 'shortcut' | 'folder' | 'image' | 'video' | 'audio';
 
 /** Single item reference in clipboard data. */
 export interface ClipboardItem {

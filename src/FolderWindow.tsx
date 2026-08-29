@@ -16,6 +16,7 @@ import {
   isDesktopShortcut,
   isImageItem,
   isVideoItem,
+  isAudioItem,
   getGridSize,
   addItemToFolder,
   folderContainsItem,
@@ -250,6 +251,16 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
             },
           })
         );
+      } else if (isAudioItem(item)) {
+        // Double-click plays just this track, on its own.
+        window.dispatchEvent(
+          new CustomEvent('open-audio', {
+            detail: {
+              tracks: [{ src: item.audioUrl, name: item.name }],
+              startIndex: 0,
+            },
+          })
+        );
       }
     },
     [currentPath, handleNavigate]
@@ -363,6 +374,8 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           clipboardItems.push({ id: item.id, type: 'image' });
         } else if (isVideoItem(item)) {
           clipboardItems.push({ id: item.id, type: 'video' });
+        } else if (isAudioItem(item)) {
+          clipboardItems.push({ id: item.id, type: 'audio' });
         }
       }
     });
@@ -404,6 +417,8 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           clipboardItems.push({ id: item.id, type: 'image' });
         } else if (isVideoItem(item)) {
           clipboardItems.push({ id: item.id, type: 'video' });
+        } else if (isAudioItem(item)) {
+          clipboardItems.push({ id: item.id, type: 'audio' });
         }
       }
     });
@@ -501,7 +516,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           const shortcut = allShortcuts.find((s) => s.id === item.id);
           const folder = allFolders.find((f) => f.id === item.id);
           const media =
-            item.type === 'image' || item.type === 'video' ? getMediaById(item.id) : null;
+            item.type === 'image' || item.type === 'video' || item.type === 'audio'
+              ? getMediaById(item.id)
+              : null;
 
           if (!shortcut && !folder && !media) {
             console.warn('[FolderWindow] Paste: Item not found', item.id);
@@ -596,7 +613,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
             const shortcut = allShortcuts.find((s) => s.id === item.id);
             const folder = allFolders.find((f) => f.id === item.id);
             const media =
-              item.type === 'image' || item.type === 'video' ? getMediaById(item.id) : null;
+              item.type === 'image' || item.type === 'video' || item.type === 'audio'
+                ? getMediaById(item.id)
+                : null;
 
             if (!shortcut && !folder && !media) {
               console.warn('[FolderWindow] Paste: Item not found for cut', item.id);
@@ -982,6 +1001,22 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
     </div>
   );
 
+  // Music icon thumbnail in the same box as icons.
+  const renderAudioThumb = (size: number) => (
+    <div
+      className="folder-window-item-icon"
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Icon name="music" size={size * ICON_GLYPH_SCALE} />
+    </div>
+  );
+
   const renderItemIcon = (icon: string, size: number, color?: string) => (
     <div
       className="folder-window-item-icon"
@@ -1199,6 +1234,28 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
                       {renderVideoThumb(item.videoUrl, item.name, iconSize)}
+                      {(isList || settings.showIconLabels) && (
+                        <div className="folder-window-item-label">{item.name}</div>
+                      )}
+                    </div>
+                  );
+                } else if (isAudioItem(item)) {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`folder-window-item audio-item ${selectedClass} ${cutClass}`}
+                      data-item-id={item.id}
+                      data-item-type="audio"
+                      data-item-url={item.audioUrl}
+                      data-item-name={item.name}
+                      style={gridStyle}
+                      draggable={true}
+                      onDragStart={(e) => handleItemDragStart(item, e)}
+                      onDragEnd={handleItemDragEnd}
+                      onClick={(e) => handleItemClick(item, e)}
+                      onDoubleClick={() => handleItemDoubleClick(item)}
+                    >
+                      {renderAudioThumb(iconSize)}
                       {(isList || settings.showIconLabels) && (
                         <div className="folder-window-item-label">{item.name}</div>
                       )}

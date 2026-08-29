@@ -34,6 +34,7 @@ import {
   getGridMetrics,
   isImageItem,
   isVideoItem,
+  isAudioItem,
   getMediaUrl,
   updateFolderPosition,
   updateMediaPosition,
@@ -478,10 +479,16 @@ const DesktopMediaIcon = memo(function DesktopMediaIcon({
           detail: { images: picked, startIndex },
         })
       );
-    } else {
+    } else if (isVideoItem(media)) {
       window.dispatchEvent(
         new CustomEvent('open-video', {
           detail: { videos: picked, startIndex },
+        })
+      );
+    } else if (isAudioItem(media)) {
+      window.dispatchEvent(
+        new CustomEvent('open-audio', {
+          detail: { tracks: picked, startIndex },
         })
       );
     }
@@ -563,7 +570,7 @@ const DesktopMediaIcon = memo(function DesktopMediaIcon({
         >
           {isImageItem(media) ? (
             <img className="desktop-media-thumb" src={url} alt={media.name} draggable={false} />
-          ) : (
+          ) : isVideoItem(media) ? (
             <video
               className="desktop-media-thumb"
               src={url}
@@ -572,6 +579,8 @@ const DesktopMediaIcon = memo(function DesktopMediaIcon({
               playsInline
               draggable={false}
             />
+          ) : (
+            <Icon name="music" size={iconSize * ICON_GLYPH_SCALE} />
           )}
         </div>
         {settings.showIconLabels && <div className="desktop-icon-label">{media.name}</div>}
@@ -911,6 +920,8 @@ export function DesktopIcons() {
         items.push({ id: media.id, type: 'image' });
       } else if (media && isVideoItem(media)) {
         items.push({ id: media.id, type: 'video' });
+      } else if (media && isAudioItem(media)) {
+        items.push({ id: media.id, type: 'audio' });
       }
     });
 
@@ -942,6 +953,8 @@ export function DesktopIcons() {
         items.push({ id: media.id, type: 'image' });
       } else if (media && isVideoItem(media)) {
         items.push({ id: media.id, type: 'video' });
+      } else if (media && isAudioItem(media)) {
+        items.push({ id: media.id, type: 'audio' });
       }
     });
 
@@ -1018,7 +1031,7 @@ export function DesktopIcons() {
               const position = findNextAvailablePosition(occupied());
               createDesktopFolder(folder.name, position.x, position.y);
             }
-          } else if (item.type === 'image' || item.type === 'video') {
+          } else if (item.type === 'image' || item.type === 'video' || item.type === 'audio') {
             const position = findNextAvailablePosition(occupied());
             copyMedia(item.id, position.x, position.y);
           }
@@ -1048,7 +1061,7 @@ export function DesktopIcons() {
               updateDesktopShortcutPosition(item.id, position.x, position.y);
             } else if (item.type === 'folder') {
               setFolderPos(item.id, position.x, position.y);
-            } else if (item.type === 'image' || item.type === 'video') {
+            } else if (item.type === 'image' || item.type === 'video' || item.type === 'audio') {
               if (getMediaById(item.id)) {
                 placeMedia(item.id, position.x, position.y);
               }
