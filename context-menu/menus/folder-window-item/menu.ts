@@ -16,11 +16,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
 
       const itemId = itemEl.dataset.itemId;
       const itemType = itemEl.dataset.itemType as
-        | 'folder'
-        | 'shortcut'
-        | 'image'
-        | 'video'
-        | undefined;
+        'folder' | 'shortcut' | 'image' | 'video' | undefined;
       if (!itemId || !itemType) {
         return items;
       }
@@ -160,12 +156,8 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             type: 'folder-items',
             items: selectedIds.map((id) => {
               const el = document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null;
-              const type = (el?.dataset.itemType ||
-                (id === itemId ? itemType : 'shortcut')) as
-                | 'folder'
-                | 'shortcut'
-                | 'image'
-                | 'video';
+              const type = (el?.dataset.itemType || (id === itemId ? itemType : 'shortcut')) as
+                'folder' | 'shortcut' | 'image' | 'video';
               return { id, type };
             }),
             operation: 'copy',
@@ -188,12 +180,8 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             type: 'folder-items',
             items: selectedIds.map((id) => {
               const el = document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null;
-              const type = (el?.dataset.itemType ||
-                (id === itemId ? itemType : 'shortcut')) as
-                | 'folder'
-                | 'shortcut'
-                | 'image'
-                | 'video';
+              const type = (el?.dataset.itemType || (id === itemId ? itemType : 'shortcut')) as
+                'folder' | 'shortcut' | 'image' | 'video';
               return { id, type };
             }),
             operation: 'cut',

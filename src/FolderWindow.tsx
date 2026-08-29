@@ -455,8 +455,13 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
       return;
     }
 
-    const { getDesktopShortcuts, getDesktopFolders, getMediaById, copyDesktopMedia, removeItemFromFolder } =
-      await import('@core/desktop-shortcuts');
+    const {
+      getDesktopShortcuts,
+      getDesktopFolders,
+      getMediaById,
+      copyDesktopMedia,
+      removeItemFromFolder,
+    } = await import('@core/desktop-shortcuts');
     const allShortcuts = getDesktopShortcuts();
     const allFolders = getDesktopFolders();
 
@@ -470,7 +475,8 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           // Verify item exists
           const shortcut = allShortcuts.find((s) => s.id === item.id);
           const folder = allFolders.find((f) => f.id === item.id);
-          const media = item.type === 'image' || item.type === 'video' ? getMediaById(item.id) : null;
+          const media =
+            item.type === 'image' || item.type === 'video' ? getMediaById(item.id) : null;
 
           if (!shortcut && !folder && !media) {
             console.warn('[FolderWindow] Paste: Item not found', item.id);

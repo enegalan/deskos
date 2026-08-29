@@ -1327,7 +1327,9 @@ const DesktopMediaIcon = memo(function DesktopMediaIcon({
           dragStateRef.current.animationFrame = null;
         }
 
-        iconRef.current?.closest('.desktop-icons-container')?.classList.remove('dragging-over-window');
+        iconRef.current
+          ?.closest('.desktop-icons-container')
+          ?.classList.remove('dragging-over-window');
         if (iconRef.current) iconRef.current.style.zIndex = '';
 
         setDragOverTarget(null);
@@ -1936,11 +1938,10 @@ export function DesktopIcons() {
     const allShortcuts = getDesktopShortcuts();
 
     const occupied = () =>
-      [
-        ...getDesktopShortcuts(),
-        ...getDesktopFolders(),
-        ...getDesktopSurfaceMedia(),
-      ].map((i) => ({ x: i.x, y: i.y }));
+      [...getDesktopShortcuts(), ...getDesktopFolders(), ...getDesktopSurfaceMedia()].map((i) => ({
+        x: i.x,
+        y: i.y,
+      }));
 
     try {
       if (clipboard.operation === 'copy') {

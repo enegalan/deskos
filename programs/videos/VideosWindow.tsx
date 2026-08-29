@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProgramContext } from '@core/context';
 import { useKernel } from '@core/kernel';
-import {
-  flushSessionPersist,
-  getWindowSessionState,
-  setWindowSessionState,
-} from '@core/session';
+import { flushSessionPersist, getWindowSessionState, setWindowSessionState } from '@core/session';
 import { useWindowId, useWindowSessionState } from '@core/window-session';
 import { Icon } from '../../components/Icon';
 

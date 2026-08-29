@@ -371,7 +371,9 @@ function desktopRootOccupied(
     ...folders
       .filter((f) => !f.parentPath || f.parentPath === '/Desktop')
       .map((f) => ({ x: f.x, y: f.y })),
-    ...media.filter((m) => !inFolders.has(m.id) && m.home === '/Desktop').map((m) => ({ x: m.x, y: m.y })),
+    ...media
+      .filter((m) => !inFolders.has(m.id) && m.home === '/Desktop')
+      .map((m) => ({ x: m.x, y: m.y })),
   ];
 }
 
