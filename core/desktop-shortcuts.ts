@@ -84,6 +84,25 @@ export interface DesktopAudioItem {
 }
 
 /**
+ * User-created text-backed file (any extension). Content is UTF-8 text.
+ */
+export interface DesktopFileItem {
+  id: string;
+  name: string;
+  kind: 'file';
+  /** UTF-8 file body; empty string when newly created. */
+  content: string;
+  icon: string;
+  x: number;
+  y: number;
+  /**
+   * Where the item lives when not inside a folder or special-location contents list.
+   * `/Desktop` = desktop surface. Special-location membership uses the contents map.
+   */
+  home: '/Desktop';
+}
+
+/**
  * Special locations that accept arbitrary items (paste / drop / cut).
  * `/Applications` is excluded (virtual program list).
  */
@@ -106,9 +125,14 @@ export function isWritableSpecialPath(path: string): path is WritableSpecialPath
 /** Persisted image, video, or audio file item. */
 export type DesktopMediaItem = DesktopImageItem | DesktopVideoItem | DesktopAudioItem;
 
-/** Desktop shortcut, folder, or media file item. */
+/** Desktop shortcut, folder, media, or user file item. */
 export type DesktopItem =
-  DesktopShortcut | DesktopFolder | DesktopImageItem | DesktopVideoItem | DesktopAudioItem;
+  | DesktopShortcut
+  | DesktopFolder
+  | DesktopImageItem
+  | DesktopVideoItem
+  | DesktopAudioItem
+  | DesktopFileItem;
 
 /**
  * Type guard: whether a desktop item is a folder.
@@ -167,6 +191,13 @@ export function isMediaItem(item: DesktopItem): item is DesktopMediaItem {
   return isImageItem(item) || isVideoItem(item) || isAudioItem(item);
 }
 
+/**
+ * Type guard: whether a desktop item is a user-created text file.
+ */
+export function isFileItem(item: DesktopItem): item is DesktopFileItem {
+  return 'kind' in item && item.kind === 'file';
+}
+
 /** Asset URL for a media item. */
 export function getMediaUrl(item: DesktopMediaItem): string {
   if (isImageItem(item)) return item.imageUrl;
@@ -182,6 +213,8 @@ const FOLDERS_STORAGE_KEY = 'desktop-folders';
 const FOLDER_PATHS_STORAGE_KEY = 'folder-paths';
 /** System storage key for persisted image/video file items. */
 const MEDIA_STORAGE_KEY = 'desktop-media';
+/** System storage key for user-created text files. */
+const FILES_STORAGE_KEY = 'desktop-files';
 /** URLs already seeded from the bundled catalog (never re-seed after delete). */
 const MEDIA_KNOWN_URLS_KEY = 'media-known-urls';
 /** System storage key: special location path → item id list. */
@@ -257,6 +290,7 @@ export function addDesktopShortcut(
       ...shortcuts.filter((s) => !inFolders.has(s.id)),
       ...folders.filter(isRootDesktopFolder),
       ...getDesktopSurfaceMedia(),
+      ...getDesktopSurfaceFiles(),
     ];
     const position = findNextAvailablePosition(rootItems.map((item) => ({ x: item.x, y: item.y })));
     x = position.x;
@@ -334,7 +368,7 @@ function saveSpecialContentsMap(map: Record<string, string[]>): void {
  * Item ids nested in a user folder or a writable special location.
  * Used so those items are not also listed on the desktop / media libraries.
  */
-function getIdsInsideFolders(): Set<string> {
+export function getIdsInsideFolders(): Set<string> {
   const ids = new Set<string>();
   getDesktopFolders().forEach((folder) => {
     folder.contents.forEach((id) => ids.add(id));
@@ -376,6 +410,7 @@ export function getSpecialLocationContentItems(path: WritableSpecialPath): Deskt
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const media = getDesktopMedia();
+  const files = getDesktopFiles();
 
   return ids
     .map((itemId) => {
@@ -383,7 +418,9 @@ export function getSpecialLocationContentItems(path: WritableSpecialPath): Deskt
       if (shortcut) return shortcut;
       const folder = folders.find((f) => f.id === itemId);
       if (folder) return folder;
-      return media.find((m) => m.id === itemId) || null;
+      const mediaItem = media.find((m) => m.id === itemId);
+      if (mediaItem) return mediaItem;
+      return files.find((f) => f.id === itemId) || null;
     })
     .filter((item): item is DesktopItem => item !== null);
 }
@@ -436,6 +473,13 @@ export function moveItemToSpecialLocation(path: WritableSpecialPath, itemId: str
   if (mediaItem) {
     mediaItem.home = '/Desktop';
     saveDesktopMedia(media);
+  }
+
+  const files = getDesktopFiles();
+  const fileItem = files.find((f) => f.id === itemId);
+  if (fileItem) {
+    fileItem.home = '/Desktop';
+    saveDesktopFiles(files);
   }
 
   if (itemFolder) {
@@ -506,6 +550,11 @@ export function moveItemsToPath(path: string, itemIds: string[]): boolean {
         continue;
       }
 
+      if (getFileById(itemId)) {
+        placeFileOnDesktop(itemId, next.x, next.y);
+        continue;
+      }
+
       const folders = getDesktopFolders();
       const folder = folders.find((entry) => entry.id === itemId);
       if (folder) {
@@ -542,7 +591,7 @@ export function moveItemsToPath(path: string, itemIds: string[]): boolean {
 }
 
 /** Notify UI that desktop / folder / media contents changed. */
-function notifyDesktopUpdated(): void {
+export function notifyDesktopUpdated(): void {
   window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
 }
 
@@ -716,6 +765,7 @@ export function copyDesktopMedia(
         .filter((f) => !f.parentPath || f.parentPath === '/Desktop')
         .map((f) => ({ x: f.x, y: f.y })),
       ...getDesktopSurfaceMedia().map((m) => ({ x: m.x, y: m.y })),
+      ...getDesktopSurfaceFiles().map((f) => ({ x: f.x, y: f.y })),
     ];
     const next = findNextAvailablePosition(occupied);
     posX = next.x;
@@ -766,6 +816,315 @@ export function updateMediaPosition(mediaId: string, x: number, y: number): void
   placeMediaOnDesktop(mediaId, x, y);
 }
 
+/** Get all persisted user-created files. */
+export function getDesktopFiles(): DesktopFileItem[] {
+  return systemStorage.getItem<DesktopFileItem[]>(FILES_STORAGE_KEY) || [];
+}
+
+function saveDesktopFiles(files: DesktopFileItem[]): void {
+  systemStorage.setItem(FILES_STORAGE_KEY, files);
+}
+
+/** User files on the desktop surface. */
+export function getDesktopSurfaceFiles(): DesktopFileItem[] {
+  const inFolders = getIdsInsideFolders();
+  return getDesktopFiles().filter((item) => !inFolders.has(item.id) && item.home === '/Desktop');
+}
+
+/** Look up a user file by id. */
+export function getFileById(fileId: string): DesktopFileItem | null {
+  return getDesktopFiles().find((item) => item.id === fileId) || null;
+}
+
+/**
+ * Split a filename into base + extension for unique naming.
+ * `notes.txt` → { stem: 'notes', ext: '.txt' }; `README` → { stem: 'README', ext: '' }
+ */
+function splitFileName(name: string): { stem: string; ext: string } {
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0) return { stem: name, ext: '' };
+  return { stem: name.slice(0, dot), ext: name.slice(dot) };
+}
+
+/** Collect sibling item names under a parent path (folders, files, media). */
+function getSiblingNames(parentPath: string): Set<string> {
+  const names = new Set<string>();
+  const target = parentPath || '/Desktop';
+  const folders = getDesktopFolders();
+  const files = getDesktopFiles();
+  const media = getDesktopMedia();
+  const inFolders = getIdsInsideFolders();
+
+  folders.forEach((f) => {
+    if ((f.parentPath || '/Desktop') === target) names.add(f.name);
+  });
+
+  if (target === '/Desktop') {
+    files.forEach((f) => {
+      if (!inFolders.has(f.id) && f.home === '/Desktop') names.add(f.name);
+    });
+    media.forEach((m) => {
+      if (!inFolders.has(m.id) && m.home === '/Desktop') names.add(m.name);
+    });
+  } else {
+    const folder = getFolderByPath(target);
+    if (folder) {
+      folder.contents.forEach((id) => {
+        const file = files.find((f) => f.id === id);
+        if (file) names.add(file.name);
+        const mediaItem = media.find((m) => m.id === id);
+        if (mediaItem) names.add(mediaItem.name);
+        const sub = folders.find((f) => f.id === id);
+        if (sub) names.add(sub.name);
+      });
+    } else if (isWritableSpecialPath(target)) {
+      getSpecialLocationContentItems(target).forEach((item) => {
+        if (isDesktopFolder(item) || isMediaItem(item) || isFileItem(item)) {
+          names.add(item.name);
+        }
+      });
+    }
+  }
+
+  return names;
+}
+
+/** Unique filename among siblings (`Untitled.txt`, `Untitled (1).txt`, …). */
+function uniqueNameAmong(baseName: string, names: Set<string>): string {
+  if (!names.has(baseName)) return baseName;
+  const { stem, ext } = splitFileName(baseName);
+  let number = 1;
+  let uniqueName = `${stem} (${number})${ext}`;
+  while (names.has(uniqueName)) {
+    number++;
+    uniqueName = `${stem} (${number})${ext}`;
+  }
+  return uniqueName;
+}
+
+/** Unique filename among siblings under a parent path. */
+function generateUniqueFileName(baseName: string, parentPath: string): string {
+  return uniqueNameAmong(baseName, getSiblingNames(parentPath));
+}
+
+/**
+ * Create a new empty user file on the desktop or inside a folder.
+ */
+export function createDesktopFile(
+  name: string,
+  x?: number,
+  y?: number,
+  parentPath?: string
+): DesktopFileItem {
+  const files = getDesktopFiles();
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error('File name is required');
+  }
+  const targetParentPath = parentPath || '/Desktop';
+  const uniqueName = generateUniqueFileName(trimmed, targetParentPath);
+
+  if (x === undefined || y === undefined) {
+    const shortcuts = getDesktopShortcuts();
+    const folders = getDesktopFolders();
+    const inFolders = getIdsInsideFolders();
+    const rootItems = [
+      ...shortcuts.filter((s) => !inFolders.has(s.id)),
+      ...folders.filter(isRootDesktopFolder),
+      ...getDesktopSurfaceMedia(),
+      ...getDesktopSurfaceFiles(),
+    ];
+    const position = findNextAvailablePosition(rootItems.map((item) => ({ x: item.x, y: item.y })));
+    x = position.x;
+    y = position.y;
+  } else {
+    const clamped = clampGridPosition(x, y);
+    x = clamped.x;
+    y = clamped.y;
+  }
+
+  const newFile: DesktopFileItem = {
+    id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    name: uniqueName,
+    kind: 'file',
+    content: '',
+    icon: 'file',
+    x,
+    y,
+    home: '/Desktop',
+  };
+
+  files.push(newFile);
+  saveDesktopFiles(files);
+
+  if (targetParentPath !== '/Desktop') {
+    const parentFolder = getFolderByPath(targetParentPath);
+    if (parentFolder && !parentFolder.contents.includes(newFile.id)) {
+      const folders = getDesktopFolders();
+      const live = folders.find((f) => f.id === parentFolder.id);
+      if (live) {
+        live.contents.push(newFile.id);
+        systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+      }
+    } else if (isWritableSpecialPath(targetParentPath)) {
+      moveItemToSpecialLocation(targetParentPath, newFile.id);
+    }
+  }
+
+  rememberGridMetrics();
+  notifyDesktopUpdated();
+  return newFile;
+}
+
+/** Persist updated text content for a user file. */
+export function updateFileContent(fileId: string, content: string): void {
+  const files = getDesktopFiles();
+  const file = files.find((f) => f.id === fileId);
+  if (!file) return;
+  file.content = content;
+  saveDesktopFiles(files);
+  notifyDesktopUpdated();
+}
+
+/** Rename a user file (may change extension / open association). */
+export function renameDesktopFile(fileId: string, newName: string): void {
+  const files = getDesktopFiles();
+  const file = files.find((f) => f.id === fileId);
+  if (!file) return;
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+
+  const parentPath =
+    findSpecialLocationOfItem(fileId) ||
+    (() => {
+      const folders = getDesktopFolders();
+      const parent = folders.find((f) => f.contents.includes(fileId));
+      if (!parent) return '/Desktop';
+      const paths = getFolderPaths();
+      return (
+        paths[parent.id] ||
+        (parent.parentPath && parent.parentPath !== '/Desktop'
+          ? `${parent.parentPath}/${parent.name}`
+          : `/Desktop/${parent.name}`)
+      );
+    })();
+
+  const names = getSiblingNames(parentPath);
+  names.delete(file.name);
+  const uniqueName = uniqueNameAmong(trimmed, names);
+
+  file.name = uniqueName;
+  saveDesktopFiles(files);
+  notifyDesktopUpdated();
+}
+
+/** Rename a media item (image / video / audio). */
+export function renameDesktopMedia(mediaId: string, newName: string): void {
+  const media = getDesktopMedia();
+  const item = media.find((m) => m.id === mediaId);
+  if (!item) return;
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+
+  const parentPath =
+    findSpecialLocationOfItem(mediaId) ||
+    (() => {
+      const folders = getDesktopFolders();
+      const parent = folders.find((f) => f.contents.includes(mediaId));
+      if (!parent) {
+        if (item.home !== '/Desktop') return item.home;
+        return '/Desktop';
+      }
+      const paths = getFolderPaths();
+      return (
+        paths[parent.id] ||
+        (parent.parentPath && parent.parentPath !== '/Desktop'
+          ? `${parent.parentPath}/${parent.name}`
+          : `/Desktop/${parent.name}`)
+      );
+    })();
+
+  const names = getSiblingNames(parentPath);
+  names.delete(item.name);
+  const uniqueName = uniqueNameAmong(trimmed, names);
+
+  item.name = uniqueName;
+  saveDesktopMedia(media);
+  notifyDesktopUpdated();
+}
+
+/** Clone a user file onto the desktop (or at x/y if given). */
+export function copyDesktopFile(sourceId: string, x?: number, y?: number): DesktopFileItem | null {
+  const source = getFileById(sourceId);
+  if (!source) return null;
+
+  let posX = x;
+  let posY = y;
+  if (posX === undefined || posY === undefined) {
+    const occupied = [
+      ...getDesktopShortcuts()
+        .filter((s) => !getIdsInsideFolders().has(s.id))
+        .map((s) => ({ x: s.x, y: s.y })),
+      ...getDesktopFolders()
+        .filter((f) => !f.parentPath || f.parentPath === '/Desktop')
+        .map((f) => ({ x: f.x, y: f.y })),
+      ...getDesktopSurfaceMedia().map((m) => ({ x: m.x, y: m.y })),
+      ...getDesktopSurfaceFiles().map((f) => ({ x: f.x, y: f.y })),
+    ];
+    const next = findNextAvailablePosition(occupied);
+    posX = next.x;
+    posY = next.y;
+  }
+
+  const uniqueName = generateUniqueFileName(source.name, '/Desktop');
+  const clone: DesktopFileItem = {
+    ...source,
+    id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    name: uniqueName,
+    x: posX,
+    y: posY,
+    home: '/Desktop',
+  };
+
+  const files = getDesktopFiles();
+  files.push(clone);
+  saveDesktopFiles(files);
+  notifyDesktopUpdated();
+  return clone;
+}
+
+/** Move a user file to the desktop grid. */
+export function placeFileOnDesktop(fileId: string, x: number, y: number): void {
+  const files = getDesktopFiles();
+  const item = files.find((f) => f.id === fileId);
+  if (!item) return;
+
+  const folders = getDesktopFolders();
+  let foldersChanged = false;
+  folders.forEach((folder) => {
+    if (folder.contents.includes(fileId)) {
+      folder.contents = folder.contents.filter((id) => id !== fileId);
+      foldersChanged = true;
+    }
+  });
+  if (foldersChanged) systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+
+  removeItemFromAllSpecialLocations(fileId);
+
+  const clamped = clampGridPosition(x, y);
+  item.x = clamped.x;
+  item.y = clamped.y;
+  item.home = '/Desktop';
+  saveDesktopFiles(files);
+  rememberGridMetrics();
+  notifyDesktopUpdated();
+}
+
+/** Alias used by desktop icon reposition. */
+export function updateFilePosition(fileId: string, x: number, y: number): void {
+  placeFileOnDesktop(fileId, x, y);
+}
+
 /**
  * Find any desktop-surface item at a grid cell (ignores nested folder contents)
  */
@@ -780,6 +1139,7 @@ export function findItemAtPosition(
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const media = getDesktopSurfaceMedia();
+  const files = getDesktopSurfaceFiles();
   const inFolders = getIdsInsideFolders();
   const metrics = getGridMetrics();
   const col = Math.round(x / metrics.cellWidth);
@@ -805,11 +1165,19 @@ export function findItemAtPosition(
 
   if (folder) return folder;
 
+  const mediaHit = media.find((m) => {
+    if (exclude.has(m.id)) return false;
+    return (
+      Math.round(m.x / metrics.cellWidth) === col && Math.round(m.y / metrics.cellHeight) === row
+    );
+  });
+  if (mediaHit) return mediaHit;
+
   return (
-    media.find((m) => {
-      if (exclude.has(m.id)) return false;
+    files.find((f) => {
+      if (exclude.has(f.id)) return false;
       return (
-        Math.round(m.x / metrics.cellWidth) === col && Math.round(m.y / metrics.cellHeight) === row
+        Math.round(f.x / metrics.cellWidth) === col && Math.round(f.y / metrics.cellHeight) === row
       );
     }) || null
   );
@@ -845,15 +1213,18 @@ export function swapItemPositions(itemId1: string, itemId2: string): void {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const media = getDesktopMedia();
+  const files = getDesktopFiles();
 
   const item1 =
     shortcuts.find((s) => s.id === itemId1) ||
     folders.find((f) => f.id === itemId1) ||
-    media.find((m) => m.id === itemId1);
+    media.find((m) => m.id === itemId1) ||
+    files.find((f) => f.id === itemId1);
   const item2 =
     shortcuts.find((s) => s.id === itemId2) ||
     folders.find((f) => f.id === itemId2) ||
-    media.find((m) => m.id === itemId2);
+    media.find((m) => m.id === itemId2) ||
+    files.find((f) => f.id === itemId2);
 
   if (item1 && item2) {
     const tempX = item1.x;
@@ -866,6 +1237,7 @@ export function swapItemPositions(itemId1: string, itemId2: string): void {
     systemStorage.setItem(STORAGE_KEY, shortcuts);
     systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
     saveDesktopMedia(media);
+    saveDesktopFiles(files);
     rememberGridMetrics();
 
     window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
@@ -910,7 +1282,9 @@ function getRootDesktopItems(): DesktopItem[] {
   const inFolders = getIdsInsideFolders();
   const shortcuts = getDesktopShortcuts().filter((s) => !inFolders.has(s.id));
   const folders = getDesktopFolders().filter(isRootDesktopFolder);
-  return [...shortcuts, ...folders];
+  const media = getDesktopSurfaceMedia();
+  const files = getDesktopSurfaceFiles();
+  return [...shortcuts, ...folders, ...media, ...files];
 }
 
 /**
@@ -1142,6 +1516,10 @@ export function getDesktopSurfacePositions(
   getDesktopSurfaceMedia().forEach((m) => {
     if (exclude.has(m.id)) return;
     positions.push({ x: m.x, y: m.y });
+  });
+  getDesktopSurfaceFiles().forEach((f) => {
+    if (exclude.has(f.id)) return;
+    positions.push({ x: f.x, y: f.y });
   });
 
   return positions;
@@ -1662,6 +2040,7 @@ export function createDesktopFolder(
       ...shortcuts.filter((s) => !inFolders.has(s.id)),
       ...folders.filter(isRootDesktopFolder),
       ...getDesktopSurfaceMedia(),
+      ...getDesktopSurfaceFiles(),
     ];
     const position = findNextAvailablePosition(rootItems.map((item) => ({ x: item.x, y: item.y })));
     x = position.x;
@@ -1732,7 +2111,8 @@ export function getDesktopItems(path?: string): DesktopItem[] {
     const rootShortcuts = shortcuts.filter((s) => !inFolders.has(s.id));
     const rootFolders = folders.filter((f) => !f.parentPath || f.parentPath === '/Desktop');
     const rootMedia = getDesktopSurfaceMedia();
-    return [...rootShortcuts, ...rootFolders, ...rootMedia];
+    const rootFiles = getDesktopSurfaceFiles();
+    return [...rootShortcuts, ...rootFolders, ...rootMedia, ...rootFiles];
   }
 
   // For specific paths, we'll need the file-system module
@@ -1800,6 +2180,7 @@ export function getItemsByPath(path: string): DesktopItem[] {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const media = getDesktopMedia();
+  const files = getDesktopFiles();
 
   return folder.contents
     .map((itemId) => {
@@ -1808,7 +2189,8 @@ export function getItemsByPath(path: string): DesktopItem[] {
       const subFolder = folders.find((f) => f.id === itemId);
       if (subFolder) return subFolder;
       const mediaItem = media.find((m) => m.id === itemId);
-      return mediaItem || null;
+      if (mediaItem) return mediaItem;
+      return files.find((f) => f.id === itemId) || null;
     })
     .filter((item): item is DesktopItem => item !== null);
 }
@@ -1879,6 +2261,13 @@ export function addItemToFolder(folderId: string, itemId: string): void {
     saveDesktopMedia(media);
   }
 
+  const files = getDesktopFiles();
+  const fileItem = files.find((f) => f.id === itemId);
+  if (fileItem) {
+    fileItem.home = '/Desktop';
+    saveDesktopFiles(files);
+  }
+
   removeItemFromAllSpecialLocations(itemId);
 
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
@@ -1913,6 +2302,13 @@ export function removeItemFromFolder(folderId: string, itemId: string): void {
   if (mediaItem) {
     mediaItem.home = '/Desktop';
     saveDesktopMedia(media);
+  }
+
+  const files = getDesktopFiles();
+  const fileItem = files.find((f) => f.id === itemId);
+  if (fileItem) {
+    fileItem.home = '/Desktop';
+    saveDesktopFiles(files);
   }
 
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);

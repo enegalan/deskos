@@ -35,6 +35,7 @@ export function createScopedStorage(programId: string): StorageAPI {
         localStorage.setItem(fullKey, JSON.stringify(value));
       } catch (error) {
         console.error(`[Storage] Failed to set item "${key}":`, error);
+        throw error;
       }
     },
 

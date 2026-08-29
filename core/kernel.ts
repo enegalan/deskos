@@ -122,6 +122,8 @@ export interface KernelState {
   ) => string;
   closeWindow: (windowId: string) => void;
   focusWindow: (windowId: string) => void;
+  /** Clear window focus so the desktop is the active surface. */
+  clearWindowFocus: () => void;
   minimizeWindow: (windowId: string) => void;
   maximizeWindow: (windowId: string) => void;
   restoreWindow: (windowId: string) => void;
@@ -432,6 +434,17 @@ export const useKernel = create<KernelState>((set, get) => ({
         })),
         windowOrder: newOrder,
         activeWindowId: windowId,
+      };
+    });
+  },
+
+  clearWindowFocus: (): void => {
+    set((state) => {
+      if (!state.activeWindowId) return state;
+      scheduleSessionPersist();
+      return {
+        windows: state.windows.map((w) => ({ ...w, isFocused: false })),
+        activeWindowId: null,
       };
     });
   },

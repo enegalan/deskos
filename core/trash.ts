@@ -9,6 +9,7 @@ import {
   getDesktopShortcuts,
   getDesktopFolders,
   getDesktopMedia,
+  getDesktopFiles,
   findNextAvailablePosition,
   isDesktopFolder,
   isDesktopShortcut,
@@ -16,6 +17,7 @@ import {
   isVideoItem,
   isAudioItem,
   isMediaItem,
+  isFileItem,
   findSpecialLocationOfItem,
   removeItemFromAllSpecialLocations,
   moveItemToSpecialLocation,
@@ -24,6 +26,7 @@ import {
   type DesktopFolder,
   type DesktopItem,
   type DesktopMediaItem,
+  type DesktopFileItem,
 } from './desktop-shortcuts';
 
 /** System storage key for the trash entry list */
@@ -38,6 +41,8 @@ const FOLDERS_STORAGE_KEY = 'desktop-folders';
 const FOLDER_PATHS_STORAGE_KEY = 'folder-paths';
 /** System storage key for persisted media files */
 const MEDIA_STORAGE_KEY = 'desktop-media';
+/** System storage key for user-created text files */
+const FILES_STORAGE_KEY = 'desktop-files';
 
 /**
  * Soft-deleted desktop item snapshot stored in the trash list.
@@ -78,6 +83,11 @@ function saveFolders(folders: DesktopFolder[]): void {
 /** Persist the live media file array. */
 function saveMedia(media: DesktopMediaItem[]): void {
   systemStorage.setItem(MEDIA_STORAGE_KEY, media);
+}
+
+/** Persist the live user-created file array. */
+function saveFiles(files: DesktopFileItem[]): void {
+  systemStorage.setItem(FILES_STORAGE_KEY, files);
 }
 
 /** Notify UI that trash and/or desktop contents changed. */
@@ -155,6 +165,7 @@ function captureFolderTree(
   shortcuts: DesktopShortcut[],
   folders: DesktopFolder[],
   media: DesktopMediaItem[],
+  files: DesktopFileItem[],
   paths: Record<string, string>,
   deletedAt: number
 ): TrashEntry | null {
@@ -165,7 +176,15 @@ function captureFolderTree(
   for (const childId of [...folder.contents]) {
     const subFolder = folders.find((f) => f.id === childId);
     if (subFolder) {
-      const childEntry = captureFolderTree(childId, shortcuts, folders, media, paths, deletedAt);
+      const childEntry = captureFolderTree(
+        childId,
+        shortcuts,
+        folders,
+        media,
+        files,
+        paths,
+        deletedAt
+      );
       if (childEntry) nested.push(childEntry);
       continue;
     }
@@ -192,6 +211,17 @@ function captureFolderTree(
         item: { ...media[mediaIndex] },
       });
       media.splice(mediaIndex, 1);
+      continue;
+    }
+    const fileIndex = files.findIndex((f) => f.id === childId);
+    if (fileIndex !== -1) {
+      nested.push({
+        id: newTrashId(),
+        deletedAt,
+        originalParentPath: folderPathOf(folder, paths),
+        item: { ...files[fileIndex] },
+      });
+      files.splice(fileIndex, 1);
     }
   }
 
@@ -304,9 +334,43 @@ function captureMediaItem(
 }
 
 /**
+ * Snapshot a user file and remove it from live storage arrays.
+ */
+function captureFileItem(
+  fileId: string,
+  files: DesktopFileItem[],
+  folders: DesktopFolder[],
+  paths: Record<string, string>,
+  deletedAt: number
+): TrashEntry | null {
+  const index = files.findIndex((f) => f.id === fileId);
+  if (index === -1) return null;
+
+  const item = files[index];
+  const parentPath = findOriginalParentPath(fileId, folders, paths);
+
+  for (const folder of folders) {
+    if (folder.contents.includes(fileId)) {
+      folder.contents = folder.contents.filter((id) => id !== fileId);
+    }
+  }
+
+  removeItemFromAllSpecialLocations(fileId);
+
+  files.splice(index, 1);
+
+  return {
+    id: newTrashId(),
+    deletedAt,
+    originalParentPath: parentPath ?? (item.home === '/Desktop' ? null : item.home),
+    item: { ...item },
+  };
+}
+
+/**
  * Move desktop items into the trash (soft-delete).
  *
- * @param itemIds - Shortcut, folder, or media ids to move
+ * @param itemIds - Shortcut, folder, media, or file ids to move
  */
 export function moveToTrash(itemIds: string[]): void {
   const uniqueIds = [...new Set(itemIds)];
@@ -315,6 +379,7 @@ export function moveToTrash(itemIds: string[]): void {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const media = getDesktopMedia();
+  const files = getDesktopFiles();
   const paths = getFolderPaths();
   const trash = getTrashItems();
   const deletedAt = Date.now();
@@ -325,7 +390,7 @@ export function moveToTrash(itemIds: string[]): void {
   for (const folderId of folderIds) {
     // Skip if already removed as nested content of another selected folder
     if (!folders.some((f) => f.id === folderId)) continue;
-    const entry = captureFolderTree(folderId, shortcuts, folders, media, paths, deletedAt);
+    const entry = captureFolderTree(folderId, shortcuts, folders, media, files, paths, deletedAt);
     if (entry) trash.unshift(entry);
   }
 
@@ -336,12 +401,16 @@ export function moveToTrash(itemIds: string[]): void {
     } else if (media.some((m) => m.id === itemId)) {
       const entry = captureMediaItem(itemId, media, folders, paths, deletedAt);
       if (entry) trash.unshift(entry);
+    } else if (files.some((f) => f.id === itemId)) {
+      const entry = captureFileItem(itemId, files, folders, paths, deletedAt);
+      if (entry) trash.unshift(entry);
     }
   }
 
   saveShortcuts(shortcuts);
   saveFolders(folders);
   saveMedia(media);
+  saveFiles(files);
   setFolderPaths(paths);
   setTrashItems(trash);
   notifyTrashUpdated();
@@ -370,7 +439,8 @@ function uniqueFolderName(baseName: string, parentPath: string, folders: Desktop
 function desktopRootOccupied(
   shortcuts: DesktopShortcut[],
   folders: DesktopFolder[],
-  media: DesktopMediaItem[] = []
+  media: DesktopMediaItem[] = [],
+  files: DesktopFileItem[] = []
 ): Array<{ x: number; y: number }> {
   const inFolders = new Set<string>();
   folders.forEach((folder) => {
@@ -384,6 +454,9 @@ function desktopRootOccupied(
     ...media
       .filter((m) => !inFolders.has(m.id) && m.home === '/Desktop')
       .map((m) => ({ x: m.x, y: m.y })),
+    ...files
+      .filter((f) => !inFolders.has(f.id) && f.home === '/Desktop')
+      .map((f) => ({ x: f.x, y: f.y })),
   ];
 }
 
@@ -410,6 +483,7 @@ function restoreFolderEntry(
   shortcuts: DesktopShortcut[],
   folders: DesktopFolder[],
   media: DesktopMediaItem[],
+  files: DesktopFileItem[],
   paths: Record<string, string>
 ): void {
   if (!isDesktopFolder(entry.item)) return;
@@ -421,7 +495,7 @@ function restoreFolderEntry(
   let y = entry.item.y;
 
   if (targetParent === '/Desktop') {
-    const occupied = desktopRootOccupied(shortcuts, folders, media);
+    const occupied = desktopRootOccupied(shortcuts, folders, media, files);
     const conflict = occupied.some((pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1);
     if (conflict) {
       const next = findNextAvailablePosition(occupied);
@@ -452,11 +526,13 @@ function restoreFolderEntry(
 
   for (const child of entry.nested || []) {
     if (isDesktopFolder(child.item)) {
-      restoreFolderEntry(child, path, shortcuts, folders, media, paths);
+      restoreFolderEntry(child, path, shortcuts, folders, media, files, paths);
     } else if (isDesktopShortcut(child.item)) {
-      restoreShortcutEntry(child, path, shortcuts, folders, media, paths);
+      restoreShortcutEntry(child, path, shortcuts, folders, media, files, paths);
     } else if (isMediaItem(child.item)) {
-      restoreMediaEntry(child, path, shortcuts, folders, media, paths);
+      restoreMediaEntry(child, path, shortcuts, folders, media, files, paths);
+    } else if (isFileItem(child.item)) {
+      restoreFileEntry(child, path, shortcuts, folders, media, files, paths);
     }
   }
 }
@@ -470,6 +546,7 @@ function restoreShortcutEntry(
   shortcuts: DesktopShortcut[],
   folders: DesktopFolder[],
   media: DesktopMediaItem[],
+  files: DesktopFileItem[],
   paths: Record<string, string>
 ): void {
   if (!isDesktopShortcut(entry.item)) return;
@@ -483,7 +560,7 @@ function restoreShortcutEntry(
   let y = entry.item.y;
 
   if (!targetParent && !isSpecial) {
-    const occupied = desktopRootOccupied(shortcuts, folders, media);
+    const occupied = desktopRootOccupied(shortcuts, folders, media, files);
     const conflict = occupied.some((pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1);
     if (conflict) {
       const next = findNextAvailablePosition(occupied);
@@ -525,6 +602,7 @@ function restoreMediaEntry(
   shortcuts: DesktopShortcut[],
   folders: DesktopFolder[],
   media: DesktopMediaItem[],
+  files: DesktopFileItem[],
   paths: Record<string, string>
 ): void {
   if (!isMediaItem(entry.item)) return;
@@ -539,7 +617,7 @@ function restoreMediaEntry(
   let y = entry.item.y;
 
   if (!targetFolderPath && !isLibrary && !isSpecial) {
-    const occupied = desktopRootOccupied(shortcuts, folders, media);
+    const occupied = desktopRootOccupied(shortcuts, folders, media, files);
     const conflict = occupied.some((pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1);
     if (conflict) {
       const next = findNextAvailablePosition(occupied);
@@ -594,6 +672,63 @@ function restoreMediaEntry(
 }
 
 /**
+ * Restore a user file entry into live storage.
+ */
+function restoreFileEntry(
+  entry: TrashEntry,
+  parentPath: string | null,
+  shortcuts: DesktopShortcut[],
+  folders: DesktopFolder[],
+  media: DesktopMediaItem[],
+  files: DesktopFileItem[],
+  paths: Record<string, string>
+): void {
+  if (!isFileItem(entry.item)) return;
+  if (files.some((f) => f.id === entry.item.id)) return;
+
+  const isSpecial = parentPath !== null && isWritableSpecialPath(parentPath);
+  const targetFolderPath =
+    parentPath && parentPath !== '/Desktop' && !isSpecial ? parentPath : null;
+
+  let x = entry.item.x;
+  let y = entry.item.y;
+
+  if (!targetFolderPath && !isSpecial) {
+    const occupied = desktopRootOccupied(shortcuts, folders, media, files);
+    const conflict = occupied.some((pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1);
+    if (conflict) {
+      const next = findNextAvailablePosition(occupied);
+      x = next.x;
+      y = next.y;
+    }
+  }
+
+  const restored: DesktopFileItem = {
+    ...entry.item,
+    x,
+    y,
+    home: '/Desktop',
+  };
+  files.push(restored);
+
+  if (isSpecial && parentPath) {
+    saveFiles(files);
+    moveItemToSpecialLocation(parentPath, restored.id);
+    const live = getDesktopFiles();
+    files.length = 0;
+    live.forEach((f) => files.push(f));
+    return;
+  }
+
+  if (targetFolderPath) {
+    const liveParent = findFolderByPathInMemory(targetFolderPath, folders, paths);
+    if (liveParent && !liveParent.contents.includes(restored.id)) {
+      liveParent.contents.push(restored.id);
+    }
+  }
+}
+
+/**
  * Restore trash entries to their original parent (or desktop if missing).
  *
  * @param entryIds - Top-level trash entry ids
@@ -606,6 +741,7 @@ export function restoreFromTrash(entryIds: string[]): void {
   const shortcuts = getDesktopShortcuts();
   const folders = getDesktopFolders();
   const media = getDesktopMedia();
+  const files = getDesktopFiles();
   const paths = getFolderPaths();
   const remaining: TrashEntry[] = [];
 
@@ -626,17 +762,20 @@ export function restoreFromTrash(entryIds: string[]): void {
     }
 
     if (isDesktopFolder(entry.item)) {
-      restoreFolderEntry(entry, parentPath, shortcuts, folders, media, paths);
+      restoreFolderEntry(entry, parentPath, shortcuts, folders, media, files, paths);
     } else if (isMediaItem(entry.item)) {
-      restoreMediaEntry(entry, parentPath, shortcuts, folders, media, paths);
+      restoreMediaEntry(entry, parentPath, shortcuts, folders, media, files, paths);
+    } else if (isFileItem(entry.item)) {
+      restoreFileEntry(entry, parentPath, shortcuts, folders, media, files, paths);
     } else {
-      restoreShortcutEntry(entry, parentPath, shortcuts, folders, media, paths);
+      restoreShortcutEntry(entry, parentPath, shortcuts, folders, media, files, paths);
     }
   }
 
   saveShortcuts(shortcuts);
   saveFolders(folders);
   saveMedia(media);
+  saveFiles(files);
   setFolderPaths(paths);
   setTrashItems(remaining);
   notifyTrashUpdated();
@@ -672,6 +811,7 @@ export function getTrashEntryName(entry: TrashEntry): string {
   if (isImageItem(entry.item)) return entry.item.name;
   if (isVideoItem(entry.item)) return entry.item.name;
   if (isAudioItem(entry.item)) return entry.item.name;
+  if (isFileItem(entry.item)) return entry.item.name;
   return entry.item.customName || entry.item.programId;
 }
 
@@ -686,5 +826,6 @@ export function getTrashEntryIcon(entry: TrashEntry): string {
   if (isImageItem(entry.item)) return entry.item.icon || 'image';
   if (isVideoItem(entry.item)) return entry.item.icon || 'video';
   if (isAudioItem(entry.item)) return entry.item.icon || 'music';
+  if (isFileItem(entry.item)) return entry.item.icon || 'file';
   return 'package';
 }

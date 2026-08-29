@@ -17,6 +17,7 @@ import {
   isImageItem,
   isVideoItem,
   isAudioItem,
+  isFileItem,
   getGridSize,
   addItemToFolder,
   folderContainsItem,
@@ -28,8 +29,9 @@ import {
   removeItemFromSpecialLocation,
   findSpecialLocationOfItem,
 } from '@core/desktop-shortcuts';
+import { openDesktopItem } from '@core/open-file';
+import { importOsFiles, importUrlToDesktop, readDraggedUrl } from '@core/file-transfer';
 import { programs } from 'virtual:programs';
-import { launchOrFocusProgram } from '@core/context';
 import { FolderSidebar } from './FolderSidebar';
 import { Icon } from '../components/Icon';
 import { hasIcon, type IconName } from '@core/icons';
@@ -229,39 +231,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
       if (isDesktopFolder(item)) {
         const path = `${currentPath}/${item.name}`;
         handleNavigate(path);
-      } else if (isDesktopShortcut(item)) {
-        await launchOrFocusProgram(item.programId);
-      } else if (isImageItem(item)) {
-        // Double-click previews just this image, on its own.
-        window.dispatchEvent(
-          new CustomEvent('open-image', {
-            detail: {
-              images: [{ src: item.imageUrl, name: item.name }],
-              startIndex: 0,
-            },
-          })
-        );
-      } else if (isVideoItem(item)) {
-        // Double-click plays just this video, on its own.
-        window.dispatchEvent(
-          new CustomEvent('open-video', {
-            detail: {
-              videos: [{ src: item.videoUrl, name: item.name }],
-              startIndex: 0,
-            },
-          })
-        );
-      } else if (isAudioItem(item)) {
-        // Double-click plays just this track, on its own.
-        window.dispatchEvent(
-          new CustomEvent('open-audio', {
-            detail: {
-              tracks: [{ src: item.audioUrl, name: item.name }],
-              startIndex: 0,
-            },
-          })
-        );
+        return;
       }
+      await openDesktopItem(item);
     },
     [currentPath, handleNavigate]
   );
@@ -376,6 +348,8 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           clipboardItems.push({ id: item.id, type: 'video' });
         } else if (isAudioItem(item)) {
           clipboardItems.push({ id: item.id, type: 'audio' });
+        } else if (isFileItem(item)) {
+          clipboardItems.push({ id: item.id, type: 'file' });
         }
       }
     });
@@ -419,6 +393,8 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           clipboardItems.push({ id: item.id, type: 'video' });
         } else if (isAudioItem(item)) {
           clipboardItems.push({ id: item.id, type: 'audio' });
+        } else if (isFileItem(item)) {
+          clipboardItems.push({ id: item.id, type: 'file' });
         }
       }
     });
@@ -473,7 +449,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
       getDesktopShortcuts,
       getDesktopFolders,
       getMediaById,
+      getFileById,
       copyDesktopMedia,
+      copyDesktopFile,
       removeItemFromFolder,
     } = await import('@core/desktop-shortcuts');
     const allShortcuts = getDesktopShortcuts();
@@ -519,8 +497,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
             item.type === 'image' || item.type === 'video' || item.type === 'audio'
               ? getMediaById(item.id)
               : null;
+          const file = item.type === 'file' ? getFileById(item.id) : null;
 
-          if (!shortcut && !folder && !media) {
+          if (!shortcut && !folder && !media && !file) {
             console.warn('[FolderWindow] Paste: Item not found', item.id);
             continue;
           }
@@ -552,11 +531,14 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                   getDesktopFolders: getCurrentFolders,
                   getDesktopShortcuts: getCurrentShortcuts,
                   getDesktopMedia: getCurrentMedia,
+                  getDesktopFiles: getCurrentFiles,
                   copyDesktopMedia: copyMedia,
+                  copyDesktopFile: copyFile,
                 } = await import('@core/desktop-shortcuts');
                 const currentFolders = getCurrentFolders();
                 const currentShortcuts = getCurrentShortcuts();
                 const currentMedia = getCurrentMedia();
+                const currentFiles = getCurrentFiles();
 
                 const sourceFolder = currentFolders.find((f) => f.id === sourceFolderId);
                 if (!sourceFolder) return;
@@ -568,6 +550,7 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                   const contentShortcut = currentShortcuts.find((s) => s.id === contentId);
                   const contentFolder = currentFolders.find((f) => f.id === contentId);
                   const contentMedia = currentMedia.find((m) => m.id === contentId);
+                  const contentFile = currentFiles.find((f) => f.id === contentId);
 
                   if (contentShortcut) {
                     const newContentShortcut = addDesktopShortcut(
@@ -592,6 +575,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                   } else if (contentMedia) {
                     const clone = copyMedia(contentMedia.id);
                     if (clone) addItemToFolder(targetFolderId, clone.id);
+                  } else if (contentFile) {
+                    const clone = copyFile(contentFile.id);
+                    if (clone) addItemToFolder(targetFolderId, clone.id);
                   }
                 }
               };
@@ -600,6 +586,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
             }
           } else if (media) {
             const clone = copyDesktopMedia(media.id);
+            if (clone) placeInCurrent(clone.id);
+          } else if (file) {
+            const clone = copyDesktopFile(file.id);
             if (clone) placeInCurrent(clone.id);
           }
         }
@@ -616,8 +605,9 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
               item.type === 'image' || item.type === 'video' || item.type === 'audio'
                 ? getMediaById(item.id)
                 : null;
+            const file = item.type === 'file' ? getFileById(item.id) : null;
 
-            if (!shortcut && !folder && !media) {
+            if (!shortcut && !folder && !media && !file) {
               console.warn('[FolderWindow] Paste: Item not found for cut', item.id);
               continue;
             }
@@ -765,6 +755,15 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
     );
   }, []);
 
+  const hasExternalDragData = useCallback((dataTransfer: DataTransfer) => {
+    const types = Array.from(dataTransfer.types);
+    return (
+      types.includes('Files') ||
+      types.includes('text/uri-list') ||
+      types.includes('application/x-deskos-browser-bookmark-url')
+    );
+  }, []);
+
   const handleItemDragStart = useCallback(
     (item: DesktopItem, e: React.DragEvent) => {
       const ids =
@@ -795,16 +794,20 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
   /** Drop onto a nested folder icon (move into that folder, not the open window). */
   const handleFolderItemDragOver = useCallback(
     (targetFolder: DesktopItem, e: React.DragEvent) => {
-      if (!isDesktopFolder(targetFolder) || !hasDeskosDragData(e.dataTransfer)) return;
+      if (!isDesktopFolder(targetFolder)) return;
       if (draggedItemIdsRef.current.includes(targetFolder.id)) return;
+
+      const isDeskos = hasDeskosDragData(e.dataTransfer);
+      const isExternal = hasExternalDragData(e.dataTransfer);
+      if (!isDeskos && !isExternal) return;
 
       e.preventDefault();
       e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
+      e.dataTransfer.dropEffect = isExternal ? 'copy' : 'move';
       contentRef.current?.classList.remove('drag-over');
       e.currentTarget.classList.add('drag-over-target');
     },
-    [hasDeskosDragData]
+    [hasDeskosDragData, hasExternalDragData]
   );
 
   const handleFolderItemDragLeave = useCallback((e: React.DragEvent) => {
@@ -814,7 +817,7 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
   }, []);
 
   const handleFolderItemDrop = useCallback(
-    (targetFolder: DesktopItem, e: React.DragEvent) => {
+    async (targetFolder: DesktopItem, e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
       e.currentTarget.classList.remove('drag-over-target');
@@ -822,23 +825,45 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
 
       if (!isDesktopFolder(targetFolder)) return;
 
+      // Capture before any await — browsers clear dataTransfer after the drop handler returns.
       const itemIds = readDraggedItemIds(e.dataTransfer);
-      if (itemIds.length === 0) return;
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      const droppedUrl = readDraggedUrl(e.dataTransfer);
 
-      for (const itemId of itemIds) {
-        if (itemId === targetFolder.id) continue;
-        // Reject dropping a folder onto one of its own descendants.
-        if (
-          getDesktopFolders().some((f) => f.id === itemId) &&
-          folderContainsItem(itemId, targetFolder.id)
-        ) {
-          continue;
+      if (itemIds.length > 0) {
+        for (const itemId of itemIds) {
+          if (itemId === targetFolder.id) continue;
+          // Reject dropping a folder onto one of its own descendants.
+          if (
+            getDesktopFolders().some((f) => f.id === itemId) &&
+            folderContainsItem(itemId, targetFolder.id)
+          ) {
+            continue;
+          }
+          addItemToFolder(targetFolder.id, itemId);
         }
-        addItemToFolder(targetFolder.id, itemId);
+        draggedItemIdsRef.current = [];
+        loadItems(currentPath);
+        window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+        return;
       }
-      draggedItemIdsRef.current = [];
-      loadItems(currentPath);
-      window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+
+      // OS files / URLs dropped onto a nested folder icon
+      const targetPath =
+        currentPath === '/' ? `/${targetFolder.name}` : `${currentPath}/${targetFolder.name}`;
+      try {
+        if (droppedFiles.length > 0) {
+          await importOsFiles(droppedFiles, { parentPath: targetPath });
+          loadItems(currentPath);
+          return;
+        }
+        if (droppedUrl) {
+          await importUrlToDesktop(droppedUrl, { parentPath: targetPath });
+          loadItems(currentPath);
+        }
+      } catch (error) {
+        console.error('[FolderWindow] Error importing into folder:', error);
+      }
     },
     [currentPath, loadItems]
   );
@@ -853,9 +878,14 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
         if (contentRef.current) {
           contentRef.current.classList.add('drag-over');
         }
+      } else if (hasExternalDragData(e.dataTransfer)) {
+        e.dataTransfer.dropEffect = 'copy';
+        if (contentRef.current) {
+          contentRef.current.classList.add('drag-over');
+        }
       }
     },
-    [hasDeskosDragData]
+    [hasDeskosDragData, hasExternalDragData]
   );
 
   // Handle mouse move to detect dragging over folder window (for custom drag system)
@@ -904,12 +934,18 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
         contentRef.current.classList.remove('drag-over');
       }
 
+      const isDesktopRoot = currentPath === '/Desktop' || currentPath === '/';
       const isSpecialTarget = isWritableSpecialPath(currentPath);
-      const currentFolder = isSpecialTarget ? null : getFolderByPath(currentPath);
-      if (!isSpecialTarget && !currentFolder) return;
+      const currentFolder = isSpecialTarget || isDesktopRoot ? null : getFolderByPath(currentPath);
+      // Accept drops on Desktop, writable special locations, and user folders.
+      if (!isDesktopRoot && !isSpecialTarget && !currentFolder) return;
 
+      // Capture before any await — browsers clear dataTransfer after the drop handler returns.
       const itemIds = readDraggedItemIds(e.dataTransfer);
       const programId = e.dataTransfer.getData('application/x-deskos-program-id');
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      const droppedUrl = readDraggedUrl(e.dataTransfer);
+      const parentPath = isDesktopRoot ? undefined : currentPath;
 
       try {
         if (itemIds.length > 0) {
@@ -919,10 +955,18 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
               moveItemToSpecialLocation(currentPath, itemId);
             } else if (currentFolder) {
               addItemToFolder(currentFolder.id, itemId);
+            } else if (isDesktopRoot) {
+              // Moving onto Desktop surface is handled by Desktop.tsx; ignore here.
             }
           }
           loadItems(currentPath);
           window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+        } else if (droppedFiles.length > 0) {
+          await importOsFiles(droppedFiles, { parentPath });
+          loadItems(currentPath);
+        } else if (droppedUrl) {
+          await importUrlToDesktop(droppedUrl, { parentPath });
+          loadItems(currentPath);
         } else if (programId && currentFolder) {
           console.log('[FolderWindow] Drop: Creating new shortcut from program', programId);
           const { addDesktopShortcut } = await import('@core/desktop-shortcuts');
@@ -1058,22 +1102,29 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
         ) : (
           <div className="folder-breadcrumbs" onClick={handlePathClick}>
             {breadcrumbs.length === 0 ? (
-              <span className="folder-breadcrumb-item clickable">/</span>
+              <button type="button" className="folder-breadcrumb-item clickable" data-path="/">
+                /
+              </button>
             ) : (
-              breadcrumbs.map((part, index) => (
-                <span key={index} className="folder-breadcrumb">
-                  {index > 0 && <span className="folder-breadcrumb-separator">/</span>}
-                  <button
-                    className="folder-breadcrumb-item"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBreadcrumbClick(index);
-                    }}
-                  >
-                    {part}
-                  </button>
-                </span>
-              ))
+              breadcrumbs.map((part, index) => {
+                const path = '/' + breadcrumbs.slice(0, index + 1).join('/');
+                return (
+                  <span key={index} className="folder-breadcrumb">
+                    {index > 0 && <span className="folder-breadcrumb-separator">/</span>}
+                    <button
+                      type="button"
+                      className="folder-breadcrumb-item"
+                      data-path={path}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBreadcrumbClick(index);
+                      }}
+                    >
+                      {part}
+                    </button>
+                  </span>
+                );
+              })
             )}
           </div>
         )}
@@ -1256,6 +1307,27 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
                       onDoubleClick={() => handleItemDoubleClick(item)}
                     >
                       {renderAudioThumb(iconSize)}
+                      {(isList || settings.showIconLabels) && (
+                        <div className="folder-window-item-label">{item.name}</div>
+                      )}
+                    </div>
+                  );
+                } else if (isFileItem(item)) {
+                  return (
+                    <div
+                      key={item.id}
+                      className={`folder-window-item file-item ${selectedClass} ${cutClass}`}
+                      data-item-id={item.id}
+                      data-item-type="file"
+                      data-item-name={item.name}
+                      style={gridStyle}
+                      draggable={true}
+                      onDragStart={(e) => handleItemDragStart(item, e)}
+                      onDragEnd={handleItemDragEnd}
+                      onClick={(e) => handleItemClick(item, e)}
+                      onDoubleClick={() => handleItemDoubleClick(item)}
+                    >
+                      {renderItemIcon('file', iconSize)}
                       {(isList || settings.showIconLabels) && (
                         <div className="folder-window-item-label">{item.name}</div>
                       )}

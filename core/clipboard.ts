@@ -4,7 +4,7 @@
  */
 
 /** Kind of desktop item stored on the clipboard. */
-export type ClipboardItemType = 'shortcut' | 'folder' | 'image' | 'video' | 'audio';
+export type ClipboardItemType = 'shortcut' | 'folder' | 'image' | 'video' | 'audio' | 'file';
 
 /** Single item reference in clipboard data. */
 export interface ClipboardItem {
@@ -27,13 +27,13 @@ export interface ClipboardData {
 let clipboardData: ClipboardData | null = null;
 
 /** Registered copy handlers sorted by priority (folder windows override desktop). */
-let copyHandlers: Array<{ handler: () => void; priority: number }> = [];
+let copyHandlers: Array<{ handler: () => void | Promise<void>; priority: number }> = [];
 /** Registered cut handlers sorted by priority. */
-let cutHandlers: Array<{ handler: () => void; priority: number }> = [];
+let cutHandlers: Array<{ handler: () => void | Promise<void>; priority: number }> = [];
 /** Registered paste handlers sorted by priority. */
-let pasteHandlers: Array<{ handler: () => void; priority: number }> = [];
+let pasteHandlers: Array<{ handler: () => void | Promise<void>; priority: number }> = [];
 /** Registered delete handlers sorted by priority. */
-let deleteHandlers: Array<{ handler: () => void; priority: number }> = [];
+let deleteHandlers: Array<{ handler: () => void | Promise<void>; priority: number }> = [];
 
 /** Handler priority: desktop icon surface. */
 const PRIORITY_DESKTOP = 0;
@@ -49,7 +49,7 @@ function notifyClipboardUpdated(): void {
  * Register a handler for "Copy" keyboard shortcut
  */
 export function registerCopyHandler(
-  handler: () => void,
+  handler: () => void | Promise<void>,
   priority: number = PRIORITY_DESKTOP
 ): () => void {
   copyHandlers.push({ handler, priority });
@@ -65,7 +65,7 @@ export function registerCopyHandler(
  * Register a handler for "Cut" keyboard shortcut
  */
 export function registerCutHandler(
-  handler: () => void,
+  handler: () => void | Promise<void>,
   priority: number = PRIORITY_DESKTOP
 ): () => void {
   cutHandlers.push({ handler, priority });
@@ -81,7 +81,7 @@ export function registerCutHandler(
  * Register a handler for "Paste" keyboard shortcut
  */
 export function registerPasteHandler(
-  handler: () => void,
+  handler: () => void | Promise<void>,
   priority: number = PRIORITY_DESKTOP
 ): () => void {
   pasteHandlers.push({ handler, priority });
@@ -97,7 +97,7 @@ export function registerPasteHandler(
  * Register a handler for Delete / Backspace
  */
 export function registerDeleteHandler(
-  handler: () => void,
+  handler: () => void | Promise<void>,
   priority: number = PRIORITY_DESKTOP
 ): () => void {
   deleteHandlers.push({ handler, priority });
@@ -112,7 +112,7 @@ export function registerDeleteHandler(
  * Get current copy handler (highest priority)
  * @internal Used by keyboard shortcuts manager
  */
-export function getCopyHandler(): (() => void) | null {
+export function getCopyHandler(): (() => void | Promise<void>) | null {
   return copyHandlers.length > 0 ? copyHandlers[0].handler : null;
 }
 
@@ -120,7 +120,7 @@ export function getCopyHandler(): (() => void) | null {
  * Get current cut handler (highest priority)
  * @internal Used by keyboard shortcuts manager
  */
-export function getCutHandler(): (() => void) | null {
+export function getCutHandler(): (() => void | Promise<void>) | null {
   return cutHandlers.length > 0 ? cutHandlers[0].handler : null;
 }
 
@@ -128,7 +128,10 @@ export function getCutHandler(): (() => void) | null {
  * Get all copy handlers in priority order
  * @internal Used by keyboard shortcuts manager
  */
-export function getAllCopyHandlers(): Array<{ handler: () => void; priority: number }> {
+export function getAllCopyHandlers(): Array<{
+  handler: () => void | Promise<void>;
+  priority: number;
+}> {
   return [...copyHandlers];
 }
 
@@ -136,7 +139,10 @@ export function getAllCopyHandlers(): Array<{ handler: () => void; priority: num
  * Get all cut handlers in priority order
  * @internal Used by keyboard shortcuts manager
  */
-export function getAllCutHandlers(): Array<{ handler: () => void; priority: number }> {
+export function getAllCutHandlers(): Array<{
+  handler: () => void | Promise<void>;
+  priority: number;
+}> {
   return [...cutHandlers];
 }
 
@@ -144,7 +150,7 @@ export function getAllCutHandlers(): Array<{ handler: () => void; priority: numb
  * Get current paste handler (highest priority)
  * @internal Used by keyboard shortcuts manager
  */
-export function getPasteHandler(): (() => void) | null {
+export function getPasteHandler(): (() => void | Promise<void>) | null {
   return pasteHandlers.length > 0 ? pasteHandlers[0].handler : null;
 }
 
@@ -152,7 +158,10 @@ export function getPasteHandler(): (() => void) | null {
  * Get all paste handlers in priority order
  * @internal Used by keyboard shortcuts manager
  */
-export function getAllPasteHandlers(): Array<{ handler: () => void; priority: number }> {
+export function getAllPasteHandlers(): Array<{
+  handler: () => void | Promise<void>;
+  priority: number;
+}> {
   return [...pasteHandlers];
 }
 
@@ -160,7 +169,10 @@ export function getAllPasteHandlers(): Array<{ handler: () => void; priority: nu
  * Get all delete handlers in priority order
  * @internal Used by keyboard shortcuts manager
  */
-export function getAllDeleteHandlers(): Array<{ handler: () => void; priority: number }> {
+export function getAllDeleteHandlers(): Array<{
+  handler: () => void | Promise<void>;
+  priority: number;
+}> {
   return [...deleteHandlers];
 }
 

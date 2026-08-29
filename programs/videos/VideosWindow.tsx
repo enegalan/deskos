@@ -4,6 +4,7 @@ import { useKernel } from '@core/kernel';
 import { flushSessionPersist, getWindowSessionState, setWindowSessionState } from '@core/session';
 import { useWindowId, useWindowSessionState } from '@core/window-session';
 import { Icon } from '../../components/Icon';
+import { revokeContentBlobUrl } from '@core/file-associations';
 
 /** One video shown by the player. */
 interface PreviewVideo {
@@ -94,6 +95,24 @@ export function VideosWindow({ ctx, initialVideos, initialStartIndex }: VideosWi
   );
   const { videos, index, muted, volume, currentTime: savedTime } = preview;
   const current = videos[index] ?? videos[0];
+  const videosRef = useRef(videos);
+
+  useEffect(() => {
+    videosRef.current = videos;
+  }, [videos]);
+
+  // Revoke object URLs created by open-file when this window closes.
+  useEffect(() => {
+    return () => {
+      const seen = new Set<string>();
+      for (const video of videosRef.current) {
+        if (!video.src.startsWith('blob:') || seen.has(video.src)) continue;
+        seen.add(video.src);
+        revokeContentBlobUrl(video.src);
+      }
+    };
+  }, []);
+
   // Older session snapshots may omit volume / currentTime.
   const safeVolume = clampVolume(typeof volume === 'number' ? volume : 1);
   const safeSavedTime = typeof savedTime === 'number' && savedTime > 0 ? savedTime : 0;

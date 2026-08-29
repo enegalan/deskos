@@ -352,14 +352,24 @@ export class ContextMenuManager {
     event: MouseEvent | KeyboardEvent | TouchEvent,
     target: HTMLElement
   ): MenuContext {
-    // For desktop icons / folder-window items, use the item root as target
+    // For desktop icons / folder-window items / sidebar rows, use the item root as target
     let actualTarget: HTMLElement = target;
     const desktopIcon = target.closest('.desktop-icon') as HTMLElement | null;
     const folderWindowItem = target.closest('.folder-window-item') as HTMLElement | null;
+    const folderSidebarItem = target.closest(
+      '.folder-sidebar-item[data-drop-path]'
+    ) as HTMLElement | null;
+    const folderBreadcrumbItem = target.closest(
+      '.folder-breadcrumb-item[data-path]'
+    ) as HTMLElement | null;
     if (desktopIcon) {
       actualTarget = desktopIcon;
     } else if (folderWindowItem) {
       actualTarget = folderWindowItem;
+    } else if (folderSidebarItem) {
+      actualTarget = folderSidebarItem;
+    } else if (folderBreadcrumbItem) {
+      actualTarget = folderBreadcrumbItem;
     }
 
     // Nearest ancestor wins (desktop also has data-program-id="system")
@@ -607,6 +617,14 @@ export class ContextMenuManager {
       if (element.closest('.folder-window-item') !== null) {
         return false;
       }
+      // Sidebar / breadcrumbs have their own menus
+      if (
+        element.closest(
+          '.folder-sidebar-item[data-drop-path], .folder-breadcrumb-item[data-path]'
+        ) !== null
+      ) {
+        return false;
+      }
       return true;
     }
     if (selector === 'window') {
@@ -615,8 +633,12 @@ export class ContextMenuManager {
       if (!isInsideWindow) {
         return false;
       }
-      // Folder content has its own menus
-      if (element.closest('.folder-window-grid, .folder-window-item') !== null) {
+      // Folder content / sidebar / breadcrumbs have their own menus
+      if (
+        element.closest(
+          '.folder-window-grid, .folder-window-item, .folder-sidebar-item[data-drop-path], .folder-breadcrumb-item[data-path]'
+        ) !== null
+      ) {
         return false;
       }
       // Exclude native interactive elements from window menu

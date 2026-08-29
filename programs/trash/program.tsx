@@ -1,5 +1,6 @@
 import { defineProgram } from '@core/program';
 import { emptyTrash, isTrashEmpty, moveToTrash } from '@core/trash';
+import { dialog } from '@core/dialog';
 import { TrashWindow } from './TrashWindow';
 
 /** Context-menu delete label for the Trash soft-delete handler. */
@@ -23,9 +24,15 @@ export default defineProgram({
       label: 'Empty Trash',
       icon: 'delete',
       enabled: !isTrashEmpty(),
-      action: () => {
+      action: async () => {
         if (isTrashEmpty()) return;
-        if (!confirm('Are you sure you want to permanently erase the items in the Trash?')) {
+        if (
+          !(await dialog.confirm(
+            'Are you sure you want to permanently erase the items in the Trash?',
+            'Empty Trash',
+            { danger: true }
+          ))
+        ) {
           return;
         }
         emptyTrash();

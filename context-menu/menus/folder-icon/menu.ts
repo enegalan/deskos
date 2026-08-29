@@ -1,4 +1,5 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
+import { dialog } from '@core/dialog';
 
 /** Register the folder icon context menu provider */
 export function registerFolderIconMenu(manager: ContextMenuManager): void {
@@ -141,7 +142,7 @@ export function registerFolderIconMenu(manager: ContextMenuManager): void {
           action: async (context: MenuContext) => {
             const folderId = context.target.getAttribute('data-folder-id');
             if (folderId) {
-              const newName = prompt('Enter new folder name:');
+              const newName = await dialog.prompt('Enter new folder name:');
               if (newName && newName.trim()) {
                 try {
                   const { renameDesktopFolder } = await import('@core/desktop-shortcuts');
