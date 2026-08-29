@@ -14,5 +14,12 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "vite-plugin-programs.ts", "vite-plugin-images.ts", "cli"]
+  "include": [
+    "vite.config.ts",
+    "vite-plugin-programs.ts",
+    "vite-plugin-images.ts",
+    "vite-plugin-videos.ts",
+    "vite-plugin-music.ts",
+    "cli"
+  ]
 }

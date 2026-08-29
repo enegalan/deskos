@@ -64,6 +64,26 @@ export interface DesktopVideoItem {
 }
 
 /**
+ * Audio entry shown inside `/Music`, the desktop, or a user folder.
+ * Points at a bundled asset URL under `public/music/`.
+ */
+export interface DesktopAudioItem {
+  id: string;
+  name: string;
+  kind: 'audio';
+  /** Asset URL served from `public/` (e.g. `/music/track.mp3`). */
+  audioUrl: string;
+  icon: string;
+  x: number;
+  y: number;
+  /**
+   * Where the item lives when not inside a folder or special-location contents list.
+   * `/Music` = media library; `/Desktop` = desktop surface.
+   */
+  home: '/Music' | '/Desktop';
+}
+
+/**
  * Special locations that accept arbitrary items (paste / drop / cut).
  * `/Applications` is excluded (virtual program list).
  */
@@ -83,11 +103,12 @@ export function isWritableSpecialPath(path: string): path is WritableSpecialPath
   return (WRITABLE_SPECIAL_PATHS as readonly string[]).includes(path);
 }
 
-/** Persisted image or video file item. */
-export type DesktopMediaItem = DesktopImageItem | DesktopVideoItem;
+/** Persisted image, video, or audio file item. */
+export type DesktopMediaItem = DesktopImageItem | DesktopVideoItem | DesktopAudioItem;
 
 /** Desktop shortcut, folder, or media file item. */
-export type DesktopItem = DesktopShortcut | DesktopFolder | DesktopImageItem | DesktopVideoItem;
+export type DesktopItem =
+  DesktopShortcut | DesktopFolder | DesktopImageItem | DesktopVideoItem | DesktopAudioItem;
 
 /**
  * Type guard: whether a desktop item is a folder.
@@ -130,15 +151,27 @@ export function isVideoItem(item: DesktopItem): item is DesktopVideoItem {
 }
 
 /**
+ * Type guard: whether a desktop item is a read-only audio entry.
+ *
+ * @param item - Shortcut, folder, or media item
+ * @returns `true` if `item` is a `DesktopAudioItem`
+ */
+export function isAudioItem(item: DesktopItem): item is DesktopAudioItem {
+  return 'kind' in item && item.kind === 'audio';
+}
+
+/**
  * Type guard: whether a desktop item is a persisted media file.
  */
 export function isMediaItem(item: DesktopItem): item is DesktopMediaItem {
-  return isImageItem(item) || isVideoItem(item);
+  return isImageItem(item) || isVideoItem(item) || isAudioItem(item);
 }
 
 /** Asset URL for a media item. */
 export function getMediaUrl(item: DesktopMediaItem): string {
-  return isImageItem(item) ? item.imageUrl : item.videoUrl;
+  if (isImageItem(item)) return item.imageUrl;
+  if (isVideoItem(item)) return item.videoUrl;
+  return item.audioUrl;
 }
 
 /** System storage key for live desktop shortcuts. */
@@ -358,7 +391,7 @@ export function getSpecialLocationContentItems(path: WritableSpecialPath): Deskt
 /**
  * Move an item into a writable special location (Documents, Images, …).
  * Removes it from folders / other special locations first.
- * Media destined for `/Images` or `/Videos` uses `home` (library); otherwise contents.
+ * Media destined for `/Images`, `/Videos`, or `/Music` uses `home` (library); otherwise contents.
  */
 export function moveItemToSpecialLocation(path: WritableSpecialPath, itemId: string): void {
   const folders = getDesktopFolders();
@@ -377,11 +410,13 @@ export function moveItemToSpecialLocation(path: WritableSpecialPath, itemId: str
   const mediaItem = media.find((m) => m.id === itemId);
   const itemFolder = folders.find((f) => f.id === itemId);
 
-  if (mediaItem && (path === '/Images' || path === '/Videos')) {
+  if (mediaItem && (path === '/Images' || path === '/Videos' || path === '/Music')) {
     if (isImageItem(mediaItem) && path === '/Images') {
       mediaItem.home = '/Images';
     } else if (isVideoItem(mediaItem) && path === '/Videos') {
       mediaItem.home = '/Videos';
+    } else if (isAudioItem(mediaItem) && path === '/Music') {
+      mediaItem.home = '/Music';
     } else {
       // Cross-type library (e.g. image → /Videos): store in contents.
       mediaItem.home = '/Desktop';
@@ -551,7 +586,7 @@ function collectTrashMediaRefs(): { ids: Set<string>; urls: Set<string> } {
 }
 
 /** Whether this is the original catalog seed row (not a user copy). */
-function isOriginalSeedRecord(item: DesktopMediaItem, kind: 'image' | 'video'): boolean {
+function isOriginalSeedRecord(item: DesktopMediaItem, kind: 'image' | 'video' | 'audio'): boolean {
   return item.kind === kind && item.id === `${kind}-${item.name}`;
 }
 
@@ -561,7 +596,7 @@ function isOriginalSeedRecord(item: DesktopMediaItem, kind: 'image' | 'video'): 
  * nested in a folder/special location or represented in the trash.
  */
 export function ensureMediaLibrarySeeded(
-  kind: 'image' | 'video',
+  kind: 'image' | 'video' | 'audio',
   catalog: Array<{ name: string; url: string }>
 ): void {
   const media = getDesktopMedia();
@@ -591,37 +626,48 @@ export function ensureMediaLibrarySeeded(
     if (known.has(entry.url)) return;
     known.add(entry.url);
     changed = true;
-    media.push(
-      kind === 'image'
-        ? {
-            id: `image-${entry.name}`,
-            name: entry.name,
-            kind: 'image',
-            imageUrl: entry.url,
-            icon: 'image',
-            x: 0,
-            y: i,
-            home: '/Images',
-          }
-        : {
-            id: `video-${entry.name}`,
-            name: entry.name,
-            kind: 'video',
-            videoUrl: entry.url,
-            icon: 'video',
-            x: 0,
-            y: i,
-            home: '/Videos',
-          }
-    );
+    if (kind === 'image') {
+      media.push({
+        id: `image-${entry.name}`,
+        name: entry.name,
+        kind: 'image',
+        imageUrl: entry.url,
+        icon: 'image',
+        x: 0,
+        y: i,
+        home: '/Images',
+      });
+    } else if (kind === 'video') {
+      media.push({
+        id: `video-${entry.name}`,
+        name: entry.name,
+        kind: 'video',
+        videoUrl: entry.url,
+        icon: 'video',
+        x: 0,
+        y: i,
+        home: '/Videos',
+      });
+    } else {
+      media.push({
+        id: `audio-${entry.name}`,
+        name: entry.name,
+        kind: 'audio',
+        audioUrl: entry.url,
+        icon: 'music',
+        x: 0,
+        y: i,
+        home: '/Music',
+      });
+    }
   });
 
   saveKnownMediaUrls(known);
   if (changed) saveDesktopMedia(media);
 }
 
-/** Media shown in `/Images` or `/Videos` (not inside a folder or other location). */
-export function getLibraryMediaItems(home: '/Images' | '/Videos'): DesktopMediaItem[] {
+/** Media shown in `/Images`, `/Videos`, or `/Music` (not inside a folder or other location). */
+export function getLibraryMediaItems(home: '/Images' | '/Videos' | '/Music'): DesktopMediaItem[] {
   const contained = getIdsInsideFolders();
   return getDesktopMedia().filter((item) => !contained.has(item.id) && item.home === home);
 }
@@ -629,7 +675,7 @@ export function getLibraryMediaItems(home: '/Images' | '/Videos'): DesktopMediaI
 /** All items shown in a writable special location (library media + moved-in items). */
 export function getWritableSpecialLocationItems(path: WritableSpecialPath): DesktopItem[] {
   const fromContents = getSpecialLocationContentItems(path);
-  if (path === '/Images' || path === '/Videos') {
+  if (path === '/Images' || path === '/Videos' || path === '/Music') {
     const library = getLibraryMediaItems(path);
     const contentIds = new Set(fromContents.map((item) => item.id));
     return [...library.filter((item) => !contentIds.has(item.id)), ...fromContents];

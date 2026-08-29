@@ -24,7 +24,8 @@
       "@wallpapers/*": ["./wallpapers/*"],
       "virtual:programs": ["./virtual-programs.d.ts"],
       "virtual:images": ["./virtual-images.d.ts"],
-      "virtual:videos": ["./virtual-videos.d.ts"]
+      "virtual:videos": ["./virtual-videos.d.ts"],
+      "virtual:music": ["./virtual-music.d.ts"]
     }
   },
   "include": [
@@ -40,10 +41,12 @@
     "vite-plugin-programs.ts",
     "vite-plugin-images.ts",
     "vite-plugin-videos.ts",
+    "vite-plugin-music.ts",
     "vite.config.ts",
     "virtual-programs.d.ts",
     "virtual-images.d.ts",
     "virtual-videos.d.ts",
+    "virtual-music.d.ts",
     "vite-env.d.ts"
   ]
 }

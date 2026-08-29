@@ -1,7 +1,13 @@
 import type { ContextMenuManager, MenuContext, MenuItem } from '../../ContextMenuManager';
 import type { ClipboardItemType } from '@core/clipboard';
 
-const CLIPBOARD_ITEM_TYPES: ReadonlySet<string> = new Set(['folder', 'shortcut', 'image', 'video']);
+const CLIPBOARD_ITEM_TYPES: ReadonlySet<string> = new Set([
+  'folder',
+  'shortcut',
+  'image',
+  'video',
+  'audio',
+]);
 
 /** Parse a DOM `data-item-type` into a clipboard type, or `null` if invalid. */
 function parseClipboardItemType(value: string | undefined): ClipboardItemType | null {
@@ -41,7 +47,7 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
           : [itemId];
       const isMultiple = selectedIds.length > 1;
 
-      // Image / video files: Preview or Play, then the same file ops as other items.
+      // Image / video / audio files: Preview or Play, then the same file ops as other items.
       if (itemType === 'image') {
         const picked = (isMultiple ? selectedIds : [itemId])
           .map((id) => document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
@@ -106,9 +112,42 @@ export function registerFolderWindowItemMenu(manager: ContextMenuManager): void 
             label: '',
           });
         }
+      } else if (itemType === 'audio') {
+        const picked = (isMultiple ? selectedIds : [itemId])
+          .map((id) => document.querySelector(`[data-item-id="${id}"]`) as HTMLElement | null)
+          .filter((el): el is HTMLElement => !!el && el.dataset.itemType === 'audio')
+          .map((el) => ({
+            src: el.dataset.itemUrl as string,
+            name: el.dataset.itemName as string,
+          }));
+
+        if (picked.length > 0) {
+          const startIndex = Math.max(
+            0,
+            picked.findIndex(
+              (track) =>
+                track.src === itemEl.dataset.itemUrl && track.name === itemEl.dataset.itemName
+            )
+          );
+          items.push({
+            id: 'folder-window-item-play-audio',
+            label: picked.length > 1 ? `Play ${picked.length} tracks` : 'Play',
+            icon: 'play',
+            action: async () => {
+              window.dispatchEvent(
+                new CustomEvent('open-audio', { detail: { tracks: picked, startIndex } })
+              );
+            },
+          });
+          items.push({
+            id: 'folder-window-item-separator-audio',
+            type: 'separator',
+            label: '',
+          });
+        }
       }
 
-      if (!isMultiple && itemType !== 'image' && itemType !== 'video') {
+      if (!isMultiple && itemType !== 'image' && itemType !== 'video' && itemType !== 'audio') {
         items.push({
           id: 'folder-window-item-open',
           label: 'Open',

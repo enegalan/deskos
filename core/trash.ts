@@ -14,6 +14,7 @@ import {
   isDesktopShortcut,
   isImageItem,
   isVideoItem,
+  isAudioItem,
   isMediaItem,
   findSpecialLocationOfItem,
   removeItemFromAllSpecialLocations,
@@ -529,7 +530,7 @@ function restoreMediaEntry(
   if (!isMediaItem(entry.item)) return;
   if (media.some((m) => m.id === entry.item.id)) return;
 
-  const isLibrary = parentPath === '/Images' || parentPath === '/Videos';
+  const isLibrary = parentPath === '/Images' || parentPath === '/Videos' || parentPath === '/Music';
   const isSpecial = parentPath !== null && isWritableSpecialPath(parentPath);
   const targetFolderPath =
     parentPath && parentPath !== '/Desktop' && !isSpecial ? parentPath : null;
@@ -547,19 +548,29 @@ function restoreMediaEntry(
     }
   }
 
-  const restored: DesktopMediaItem = isImageItem(entry.item)
-    ? {
-        ...entry.item,
-        x,
-        y,
-        home: parentPath === '/Images' ? '/Images' : '/Desktop',
-      }
-    : {
-        ...entry.item,
-        x,
-        y,
-        home: parentPath === '/Videos' ? '/Videos' : '/Desktop',
-      };
+  let restored: DesktopMediaItem;
+  if (isImageItem(entry.item)) {
+    restored = {
+      ...entry.item,
+      x,
+      y,
+      home: parentPath === '/Images' ? '/Images' : '/Desktop',
+    };
+  } else if (isVideoItem(entry.item)) {
+    restored = {
+      ...entry.item,
+      x,
+      y,
+      home: parentPath === '/Videos' ? '/Videos' : '/Desktop',
+    };
+  } else {
+    restored = {
+      ...entry.item,
+      x,
+      y,
+      home: parentPath === '/Music' ? '/Music' : '/Desktop',
+    };
+  }
 
   media.push(restored);
 
@@ -660,6 +671,7 @@ export function getTrashEntryName(entry: TrashEntry): string {
   if (isDesktopFolder(entry.item)) return entry.item.name;
   if (isImageItem(entry.item)) return entry.item.name;
   if (isVideoItem(entry.item)) return entry.item.name;
+  if (isAudioItem(entry.item)) return entry.item.name;
   return entry.item.customName || entry.item.programId;
 }
 
@@ -673,5 +685,6 @@ export function getTrashEntryIcon(entry: TrashEntry): string {
   }
   if (isImageItem(entry.item)) return entry.item.icon || 'image';
   if (isVideoItem(entry.item)) return entry.item.icon || 'video';
+  if (isAudioItem(entry.item)) return entry.item.icon || 'music';
   return 'package';
 }
