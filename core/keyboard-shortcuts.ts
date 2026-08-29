@@ -231,6 +231,11 @@ class KeyboardShortcutsManager {
       return;
     }
 
+    // DialogContainer owns Escape / confirm while a system dialog is open
+    if (dialog.getCurrent()) {
+      return;
+    }
+
     const shortcutKey = this.getShortcutKey(e);
     const shortcut = this.shortcuts.get(shortcutKey);
 

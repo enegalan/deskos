@@ -77,9 +77,17 @@ export function getMimeTypeForName(name: string): string {
 
 /**
  * Build a blob: URL from UTF-8 text content for preview / browser open.
+ * Callers must revoke with `revokeContentBlobUrl` when the consumer releases it.
  */
 export function createContentBlobUrl(content: string, name: string): string {
   const mime = getMimeTypeForName(name);
   const blob = new Blob([content], { type: mime });
   return URL.createObjectURL(blob);
+}
+
+/** Revoke a blob: URL previously created by `createContentBlobUrl`. */
+export function revokeContentBlobUrl(url: string): void {
+  if (url.startsWith('blob:')) {
+    URL.revokeObjectURL(url);
+  }
 }

@@ -60,6 +60,11 @@ export function Taskbar() {
 
   useEffect(() => {
     if (!pickerProgramId) return;
+    const programWindows = windows.filter((w) => w.programId === pickerProgramId);
+    if (programWindows.length < 2) {
+      setPickerProgramId(null);
+      return;
+    }
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Node | null;
       if (target && dockRef.current?.contains(target)) return;
@@ -74,7 +79,7 @@ export function Taskbar() {
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [pickerProgramId]);
+  }, [pickerProgramId, windows]);
 
   const windowsByProgram = new Map<string, typeof windows>();
   windows.forEach((win) => {

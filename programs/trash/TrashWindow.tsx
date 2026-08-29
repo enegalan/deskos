@@ -7,7 +7,6 @@ import {
   getTrashItems,
   restoreFromTrash,
   deleteForever,
-  emptyTrash,
   isTrashEmpty,
   getTrashEntryName,
   getTrashEntryIcon,
@@ -211,6 +210,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
             enabled: !empty,
             action: async () => {
               if (isTrashEmpty()) return;
+              const entryIds = getTrashItems().map((entry) => entry.id);
               if (
                 !(await dialog.confirm(
                   'Are you sure you want to permanently erase the items in the Trash?',
@@ -220,7 +220,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
               ) {
                 return;
               }
-              emptyTrash();
+              deleteForever(entryIds);
               setSelectedIds(new Set());
             },
           },
@@ -277,6 +277,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
 
   const handleEmpty = useCallback(async () => {
     if (isTrashEmpty()) return;
+    const entryIds = getTrashItems().map((entry) => entry.id);
     if (
       !(await dialog.confirm(
         'Are you sure you want to permanently erase the items in the Trash?',
@@ -286,7 +287,7 @@ export function TrashWindow({ ctx }: TrashWindowProps) {
     ) {
       return;
     }
-    emptyTrash();
+    deleteForever(entryIds);
     setSelectedIds(new Set());
   }, []);
 

@@ -400,8 +400,6 @@ const FolderIcon = memo(function FolderIcon({
 /** Desktop media icon — same drag / transition behavior as folder & app icons. */
 const DesktopMediaIcon = memo(function DesktopMediaIcon({
   media,
-  mediaItems: _mediaItems,
-  selectedIds: _selectedIds,
   onUpdate,
   isSelected,
   isCut,
@@ -416,8 +414,6 @@ const DesktopMediaIcon = memo(function DesktopMediaIcon({
   resolveItemPosition,
 }: {
   media: DesktopMediaItem;
-  mediaItems: DesktopMediaItem[];
-  selectedIds: Set<string>;
   onUpdate: () => void;
   isSelected: boolean;
   isCut?: boolean;
@@ -435,8 +431,6 @@ const DesktopMediaIcon = memo(function DesktopMediaIcon({
   onDragGroupEnd: () => void;
   resolveItemPosition: (id: string, x: number, y: number) => void;
 }) {
-  void _mediaItems;
-  void _selectedIds;
   void layoutTick;
   const settings = useKernel((state) => state.settings);
   const url = getMediaUrl(media);
@@ -733,10 +727,13 @@ export function DesktopIcons() {
   const filesRef = useRef(fileItems);
   const suppressClickClearRef = useRef(false);
   selectedIdsRef.current = selectedIds;
-  shortcutsRef.current = shortcuts;
-  foldersRef.current = folders;
-  mediaRef.current = mediaItems;
-  filesRef.current = fileItems;
+
+  useEffect(() => {
+    shortcutsRef.current = shortcuts;
+    foldersRef.current = folders;
+    mediaRef.current = mediaItems;
+    filesRef.current = fileItems;
+  }, [shortcuts, folders, mediaItems, fileItems]);
 
   const loadItems = useCallback(() => {
     const allFolders = getDesktopFolders();
@@ -1334,8 +1331,6 @@ export function DesktopIcons() {
         <DesktopMediaIcon
           key={media.id}
           media={media}
-          mediaItems={mediaItems}
-          selectedIds={selectedIds}
           onUpdate={handleUpdate}
           isSelected={selectedIds.has(media.id)}
           isCut={cutIds.has(media.id)}

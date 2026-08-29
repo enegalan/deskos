@@ -97,9 +97,9 @@ export interface DesktopFileItem {
   y: number;
   /**
    * Where the item lives when not inside a folder or special-location contents list.
-   * `/Desktop` = desktop surface; writable special paths when placed there via contents.
+   * `/Desktop` = desktop surface. Special-location membership uses the contents map.
    */
-  home: '/Desktop' | WritableSpecialPath;
+  home: '/Desktop';
 }
 
 /**
@@ -890,10 +890,8 @@ function getSiblingNames(parentPath: string): Set<string> {
 }
 
 /** Unique filename among siblings (`Untitled.txt`, `Untitled (1).txt`, …). */
-function generateUniqueFileName(baseName: string, parentPath: string): string {
-  const names = getSiblingNames(parentPath);
+function uniqueNameAmong(baseName: string, names: Set<string>): string {
   if (!names.has(baseName)) return baseName;
-
   const { stem, ext } = splitFileName(baseName);
   let number = 1;
   let uniqueName = `${stem} (${number})${ext}`;
@@ -902,6 +900,11 @@ function generateUniqueFileName(baseName: string, parentPath: string): string {
     uniqueName = `${stem} (${number})${ext}`;
   }
   return uniqueName;
+}
+
+/** Unique filename among siblings under a parent path. */
+function generateUniqueFileName(baseName: string, parentPath: string): string {
+  return uniqueNameAmong(baseName, getSiblingNames(parentPath));
 }
 
 /**
@@ -1008,16 +1011,7 @@ export function renameDesktopFile(fileId: string, newName: string): void {
 
   const names = getSiblingNames(parentPath);
   names.delete(file.name);
-  let uniqueName = trimmed;
-  if (names.has(uniqueName)) {
-    const { stem, ext } = splitFileName(trimmed);
-    let number = 1;
-    uniqueName = `${stem} (${number})${ext}`;
-    while (names.has(uniqueName)) {
-      number++;
-      uniqueName = `${stem} (${number})${ext}`;
-    }
-  }
+  const uniqueName = uniqueNameAmong(trimmed, names);
 
   file.name = uniqueName;
   saveDesktopFiles(files);
@@ -1052,16 +1046,7 @@ export function renameDesktopMedia(mediaId: string, newName: string): void {
 
   const names = getSiblingNames(parentPath);
   names.delete(item.name);
-  let uniqueName = trimmed;
-  if (names.has(uniqueName)) {
-    const { stem, ext } = splitFileName(trimmed);
-    let number = 1;
-    uniqueName = `${stem} (${number})${ext}`;
-    while (names.has(uniqueName)) {
-      number++;
-      uniqueName = `${stem} (${number})${ext}`;
-    }
-  }
+  const uniqueName = uniqueNameAmong(trimmed, names);
 
   item.name = uniqueName;
   saveDesktopMedia(media);

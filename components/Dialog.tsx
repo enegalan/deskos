@@ -94,15 +94,21 @@ export function DialogContainer() {
               className={`system-dialog-input${promptError ? ' system-dialog-input-error' : ''}`}
               type="text"
               value={promptValue}
+              aria-label={current.title}
               aria-invalid={promptError ? true : undefined}
               aria-required={current.required || undefined}
+              aria-describedby={promptError ? 'system-dialog-prompt-error' : undefined}
               onChange={(e) => {
                 setPromptValue(e.target.value);
                 if (promptError) setPromptError('');
               }}
               onKeyDown={handlePromptKeyDown}
             />
-            {promptError && <p className="system-dialog-error">{promptError}</p>}
+            {promptError && (
+              <p id="system-dialog-prompt-error" className="system-dialog-error">
+                {promptError}
+              </p>
+            )}
           </form>
         )}
 

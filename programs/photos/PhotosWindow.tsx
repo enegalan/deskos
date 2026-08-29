@@ -1,8 +1,9 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ProgramContext } from '@core/context';
 import { useKernel } from '@core/kernel';
 import { useWindowId, useWindowSessionState } from '@core/window-session';
 import { Icon } from '../../components/Icon';
+import { revokeContentBlobUrl } from '@core/file-associations';
 
 /** One image shown by the previewer. */
 interface PreviewImage {
@@ -71,6 +72,23 @@ export function PhotosWindow({ ctx, initialImages, initialStartIndex }: PhotosWi
   );
   const { images, index, zoom, rotation } = preview;
   const current = images[index] ?? images[0];
+  const imagesRef = useRef(images);
+
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  // Revoke object URLs created by open-file when this window closes.
+  useEffect(() => {
+    return () => {
+      const seen = new Set<string>();
+      for (const image of imagesRef.current) {
+        if (!image.src.startsWith('blob:') || seen.has(image.src)) continue;
+        seen.add(image.src);
+        revokeContentBlobUrl(image.src);
+      }
+    };
+  }, []);
 
   // Restore without preview payload (or empty open) — nothing to show.
   useEffect(() => {

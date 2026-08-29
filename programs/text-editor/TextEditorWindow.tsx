@@ -22,7 +22,10 @@ export function TextEditorWindow({ ctx, fileId: initialFileId }: TextEditorWindo
   const [fileName, setFileName] = useState('Untitled');
   const saveTimerRef = useRef<number | null>(null);
   const contentRef = useRef(content);
-  contentRef.current = content;
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     if (!fileId) {

@@ -24,7 +24,10 @@ function getFolderOpenBridge(): FolderOpenBridge {
       pending: [],
       queue(request) {
         bridge.pending.push(request);
-        void launchOrFocusProgram('folder', true);
+        void launchOrFocusProgram('folder', true).catch(() => {
+          const index = bridge.pending.indexOf(request);
+          if (index >= 0) bridge.pending.splice(index, 1);
+        });
       },
     };
     win[BRIDGE_KEY] = bridge;
@@ -37,8 +40,12 @@ function getFolderOpenBridge(): FolderOpenBridge {
   } else {
     // Keep queue pointing at latest launchOrFocusProgram after HMR.
     win[BRIDGE_KEY].queue = (request) => {
-      win[BRIDGE_KEY]!.pending.push(request);
-      void launchOrFocusProgram('folder', true);
+      const bridge = win[BRIDGE_KEY]!;
+      bridge.pending.push(request);
+      void launchOrFocusProgram('folder', true).catch(() => {
+        const index = bridge.pending.indexOf(request);
+        if (index >= 0) bridge.pending.splice(index, 1);
+      });
     };
   }
   return win[BRIDGE_KEY];

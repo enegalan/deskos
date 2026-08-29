@@ -36,7 +36,10 @@ import { getFileExtension, getMimeTypeForName } from './file-associations';
 export const DESKOS_URL_DRAG_TYPE = 'application/x-deskos-browser-bookmark-url';
 
 /** Max bytes to store as a data URL in system storage (keep localStorage healthy). */
-const MAX_INLINE_BYTES = 4 * 1024 * 1024;
+const MAX_INLINE_BYTES = 1.5 * 1024 * 1024;
+
+/** Bound remote fetches so stalled requests fall through to existing catch paths. */
+const FETCH_TIMEOUT_MS = 30_000;
 
 const MEDIA_STORAGE_KEY = 'desktop-media';
 const systemStorage = createScopedStorage('system');
@@ -48,7 +51,7 @@ function isImageFileName(name: string): boolean {
 
 /** Whether a File / name looks like a video. */
 function isVideoFileName(name: string): boolean {
-  return /^(mp4|webm|ogg|ogv|mov|m4v)$/i.test(getFileExtension(name));
+  return /^(mp4|webm|ogv|mov|m4v)$/i.test(getFileExtension(name));
 }
 
 /** Whether a File / name looks like audio. */
@@ -88,14 +91,24 @@ function readFileAsText(file: File): Promise<string> {
   });
 }
 
-/** Read a File as a data URL. */
-function readFileAsDataUrl(file: File): Promise<string> {
+/** Read a Blob / File as a data URL. */
+function readFileAsDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ''));
     reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
+}
+
+/** AbortSignal that fires after `FETCH_TIMEOUT_MS`. */
+function fetchTimeoutSignal(): AbortSignal {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(FETCH_TIMEOUT_MS);
+  }
+  const controller = new AbortController();
+  window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return controller.signal;
 }
 
 /** Next free desktop cell, optionally preferring a point. */
@@ -242,18 +255,13 @@ export async function importUrlToDesktop(
     try {
       let dataUrl = trimmed;
       if (!trimmed.startsWith('data:')) {
-        const response = await fetch(trimmed);
+        const response = await fetch(trimmed, { signal: fetchTimeoutSignal() });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const blob = await response.blob();
         if (blob.size > MAX_INLINE_BYTES) {
           return createDesktopLink(trimmed, options?.name, x, y, parentPath);
         }
-        dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result ?? ''));
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(blob);
-        });
+        dataUrl = await readFileAsDataUrl(blob);
       }
       const name = options?.name || nameFromUrl(trimmed, 'image.png');
       const item = createUserMediaItem('image', name, dataUrl, x, y);
@@ -296,6 +304,17 @@ export async function importOsFiles(
         continue;
       }
 
+      if (file.type.startsWith('audio/') || isAudioFileName(file.name)) {
+        if (file.size > MAX_INLINE_BYTES) {
+          console.warn('[file-transfer] Audio too large to inline:', file.name);
+          continue;
+        }
+        const dataUrl = await readFileAsDataUrl(file);
+        const item = createUserMediaItem('audio', file.name, dataUrl, pos.x, pos.y);
+        created.push(placeNewMedia(item, options?.parentPath));
+        continue;
+      }
+
       if (isVideoFileName(file.name) || file.type.startsWith('video/')) {
         if (file.size > MAX_INLINE_BYTES) {
           console.warn('[file-transfer] Video too large to inline:', file.name);
@@ -303,17 +322,6 @@ export async function importOsFiles(
         }
         const dataUrl = await readFileAsDataUrl(file);
         const item = createUserMediaItem('video', file.name, dataUrl, pos.x, pos.y);
-        created.push(placeNewMedia(item, options?.parentPath));
-        continue;
-      }
-
-      if (isAudioFileName(file.name) || file.type.startsWith('audio/')) {
-        if (file.size > MAX_INLINE_BYTES) {
-          console.warn('[file-transfer] Audio too large to inline:', file.name);
-          continue;
-        }
-        const dataUrl = await readFileAsDataUrl(file);
-        const item = createUserMediaItem('audio', file.name, dataUrl, pos.x, pos.y);
         created.push(placeNewMedia(item, options?.parentPath));
         continue;
       }
@@ -367,7 +375,7 @@ export async function downloadDesktopItem(item: DesktopItem): Promise<void> {
       return;
     }
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: fetchTimeoutSignal() });
       const blob = await response.blob();
       triggerBlobDownload(blob, item.name);
     } catch {
@@ -450,12 +458,29 @@ export function pickAndImportFiles(options?: {
   input.type = 'file';
   input.multiple = true;
   input.style.display = 'none';
-  input.onchange = () => {
-    if (input.files && input.files.length > 0) {
-      void importOsFiles(input.files, options);
-    }
+
+  const cleanup = () => {
+    if (!input.isConnected) return;
     input.remove();
   };
+
+  input.onchange = () => {
+    const files = input.files;
+    cleanup();
+    if (files && files.length > 0) {
+      void importOsFiles(files, options);
+    }
+  };
+  input.addEventListener('cancel', cleanup);
+  // Browsers without a cancel event: remove the input after the picker closes.
+  window.addEventListener(
+    'focus',
+    () => {
+      window.setTimeout(cleanup, 500);
+    },
+    { once: true }
+  );
+
   document.body.appendChild(input);
   input.click();
 }

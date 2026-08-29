@@ -11,6 +11,7 @@ import type { ProgramContext } from '@core/context';
 import { useWindowSessionState } from '@core/window-session';
 import { TITLE_PATH } from '../../vite-plugin-page-title';
 import { Icon } from '@components/Icon';
+import { revokeContentBlobUrl } from '@core/file-associations';
 
 /** Internal URL for the new-tab home page. */
 const HOME_URL = 'about:home';
@@ -1237,6 +1238,20 @@ export function BrowserWindow({ ctx, initialUrl, initialTitle }: BrowserWindowPr
   closeTabsToRightRef.current = closeTabsToRight;
   setActiveTabIdRef.current = setActiveTabId;
   tabsRef.current = tabs;
+
+  // Revoke object URLs created by open-file when this window closes.
+  useEffect(() => {
+    return () => {
+      const seen = new Set<string>();
+      for (const tab of tabsRef.current) {
+        for (const url of tab.history) {
+          if (!url.startsWith('blob:') || seen.has(url)) continue;
+          seen.add(url);
+          revokeContentBlobUrl(url);
+        }
+      }
+    };
+  }, []);
 
   useEffect(() => {
     return ctx.contextMenu.register('.ie-tab', {

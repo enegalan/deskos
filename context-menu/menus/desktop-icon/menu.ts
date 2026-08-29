@@ -195,6 +195,32 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
         selectedFiles.length +
         selectedMedia.length;
       if (totalSelectedForCopyCut > 0) {
+        const buildClipboardItems = async () => {
+          const { getMediaById, isImageItem, isVideoItem, isAudioItem } =
+            await import('@core/desktop-shortcuts');
+          const clipboardItems: Array<{
+            id: string;
+            type: 'shortcut' | 'folder' | 'file' | 'image' | 'video' | 'audio';
+          }> = [];
+          selectedShortcuts.forEach((id) => {
+            clipboardItems.push({ id, type: 'shortcut' });
+          });
+          selectedFolders.forEach((id) => {
+            clipboardItems.push({ id, type: 'folder' });
+          });
+          selectedFiles.forEach((id) => {
+            clipboardItems.push({ id, type: 'file' });
+          });
+          selectedMedia.forEach((id) => {
+            const media = getMediaById(id);
+            if (!media) return;
+            if (isImageItem(media)) clipboardItems.push({ id, type: 'image' });
+            else if (isVideoItem(media)) clipboardItems.push({ id, type: 'video' });
+            else if (isAudioItem(media)) clipboardItems.push({ id, type: 'audio' });
+          });
+          return clipboardItems;
+        };
+
         items.push({
           id: 'desktop-icon-copy',
           label: 'Copy',
@@ -203,28 +229,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
           action: async () => {
             try {
               const { copy } = await import('@core/clipboard');
-              const { getMediaById, isImageItem, isVideoItem, isAudioItem } =
-                await import('@core/desktop-shortcuts');
-              const clipboardItems: Array<{
-                id: string;
-                type: 'shortcut' | 'folder' | 'file' | 'image' | 'video' | 'audio';
-              }> = [];
-              selectedShortcuts.forEach((id) => {
-                clipboardItems.push({ id, type: 'shortcut' });
-              });
-              selectedFolders.forEach((id) => {
-                clipboardItems.push({ id, type: 'folder' });
-              });
-              selectedFiles.forEach((id) => {
-                clipboardItems.push({ id, type: 'file' });
-              });
-              selectedMedia.forEach((id) => {
-                const media = getMediaById(id);
-                if (!media) return;
-                if (isImageItem(media)) clipboardItems.push({ id, type: 'image' });
-                else if (isVideoItem(media)) clipboardItems.push({ id, type: 'video' });
-                else if (isAudioItem(media)) clipboardItems.push({ id, type: 'audio' });
-              });
+              const clipboardItems = await buildClipboardItems();
               if (clipboardItems.length > 0) {
                 copy({
                   type: 'desktop-items',
@@ -246,28 +251,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
           action: async () => {
             try {
               const { cut } = await import('@core/clipboard');
-              const { getMediaById, isImageItem, isVideoItem, isAudioItem } =
-                await import('@core/desktop-shortcuts');
-              const clipboardItems: Array<{
-                id: string;
-                type: 'shortcut' | 'folder' | 'file' | 'image' | 'video' | 'audio';
-              }> = [];
-              selectedShortcuts.forEach((id) => {
-                clipboardItems.push({ id, type: 'shortcut' });
-              });
-              selectedFolders.forEach((id) => {
-                clipboardItems.push({ id, type: 'folder' });
-              });
-              selectedFiles.forEach((id) => {
-                clipboardItems.push({ id, type: 'file' });
-              });
-              selectedMedia.forEach((id) => {
-                const media = getMediaById(id);
-                if (!media) return;
-                if (isImageItem(media)) clipboardItems.push({ id, type: 'image' });
-                else if (isVideoItem(media)) clipboardItems.push({ id, type: 'video' });
-                else if (isAudioItem(media)) clipboardItems.push({ id, type: 'audio' });
-              });
+              const clipboardItems = await buildClipboardItems();
               if (clipboardItems.length > 0) {
                 cut({
                   type: 'desktop-items',
@@ -375,7 +359,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
               try {
                 const { renameDesktopFolder } = await import('@core/desktop-shortcuts');
                 const newName = await dialog.prompt('Enter new folder name:');
-                if (newName && newName.trim()) {
+                if (newName !== null && newName.trim()) {
                   renameDesktopFolder(folderId, newName.trim());
                 }
               } catch (error) {
@@ -386,7 +370,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
                 const { getFileById, renameDesktopFile } = await import('@core/desktop-shortcuts');
                 const file = getFileById(fileId);
                 const newName = await dialog.prompt('Enter new file name:', file?.name ?? '');
-                if (newName && newName.trim()) {
+                if (newName !== null && newName.trim()) {
                   renameDesktopFile(fileId, newName.trim());
                 }
               } catch (error) {
@@ -398,7 +382,7 @@ export function registerDesktopIconMenu(manager: ContextMenuManager): void {
                   await import('@core/desktop-shortcuts');
                 const media = getMediaById(mediaId);
                 const newName = await dialog.prompt('Enter new name:', media?.name ?? '');
-                if (newName && newName.trim()) {
+                if (newName !== null && newName.trim()) {
                   renameDesktopMedia(mediaId, newName.trim());
                 }
               } catch (error) {
