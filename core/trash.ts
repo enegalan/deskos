@@ -15,6 +15,10 @@ import {
   isImageItem,
   isVideoItem,
   isMediaItem,
+  findSpecialLocationOfItem,
+  removeItemFromAllSpecialLocations,
+  moveItemToSpecialLocation,
+  isWritableSpecialPath,
   type DesktopShortcut,
   type DesktopFolder,
   type DesktopItem,
@@ -134,7 +138,7 @@ function findOriginalParentPath(
       return folderPathOf(folder, paths);
     }
   }
-  return null;
+  return findSpecialLocationOfItem(itemId);
 }
 
 /** True if the desktop shortcut must not be soft-deleted (program flag). */
@@ -202,6 +206,7 @@ function captureFolderTree(
       parent.contents = parent.contents.filter((id) => id !== folderId);
     }
   }
+  removeItemFromAllSpecialLocations(folderId);
 
   const index = folders.findIndex((f) => f.id === folderId);
   if (index !== -1) {
@@ -251,6 +256,8 @@ function captureShortcut(
     }
   }
 
+  removeItemFromAllSpecialLocations(shortcutId);
+
   shortcuts.splice(index, 1);
 
   return {
@@ -282,6 +289,8 @@ function captureMediaItem(
       folder.contents = folder.contents.filter((id) => id !== mediaId);
     }
   }
+
+  removeItemFromAllSpecialLocations(mediaId);
 
   media.splice(index, 1);
 
@@ -467,11 +476,13 @@ function restoreShortcutEntry(
   // Already restored / still present
   if (shortcuts.some((s) => s.id === entry.item.id)) return;
 
-  const targetParent = parentPath && parentPath !== '/Desktop' ? parentPath : null;
+  const isSpecial = parentPath !== null && isWritableSpecialPath(parentPath);
+  const targetParent =
+    parentPath && parentPath !== '/Desktop' && !isSpecial ? parentPath : null;
   let x = entry.item.x;
   let y = entry.item.y;
 
-  if (!targetParent) {
+  if (!targetParent && !isSpecial) {
     const occupied = desktopRootOccupied(shortcuts, folders, media);
     const conflict = occupied.some((pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1);
     if (conflict) {
@@ -487,6 +498,15 @@ function restoreShortcutEntry(
     y,
   };
   shortcuts.push(shortcut);
+
+  if (isSpecial && parentPath) {
+    saveShortcuts(shortcuts);
+    moveItemToSpecialLocation(parentPath, shortcut.id);
+    const live = getDesktopShortcuts();
+    shortcuts.length = 0;
+    live.forEach((s) => shortcuts.push(s));
+    return;
+  }
 
   if (targetParent) {
     const liveParent = findFolderByPathInMemory(targetParent, folders, paths);
@@ -511,13 +531,14 @@ function restoreMediaEntry(
   if (media.some((m) => m.id === entry.item.id)) return;
 
   const isLibrary = parentPath === '/Images' || parentPath === '/Videos';
+  const isSpecial = parentPath !== null && isWritableSpecialPath(parentPath);
   const targetFolderPath =
-    parentPath && parentPath !== '/Desktop' && !isLibrary ? parentPath : null;
+    parentPath && parentPath !== '/Desktop' && !isSpecial ? parentPath : null;
 
   let x = entry.item.x;
   let y = entry.item.y;
 
-  if (!targetFolderPath && !isLibrary) {
+  if (!targetFolderPath && !isLibrary && !isSpecial) {
     const occupied = desktopRootOccupied(shortcuts, folders, media);
     const conflict = occupied.some((pos) => Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1);
     if (conflict) {
@@ -542,6 +563,17 @@ function restoreMediaEntry(
       };
 
   media.push(restored);
+
+  if (isSpecial && parentPath) {
+    // Persist media first, then place into special location contents / library home.
+    saveMedia(media);
+    moveItemToSpecialLocation(parentPath, restored.id);
+    // moveItem may have mutated media home / special map; reload into caller array
+    const live = getDesktopMedia();
+    media.length = 0;
+    live.forEach((m) => media.push(m));
+    return;
+  }
 
   if (targetFolderPath) {
     const liveParent = findFolderByPathInMemory(targetFolderPath, folders, paths);
@@ -577,8 +609,7 @@ export function restoreFromTrash(entryIds: string[]): void {
     if (
       parentPath &&
       parentPath !== '/Desktop' &&
-      parentPath !== '/Images' &&
-      parentPath !== '/Videos' &&
+      !isWritableSpecialPath(parentPath) &&
       !findFolderByPathInMemory(parentPath, folders, paths)
     ) {
       parentPath = null;

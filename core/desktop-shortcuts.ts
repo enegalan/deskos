@@ -37,7 +37,7 @@ export interface DesktopImageItem {
   x: number;
   y: number;
   /**
-   * Where the item lives when not inside a `DesktopFolder.contents` list.
+   * Where the item lives when not inside a folder or special-location contents list.
    * `/Images` = media library; `/Desktop` = desktop surface.
    */
   home: '/Images' | '/Desktop';
@@ -57,10 +57,30 @@ export interface DesktopVideoItem {
   x: number;
   y: number;
   /**
-   * Where the item lives when not inside a `DesktopFolder.contents` list.
+   * Where the item lives when not inside a folder or special-location contents list.
    * `/Videos` = media library; `/Desktop` = desktop surface.
    */
   home: '/Videos' | '/Desktop';
+}
+
+/**
+ * Special locations that accept arbitrary items (paste / drop / cut).
+ * `/Applications` is excluded (virtual program list).
+ */
+export const WRITABLE_SPECIAL_PATHS = [
+  '/Documents',
+  '/Downloads',
+  '/Music',
+  '/Images',
+  '/Videos',
+] as const;
+
+/** Absolute path of a writable special location. */
+export type WritableSpecialPath = (typeof WRITABLE_SPECIAL_PATHS)[number];
+
+/** Whether `path` is a special location that stores user-moved items. */
+export function isWritableSpecialPath(path: string): path is WritableSpecialPath {
+  return (WRITABLE_SPECIAL_PATHS as readonly string[]).includes(path);
 }
 
 /** Persisted image or video file item. */
@@ -131,6 +151,8 @@ const FOLDER_PATHS_STORAGE_KEY = 'folder-paths';
 const MEDIA_STORAGE_KEY = 'desktop-media';
 /** URLs already seeded from the bundled catalog (never re-seed after delete). */
 const MEDIA_KNOWN_URLS_KEY = 'media-known-urls';
+/** System storage key: special location path → item id list. */
+const SPECIAL_CONTENTS_KEY = 'special-location-contents';
 
 /**
  * Get current grid size from settings
@@ -265,15 +287,148 @@ function isRootDesktopFolder(folder: DesktopFolder): boolean {
   return !folder.parentPath || folder.parentPath === '/Desktop';
 }
 
+/** Special path → item ids stored in that location. */
+function getSpecialContentsMap(): Record<string, string[]> {
+  return systemStorage.getItem<Record<string, string[]>>(SPECIAL_CONTENTS_KEY) || {};
+}
+
+function saveSpecialContentsMap(map: Record<string, string[]>): void {
+  systemStorage.setItem(SPECIAL_CONTENTS_KEY, map);
+}
+
 /**
- * Get all item IDs inside folders
+ * Item ids nested in a user folder or a writable special location.
+ * Used so those items are not also listed on the desktop / media libraries.
  */
 function getIdsInsideFolders(): Set<string> {
   const ids = new Set<string>();
   getDesktopFolders().forEach((folder) => {
     folder.contents.forEach((id) => ids.add(id));
   });
+  Object.values(getSpecialContentsMap()).forEach((list) => {
+    list.forEach((id) => ids.add(id));
+  });
   return ids;
+}
+
+/** Remove `itemId` from every special-location contents list. */
+export function removeItemFromAllSpecialLocations(itemId: string): void {
+  const map = getSpecialContentsMap();
+  let changed = false;
+  for (const path of Object.keys(map)) {
+    const next = map[path].filter((id) => id !== itemId);
+    if (next.length !== map[path].length) {
+      map[path] = next;
+      changed = true;
+    }
+  }
+  if (changed) saveSpecialContentsMap(map);
+}
+
+/** Special location path that currently contains `itemId`, or `null`. */
+export function findSpecialLocationOfItem(itemId: string): WritableSpecialPath | null {
+  const map = getSpecialContentsMap();
+  for (const path of WRITABLE_SPECIAL_PATHS) {
+    if (map[path]?.includes(itemId)) return path;
+  }
+  return null;
+}
+
+/** Resolve stored ids in a special location to live desktop items. */
+export function getSpecialLocationContentItems(path: WritableSpecialPath): DesktopItem[] {
+  const ids = getSpecialContentsMap()[path] || [];
+  if (ids.length === 0) return [];
+
+  const shortcuts = getDesktopShortcuts();
+  const folders = getDesktopFolders();
+  const media = getDesktopMedia();
+
+  return ids
+    .map((itemId) => {
+      const shortcut = shortcuts.find((s) => s.id === itemId);
+      if (shortcut) return shortcut;
+      const folder = folders.find((f) => f.id === itemId);
+      if (folder) return folder;
+      return media.find((m) => m.id === itemId) || null;
+    })
+    .filter((item): item is DesktopItem => item !== null);
+}
+
+/**
+ * Move an item into a writable special location (Documents, Images, …).
+ * Removes it from folders / other special locations first.
+ * Media destined for `/Images` or `/Videos` uses `home` (library); otherwise contents.
+ */
+export function moveItemToSpecialLocation(path: WritableSpecialPath, itemId: string): void {
+  const folders = getDesktopFolders();
+  let foldersChanged = false;
+  folders.forEach((folder) => {
+    if (folder.contents.includes(itemId)) {
+      folder.contents = folder.contents.filter((id) => id !== itemId);
+      foldersChanged = true;
+    }
+  });
+  if (foldersChanged) systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+
+  removeItemFromAllSpecialLocations(itemId);
+
+  const media = getDesktopMedia();
+  const mediaItem = media.find((m) => m.id === itemId);
+  const itemFolder = folders.find((f) => f.id === itemId);
+
+  if (mediaItem && (path === '/Images' || path === '/Videos')) {
+    if (isImageItem(mediaItem) && path === '/Images') {
+      mediaItem.home = '/Images';
+    } else if (isVideoItem(mediaItem) && path === '/Videos') {
+      mediaItem.home = '/Videos';
+    } else {
+      // Cross-type library (e.g. image → /Videos): store in contents.
+      mediaItem.home = '/Desktop';
+      const map = getSpecialContentsMap();
+      const list = map[path] || [];
+      if (!list.includes(itemId)) {
+        list.push(itemId);
+        map[path] = list;
+        saveSpecialContentsMap(map);
+      }
+    }
+    saveDesktopMedia(media);
+    notifyDesktopUpdated();
+    return;
+  }
+
+  if (mediaItem) {
+    mediaItem.home = '/Desktop';
+    saveDesktopMedia(media);
+  }
+
+  if (itemFolder) {
+    itemFolder.parentPath = path;
+    systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+    const paths = getFolderPaths();
+    paths[itemId] = `${path}/${itemFolder.name}`;
+    setFolderPaths(paths);
+  }
+
+  const map = getSpecialContentsMap();
+  const list = map[path] || [];
+  if (!list.includes(itemId)) {
+    list.push(itemId);
+    map[path] = list;
+    saveSpecialContentsMap(map);
+  }
+
+  notifyDesktopUpdated();
+}
+
+/** Remove an item from one special location's contents list. */
+export function removeItemFromSpecialLocation(path: string, itemId: string): void {
+  const map = getSpecialContentsMap();
+  const list = map[path];
+  if (!list || !list.includes(itemId)) return;
+  map[path] = list.filter((id) => id !== itemId);
+  saveSpecialContentsMap(map);
+  notifyDesktopUpdated();
 }
 
 /** Notify UI that desktop / folder / media contents changed. */
@@ -342,10 +497,21 @@ export function ensureMediaLibrarySeeded(
   if (changed) saveDesktopMedia(media);
 }
 
-/** Media shown in `/Images` or `/Videos` (not inside a user folder). */
+/** Media shown in `/Images` or `/Videos` (not inside a folder or other location). */
 export function getLibraryMediaItems(home: '/Images' | '/Videos'): DesktopMediaItem[] {
-  const inFolders = getIdsInsideFolders();
-  return getDesktopMedia().filter((item) => !inFolders.has(item.id) && item.home === home);
+  const contained = getIdsInsideFolders();
+  return getDesktopMedia().filter((item) => !contained.has(item.id) && item.home === home);
+}
+
+/** All items shown in a writable special location (library media + moved-in items). */
+export function getWritableSpecialLocationItems(path: WritableSpecialPath): DesktopItem[] {
+  const fromContents = getSpecialLocationContentItems(path);
+  if (path === '/Images' || path === '/Videos') {
+    const library = getLibraryMediaItems(path);
+    const contentIds = new Set(fromContents.map((item) => item.id));
+    return [...library.filter((item) => !contentIds.has(item.id)), ...fromContents];
+  }
+  return fromContents;
 }
 
 /** Media on the desktop surface. */
@@ -399,7 +565,7 @@ export function copyDesktopMedia(
   return clone;
 }
 
-/** Move media to the desktop grid (also removes it from any folder). */
+/** Move media to the desktop grid (also removes it from any folder / special location). */
 export function placeMediaOnDesktop(mediaId: string, x: number, y: number): void {
   const media = getDesktopMedia();
   const item = media.find((m) => m.id === mediaId);
@@ -414,6 +580,8 @@ export function placeMediaOnDesktop(mediaId: string, x: number, y: number): void
     }
   });
   if (foldersChanged) systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
+
+  removeItemFromAllSpecialLocations(mediaId);
 
   const clamped = clampGridPosition(x, y);
   item.x = clamped.x;
@@ -1513,13 +1681,15 @@ export function addItemToFolder(folderId: string, itemId: string): void {
     paths[itemId] = newPath;
   }
 
-  // Media moved into a folder leaves the library / desktop surface.
+  // Media moved into a folder leaves the library / desktop surface / special locations.
   const media = getDesktopMedia();
   const mediaItem = media.find((m) => m.id === itemId);
   if (mediaItem) {
     mediaItem.home = '/Desktop';
     saveDesktopMedia(media);
   }
+
+  removeItemFromAllSpecialLocations(itemId);
 
   systemStorage.setItem(FOLDERS_STORAGE_KEY, folders);
   setFolderPaths(paths);

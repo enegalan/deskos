@@ -1,10 +1,13 @@
 import type { SpecialLocationInfo } from '../file-system';
-import { ensureMediaLibrarySeeded, getLibraryMediaItems } from '../../core/desktop-shortcuts';
+import {
+  ensureMediaLibrarySeeded,
+  getWritableSpecialLocationItems,
+} from '../../core/desktop-shortcuts';
 import { images } from 'virtual:images';
 
 /**
- * Special location: images folder. Lists persisted image files whose home is
- * `/Images` (seeded once from `public/img/` via `vite-plugin-images`).
+ * Special location: images folder. Lists library images (seeded from `public/img/`)
+ * plus any items moved into `/Images`.
  */
 export const location: SpecialLocationInfo = {
   path: '/Images',
@@ -13,6 +16,6 @@ export const location: SpecialLocationInfo = {
   order: 5,
   getItems: () => {
     ensureMediaLibrarySeeded('image', images);
-    return getLibraryMediaItems('/Images');
+    return getWritableSpecialLocationItems('/Images');
   },
 };

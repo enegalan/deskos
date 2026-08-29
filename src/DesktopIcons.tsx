@@ -407,23 +407,39 @@ const DesktopIcon = memo(function DesktopIcon({
                 Promise.all([
                   import('@file-system/file-system'),
                   import('@core/desktop-shortcuts'),
-                ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
-                  const resolved = resolvePath(path);
-                  if (resolved.type === 'folder') {
-                    const targetFolder = getFolderByPath(path);
-                    if (targetFolder) {
-                      // Add items to the folder
+                ]).then(
+                  ([
+                    { resolvePath },
+                    {
+                      getFolderByPath,
+                      addItemToFolder,
+                      isWritableSpecialPath,
+                      moveItemToSpecialLocation,
+                    },
+                  ]) => {
+                    if (isWritableSpecialPath(path)) {
                       for (const id of dragIds) {
-                        if (id !== targetFolder.id) {
-                          addItemToFolder(targetFolder.id, id);
-                        }
+                        moveItemToSpecialLocation(path, id);
                       }
                       setVisualPosition({ x: shortcut.x, y: shortcut.y });
-                      // Dispatch event to update folder window
                       window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+                      return;
+                    }
+                    const resolved = resolvePath(path);
+                    if (resolved.type === 'folder') {
+                      const targetFolder = getFolderByPath(path);
+                      if (targetFolder) {
+                        for (const id of dragIds) {
+                          if (id !== targetFolder.id) {
+                            addItemToFolder(targetFolder.id, id);
+                          }
+                        }
+                        setVisualPosition({ x: shortcut.x, y: shortcut.y });
+                        window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+                      }
                     }
                   }
-                });
+                );
               }
             }
           }
@@ -903,21 +919,39 @@ const FolderIcon = memo(function FolderIcon({
                 Promise.all([
                   import('@file-system/file-system'),
                   import('@core/desktop-shortcuts'),
-                ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
-                  const resolved = resolvePath(path);
-                  if (resolved.type === 'folder') {
-                    const targetFolder = getFolderByPath(path);
-                    if (targetFolder) {
+                ]).then(
+                  ([
+                    { resolvePath },
+                    {
+                      getFolderByPath,
+                      addItemToFolder,
+                      isWritableSpecialPath,
+                      moveItemToSpecialLocation,
+                    },
+                  ]) => {
+                    if (isWritableSpecialPath(path)) {
                       for (const id of dragIds) {
-                        if (id !== targetFolder.id) {
-                          addItemToFolder(targetFolder.id, id);
-                        }
+                        moveItemToSpecialLocation(path, id);
                       }
                       setVisualPosition({ x: folder.x, y: folder.y });
                       window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+                      return;
+                    }
+                    const resolved = resolvePath(path);
+                    if (resolved.type === 'folder') {
+                      const targetFolder = getFolderByPath(path);
+                      if (targetFolder) {
+                        for (const id of dragIds) {
+                          if (id !== targetFolder.id) {
+                            addItemToFolder(targetFolder.id, id);
+                          }
+                        }
+                        setVisualPosition({ x: folder.x, y: folder.y });
+                        window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+                      }
                     }
                   }
-                });
+                );
               }
             }
           }
@@ -1352,19 +1386,37 @@ const DesktopMediaIcon = memo(function DesktopMediaIcon({
                 Promise.all([
                   import('@file-system/file-system'),
                   import('@core/desktop-shortcuts'),
-                ]).then(([{ resolvePath }, { getFolderByPath, addItemToFolder }]) => {
-                  const resolved = resolvePath(path);
-                  if (resolved.type === 'folder') {
-                    const targetFolder = getFolderByPath(path);
-                    if (targetFolder) {
+                ]).then(
+                  ([
+                    { resolvePath },
+                    {
+                      getFolderByPath,
+                      addItemToFolder,
+                      isWritableSpecialPath,
+                      moveItemToSpecialLocation,
+                    },
+                  ]) => {
+                    if (isWritableSpecialPath(path)) {
                       for (const id of dragIds) {
-                        if (id !== targetFolder.id) addItemToFolder(targetFolder.id, id);
+                        moveItemToSpecialLocation(path, id);
                       }
                       setVisualPosition({ x: media.x, y: media.y });
                       window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+                      return;
+                    }
+                    const resolved = resolvePath(path);
+                    if (resolved.type === 'folder') {
+                      const targetFolder = getFolderByPath(path);
+                      if (targetFolder) {
+                        for (const id of dragIds) {
+                          if (id !== targetFolder.id) addItemToFolder(targetFolder.id, id);
+                        }
+                        setVisualPosition({ x: media.x, y: media.y });
+                        window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+                      }
                     }
                   }
-                });
+                );
               }
             }
           }
@@ -1970,14 +2022,16 @@ export function DesktopIcons() {
           clearClipboard();
         } else {
           for (const item of clipboard.items) {
-            if (
-              clipboard.sourcePath &&
-              clipboard.sourcePath !== '/Images' &&
-              clipboard.sourcePath !== '/Videos'
-            ) {
-              const sourceFolder = folderByPath(clipboard.sourcePath);
-              if (sourceFolder) {
-                removeFromFolder(sourceFolder.id, item.id);
+            if (clipboard.sourcePath) {
+              const { isWritableSpecialPath, removeItemFromSpecialLocation } =
+                await import('@core/desktop-shortcuts');
+              if (isWritableSpecialPath(clipboard.sourcePath)) {
+                removeItemFromSpecialLocation(clipboard.sourcePath, item.id);
+              } else {
+                const sourceFolder = folderByPath(clipboard.sourcePath);
+                if (sourceFolder) {
+                  removeFromFolder(sourceFolder.id, item.id);
+                }
               }
             }
 

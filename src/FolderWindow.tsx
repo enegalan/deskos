@@ -21,6 +21,10 @@ import {
   getFolderByPath,
   DESKOS_ITEM_IDS_MIME,
   readDraggedItemIds,
+  isWritableSpecialPath,
+  moveItemToSpecialLocation,
+  removeItemFromSpecialLocation,
+  findSpecialLocationOfItem,
 } from '@core/desktop-shortcuts';
 import { programs } from 'virtual:programs';
 import { launchOrFocusProgram } from '@core/context';
@@ -442,16 +446,10 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
       return;
     }
 
-    // Get the current folder
-    const resolved = resolvePath(currentPath);
-    if (resolved.type !== 'folder') {
-      console.log('[FolderWindow] Paste: Current path is not a folder', currentPath);
-      return;
-    }
-
-    const currentFolder = getFolderByPath(currentPath);
-    if (!currentFolder) {
-      console.log('[FolderWindow] Paste: Folder not found', currentPath);
+    const isSpecialTarget = isWritableSpecialPath(currentPath);
+    const currentFolder = isSpecialTarget ? null : getFolderByPath(currentPath);
+    if (!isSpecialTarget && !currentFolder) {
+      console.log('[FolderWindow] Paste: Not a writable location', currentPath);
       return;
     }
 
@@ -465,14 +463,40 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
     const allShortcuts = getDesktopShortcuts();
     const allFolders = getDesktopFolders();
 
+    const placeInCurrent = (itemId: string) => {
+      if (isSpecialTarget) {
+        moveItemToSpecialLocation(currentPath, itemId);
+      } else if (currentFolder) {
+        addItemToFolder(currentFolder.id, itemId);
+      }
+    };
+
+    const detachFromSource = (itemId: string) => {
+      if (clipboard.type === 'folder-items' && clipboard.sourcePath) {
+        if (clipboard.sourcePath === currentPath) return;
+        if (isWritableSpecialPath(clipboard.sourcePath)) {
+          removeItemFromSpecialLocation(clipboard.sourcePath, itemId);
+        } else {
+          const sourceFolder = getFolderByPath(clipboard.sourcePath);
+          if (sourceFolder) removeItemFromFolder(sourceFolder.id, itemId);
+        }
+      } else if (clipboard.type === 'desktop-items') {
+        allFolders.forEach((f) => {
+          if (f.contents.includes(itemId)) {
+            removeItemFromFolder(f.id, itemId);
+          }
+        });
+        const specialParent = findSpecialLocationOfItem(itemId);
+        if (specialParent) removeItemFromSpecialLocation(specialParent, itemId);
+      }
+    };
+
     try {
       if (clipboard.operation === 'copy') {
         console.log('[FolderWindow] Paste: Copying', clipboard.items.length, 'items to folder');
-        // Copy items to current folder - create new items instead of moving
         const { addDesktopShortcut, createDesktopFolder } = await import('@core/desktop-shortcuts');
 
         for (const item of clipboard.items) {
-          // Verify item exists
           const shortcut = allShortcuts.find((s) => s.id === item.id);
           const folder = allFolders.find((f) => f.id === item.id);
           const media =
@@ -484,92 +508,84 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
           }
 
           if (shortcut) {
-            // Create a new shortcut with the same programId and customName
-            console.log('[FolderWindow] Paste: Creating copy of shortcut', shortcut.id);
             const newShortcut = addDesktopShortcut(
               shortcut.programId,
               undefined,
               undefined,
               shortcut.customName
             );
-            // Add the new shortcut to the folder
-            addItemToFolder(currentFolder.id, newShortcut.id);
+            placeInCurrent(newShortcut.id);
           } else if (folder) {
-            // Create a new folder with the same name
-            console.log('[FolderWindow] Paste: Creating copy of folder', folder.id);
-            const newFolder = createDesktopFolder(
-              folder.name,
-              undefined,
-              undefined,
-              currentPath === '/Desktop' ? undefined : currentPath
-            );
+            if (isSpecialTarget) {
+              const newFolder = createDesktopFolder(folder.name, undefined, undefined, currentPath);
+              placeInCurrent(newFolder.id);
+              // Nested copy into special locations: only top-level folder shell for now
+            } else if (currentFolder) {
+              const newFolder = createDesktopFolder(
+                folder.name,
+                undefined,
+                undefined,
+                currentPath === '/Desktop' ? undefined : currentPath
+              );
+              addItemToFolder(currentFolder.id, newFolder.id);
 
-            // Add the new folder to the current folder
-            console.log('[FolderWindow] Paste: Adding new folder to current folder', newFolder.id);
-            addItemToFolder(currentFolder.id, newFolder.id);
+              const copyFolderContents = async (sourceFolderId: string, targetFolderId: string) => {
+                const {
+                  getDesktopFolders: getCurrentFolders,
+                  getDesktopShortcuts: getCurrentShortcuts,
+                  getDesktopMedia: getCurrentMedia,
+                  copyDesktopMedia: copyMedia,
+                } = await import('@core/desktop-shortcuts');
+                const currentFolders = getCurrentFolders();
+                const currentShortcuts = getCurrentShortcuts();
+                const currentMedia = getCurrentMedia();
 
-            // Copy contents recursively
-            const copyFolderContents = async (sourceFolderId: string, targetFolderId: string) => {
-              // Get fresh data for each recursive call
-              const {
-                getDesktopFolders: getCurrentFolders,
-                getDesktopShortcuts: getCurrentShortcuts,
-                getDesktopMedia: getCurrentMedia,
-                copyDesktopMedia: copyMedia,
-              } = await import('@core/desktop-shortcuts');
-              const currentFolders = getCurrentFolders();
-              const currentShortcuts = getCurrentShortcuts();
-              const currentMedia = getCurrentMedia();
+                const sourceFolder = currentFolders.find((f) => f.id === sourceFolderId);
+                if (!sourceFolder) return;
 
-              const sourceFolder = currentFolders.find((f) => f.id === sourceFolderId);
-              if (!sourceFolder) return;
+                const targetFolder = currentFolders.find((f) => f.id === targetFolderId);
+                if (!targetFolder) return;
 
-              const targetFolder = currentFolders.find((f) => f.id === targetFolderId);
-              if (!targetFolder) return;
+                for (const contentId of sourceFolder.contents) {
+                  const contentShortcut = currentShortcuts.find((s) => s.id === contentId);
+                  const contentFolder = currentFolders.find((f) => f.id === contentId);
+                  const contentMedia = currentMedia.find((m) => m.id === contentId);
 
-              for (const contentId of sourceFolder.contents) {
-                const contentShortcut = currentShortcuts.find((s) => s.id === contentId);
-                const contentFolder = currentFolders.find((f) => f.id === contentId);
-                const contentMedia = currentMedia.find((m) => m.id === contentId);
-
-                if (contentShortcut) {
-                  // Copy shortcut
-                  const newContentShortcut = addDesktopShortcut(
-                    contentShortcut.programId,
-                    undefined,
-                    undefined,
-                    contentShortcut.customName
-                  );
-                  addItemToFolder(targetFolderId, newContentShortcut.id);
-                } else if (contentFolder) {
-                  // Recursively copy folder
-                  const targetFolderPath = targetFolder.parentPath
-                    ? `${targetFolder.parentPath}/${targetFolder.name}`
-                    : `/Desktop/${targetFolder.name}`;
-                  const newContentFolder = createDesktopFolder(
-                    contentFolder.name,
-                    undefined,
-                    undefined,
-                    targetFolderPath === '/Desktop' ? undefined : targetFolderPath
-                  );
-                  addItemToFolder(targetFolderId, newContentFolder.id);
-                  // Recursively copy its contents
-                  await copyFolderContents(contentFolder.id, newContentFolder.id);
-                } else if (contentMedia) {
-                  const clone = copyMedia(contentMedia.id);
-                  if (clone) addItemToFolder(targetFolderId, clone.id);
+                  if (contentShortcut) {
+                    const newContentShortcut = addDesktopShortcut(
+                      contentShortcut.programId,
+                      undefined,
+                      undefined,
+                      contentShortcut.customName
+                    );
+                    addItemToFolder(targetFolderId, newContentShortcut.id);
+                  } else if (contentFolder) {
+                    const targetFolderPath = targetFolder.parentPath
+                      ? `${targetFolder.parentPath}/${targetFolder.name}`
+                      : `/Desktop/${targetFolder.name}`;
+                    const newContentFolder = createDesktopFolder(
+                      contentFolder.name,
+                      undefined,
+                      undefined,
+                      targetFolderPath === '/Desktop' ? undefined : targetFolderPath
+                    );
+                    addItemToFolder(targetFolderId, newContentFolder.id);
+                    await copyFolderContents(contentFolder.id, newContentFolder.id);
+                  } else if (contentMedia) {
+                    const clone = copyMedia(contentMedia.id);
+                    if (clone) addItemToFolder(targetFolderId, clone.id);
+                  }
                 }
-              }
-            };
+              };
 
-            await copyFolderContents(folder.id, newFolder.id);
+              await copyFolderContents(folder.id, newFolder.id);
+            }
           } else if (media) {
             const clone = copyDesktopMedia(media.id);
-            if (clone) addItemToFolder(currentFolder.id, clone.id);
+            if (clone) placeInCurrent(clone.id);
           }
         }
       } else if (clipboard.operation === 'cut') {
-        // Same folder: keep items where they are
         if (clipboard.type === 'folder-items' && clipboard.sourcePath === currentPath) {
           setSelectedIds(new Set());
           clearClipboard();
@@ -586,29 +602,8 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
               continue;
             }
 
-            if (clipboard.type === 'folder-items' && clipboard.sourcePath) {
-              if (
-                clipboard.sourcePath !== currentPath &&
-                clipboard.sourcePath !== '/Images' &&
-                clipboard.sourcePath !== '/Videos'
-              ) {
-                const sourceResolved = resolvePath(clipboard.sourcePath);
-                if (sourceResolved.type === 'folder') {
-                  const sourceFolder = getFolderByPath(clipboard.sourcePath);
-                  if (sourceFolder) {
-                    removeItemFromFolder(sourceFolder.id, item.id);
-                  }
-                }
-              }
-            } else if (clipboard.type === 'desktop-items') {
-              allFolders.forEach((f) => {
-                if (f.contents.includes(item.id)) {
-                  removeItemFromFolder(f.id, item.id);
-                }
-              });
-            }
-
-            addItemToFolder(currentFolder.id, item.id);
+            detachFromSource(item.id);
+            placeInCurrent(item.id);
           }
           setSelectedIds(new Set());
           clearClipboard();
@@ -880,33 +875,36 @@ export function FolderWindow({ ctx: _ctx, initialPath, folderId }: FolderWindowP
         contentRef.current.classList.remove('drag-over');
       }
 
-      // Get the current folder
-      const resolved = resolvePath(currentPath);
-      if (resolved.type !== 'folder') return;
+      const isSpecialTarget = isWritableSpecialPath(currentPath);
+      const currentFolder = isSpecialTarget ? null : getFolderByPath(currentPath);
+      if (!isSpecialTarget && !currentFolder) return;
 
-      const currentFolder = getFolderByPath(currentPath);
-      if (!currentFolder) return;
-
-      // Check what type of item is being dropped
       const itemIds = readDraggedItemIds(e.dataTransfer);
       const programId = e.dataTransfer.getData('application/x-deskos-program-id');
 
       try {
         if (itemIds.length > 0) {
           for (const itemId of itemIds) {
-            if (itemId !== currentFolder.id) {
+            if (currentFolder && itemId === currentFolder.id) continue;
+            if (isSpecialTarget) {
+              moveItemToSpecialLocation(currentPath, itemId);
+            } else if (currentFolder) {
               addItemToFolder(currentFolder.id, itemId);
             }
           }
           loadItems(currentPath);
           window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
-        } else if (programId) {
-          // Dropping a new program (from launcher/taskbar)
+        } else if (programId && currentFolder) {
           console.log('[FolderWindow] Drop: Creating new shortcut from program', programId);
           const { addDesktopShortcut } = await import('@core/desktop-shortcuts');
           const newShortcut = addDesktopShortcut(programId);
-          // Add the newly created shortcut to the folder
           addItemToFolder(currentFolder.id, newShortcut.id);
+          loadItems(currentPath);
+          window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
+        } else if (programId && isSpecialTarget) {
+          const { addDesktopShortcut } = await import('@core/desktop-shortcuts');
+          const newShortcut = addDesktopShortcut(programId);
+          moveItemToSpecialLocation(currentPath, newShortcut.id);
           loadItems(currentPath);
           window.dispatchEvent(new CustomEvent('desktop-shortcuts-updated'));
         }
